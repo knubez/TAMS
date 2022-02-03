@@ -1,0 +1,14 @@
+name: tams-dev
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  #
+  - matplotlib
+  - netcdf4
+  - numpy
+  - scikit-image
+  - scipy
+  - xarray
+  #
+  - jupyterlab
