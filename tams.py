@@ -43,14 +43,51 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
+def contours(x, value: float):
+    """Find contour definitions for 2-D data `x` at value `value`.
+
+    Parameters
+    ----------
+    x : xarray.DataArray
+        Data to be contoured.
+        Currently needs to have 'lat' and 'lon' coordinates.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        List of 2-D arrays describing contours.
+        The arrays are shape (n, 2); each row is a coordinate pair.
+    """
+    import matplotlib.pyplot as plt
+
+    assert x.ndim == 2, "this is for a single image"
+    with plt.ioff():
+        fig = plt.figure()
+        cs = x.plot.contour(x="lon", y="lat", levels=[value])
+
+    plt.close(fig)
+    assert len(cs.allsegs) == 1, "only one level"
+
+    return cs.allsegs[0]
+
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import xarray as xr
 
-    r = xr.open_dataset("Satellite_data.nc").ch9
+    r = (
+        xr.open_dataset("Satellite_data.nc")
+        .rename_dims({"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"})
+        .ch9.isel(time=0)
+    )
 
     tb = tb_from_ir(r, 9)
 
-    tb.isel(time=0).plot()
+    fig, ax = plt.subplots()
+
+    tb.plot(x="lon", y="lat", cmap="gray_r", ax=ax)
+    cs = contours(tb, 235)
+    for c in cs[:50]:
+        ax.plot(c[:, 0], c[:, 1], "g")
 
     plt.show()
