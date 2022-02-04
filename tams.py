@@ -71,17 +71,26 @@ def contours(x, value: float):
     return cs.allsegs[0]
 
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
+def load_example_ir():
+    """Load the example radiance data (ch9) as a DataArray."""
     import xarray as xr
 
-    r = (
-        xr.open_dataset("Satellite_data.nc")
-        .rename_dims({"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"})
-        .ch9.isel(time=0)
+    ds = xr.open_dataset("Satellite_data.nc").rename_dims(
+        {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
     )
 
-    tb = tb_from_ir(r, 9)
+    ds.lon.attrs.update(long_name="Longitude")
+    ds.lat.attrs.update(long_name="Latitude")
+
+    return ds.ch9
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    r = load_example_ir().isel(time=0)
+
+    tb = tb_from_ir(r, ch=9)
 
     fig, ax = plt.subplots()
 
