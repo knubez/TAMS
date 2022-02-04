@@ -61,7 +61,7 @@ def contours(x, value: float):
     import matplotlib.pyplot as plt
 
     assert x.ndim == 2, "this is for a single image"
-    with plt.ioff():
+    with plt.ioff():  # requires mpl 3.4
         fig = plt.figure()
         cs = x.plot.contour(x="lon", y="lat", levels=[value])
 
