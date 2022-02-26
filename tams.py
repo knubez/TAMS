@@ -71,6 +71,21 @@ def contours(x, value: float):
     return cs.allsegs[0]
 
 
+def _contours_to_gdf(cs):
+    from geopandas import GeoDataFrame
+    from shapely.geometry.polygon import LinearRing, orient
+
+    polys = []
+    for c in cs:
+        x, y = c.T
+        r = LinearRing(zip(x, y))
+        p0 = r.convex_hull
+        p = orient(p0)  # -> counter-clockwise
+        polys.append(p)
+
+    return GeoDataFrame(geometry=polys)  # TODO: crs
+
+
 def load_example_ir():
     """Load the example radiance data (ch9) as a DataArray."""
     import xarray as xr
@@ -86,17 +101,42 @@ def load_example_ir():
 
 
 if __name__ == "__main__":
+    import cartopy.crs as ccrs
     import matplotlib.pyplot as plt
+    import regionmask
+
+    # import geopandas as gpd
+    # from shapely.geometry import Point
 
     r = load_example_ir().isel(time=0)
 
     tb = tb_from_ir(r, ch=9)
 
-    fig, ax = plt.subplots()
+    tran = ccrs.PlateCarree()
+    proj = ccrs.Mercator()
+    fig, ax = plt.subplots(subplot_kw=dict(projection=proj))
 
-    tb.plot(x="lon", y="lat", cmap="gray_r", ax=ax)
+    # tb.plot(x="lon", y="lat", cmap="gray_r", ax=ax)
     cs = contours(tb, 235)
-    for c in cs[:50]:
-        ax.plot(c[:, 0], c[:, 1], "g")
+    cs = sorted(cs, key=len, reverse=True)[:30]
+    for c in cs:
+        ax.plot(c[:, 0], c[:, 1], "g", transform=tran)
+
+    shapes = _contours_to_gdf(cs)
+    regions = regionmask.from_geopandas(shapes)
+    mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
+
+    regions.plot(ax=ax)
+
+    # tb.where(mask >= 0).plot.pcolormesh(ax=ax, transform=tran)  # takes long
+    tb.where(mask >= 0).plot.pcolormesh(size=4, aspect=2)
+
+    # # Spatial join from GeoPandas
+    # points = tb.to_dataframe().drop("ch9", axis="columns").reset_index(drop=True)
+    # points["coords"] = list(zip(points.lon, points.lat))
+    # points["coords"] = points.coords.apply(Point)
+    # points = gpd.GeoDataFrame(points, geometry="coords")
+    # # or `gpd.points_from_xy(df.lon, df.lat)` but was slower?
+    # in_polys = gpd.tools.sjoin(points, shapes, predicate="within", how="left")
 
     plt.show()
