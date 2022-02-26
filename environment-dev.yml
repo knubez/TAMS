@@ -4,9 +4,11 @@ channels:
 dependencies:
   - python=3.9
   #
+  - geopandas
   - matplotlib>=3.4
   - netcdf4
   - numpy
+  - regionmask
   - scikit-image
   - scipy
   - xarray
