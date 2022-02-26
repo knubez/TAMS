@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: provision-with-micromamba
+        uses: mamba-org/provision-with-micromamba@main
+        with:
+          environment-file: environment-dev.yml
+          cache-env: true
+
+      - name: Download the sample data
+        run: |
+          wget --no-check-certificate \
+            'https://drive.google.com/uc?export=download&id=1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp' \
+            -O Satellite_data.nc
+
+      - name: Try to run
+        run: python tams.py
