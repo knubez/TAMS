@@ -36,7 +36,7 @@ def tb_from_ir(r, ch: int):
 
     vc, a, b = _tb_from_ir_coeffs[ch]
 
-    tb = (c2 * vc / np.log((c1 * vc ** 3) / r + 1) - b) / a
+    tb = (c2 * vc / np.log((c1 * vc**3) / r + 1) - b) / a
 
     tb.attrs.update(units="K", long_name="Brightness temperature")
 
@@ -83,7 +83,8 @@ def _contours_to_gdf(cs):
         p = orient(p0)  # -> counter-clockwise
         polys.append(p)
 
-    return GeoDataFrame(geometry=polys)  # TODO: crs
+    return GeoDataFrame(geometry=polys, crs="EPSG:4326")
+    # ^ This crs indicates input in degrees
 
 
 def load_example_ir():
@@ -102,10 +103,11 @@ def load_example_ir():
 
 if __name__ == "__main__":
     import cartopy.crs as ccrs
+    import geopandas as gpd
     import matplotlib.pyplot as plt
+    import pandas as pd
     import regionmask
 
-    # import geopandas as gpd
     # from shapely.geometry import Point
 
     r = load_example_ir().isel(time=0)
@@ -118,17 +120,53 @@ if __name__ == "__main__":
 
     # tb.plot(x="lon", y="lat", cmap="gray_r", ax=ax)
     cs = contours(tb, 235)
-    cs = sorted(cs, key=len, reverse=True)[:30]
+    cs = sorted(cs, key=len, reverse=True)  # [:30]
     for c in cs:
         ax.plot(c[:, 0], c[:, 1], "g", transform=tran)
 
+    # # Matching with set and while loop?
+    # cs235 = cs
+    # cs219 = contours(tb, 219)
+    # j_cs219 = set(range(len(cs219)))
+    # for i, c_i in cs235:
+    #     for j, c_j in
+
+    cs235 = _contours_to_gdf(cs)
+    cs219 = _contours_to_gdf(contours(tb, 219))
+
+    # Drop small 235s
+    cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
+    # ^ This crs is equidistant cylindrical
+    big_enough = cs235.area_km2 >= 4000
+    print(f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s are big enough")
+    cs235 = cs235[big_enough].reset_index(drop=True)
+
+    a = gpd.tools.sjoin(cs235, cs219, predicate="contains", how="left").reset_index()
+
+    i219s = {
+        i235: g.index_right.astype(int).to_list()
+        for i235, g in a.groupby("index")
+        if not g.index_right.isna().all()
+    }
+
+    # Check 219 area sum inside the 235
+    sum219s = {
+        i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
+        for i235 in cs235.index
+    }
+    cs235["area219_km2"] = pd.Series(sum219s)
+    big_enough = cs235.area219_km2 >= 4000
+    print(f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s have enough 219")
+    cs235 = cs235[big_enough].reset_index(drop=True)
+
+    # Trying regionmask
     shapes = _contours_to_gdf(cs)
     regions = regionmask.from_geopandas(shapes)
     mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
 
     regions.plot(ax=ax)
 
-    # tb.where(mask >= 0).plot.pcolormesh(ax=ax, transform=tran)  # takes long
+    # # tb.where(mask >= 0).plot.pcolormesh(ax=ax, transform=tran)  # takes long
     tb.where(mask >= 0).plot.pcolormesh(size=4, aspect=2)
 
     # # Spatial join from GeoPandas
