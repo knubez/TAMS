@@ -1,6 +1,6 @@
 <h1>
-  <!-- Token needed while private -->
-  <img src="https://raw.githubusercontent.com/knubez/TAMS/main/TAMS-logo.png?token=GHSAT0AAAAAABR6X2C2DKGATHR2IOPCKX6CYRFCQOA"
+  <!-- TODO: change src to https://raw.githubusercontent.com/knubez/TAMS/main/TAMS-logo.png once public -->
+  <img src="./TAMS-logo.png"
        alt="TAMS logo" height="180" valign="bottom">
 </h1>
 
