@@ -1,7 +1,16 @@
 """
 TAMS
 """
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
+
+if TYPE_CHECKING:
+    import xarray as xr
+    from geopandas import GeoDataFrame
+
 
 _tb_from_ir_coeffs = {
     4: (2569.094, 0.9959, 3.471),
@@ -71,7 +80,7 @@ def contours(x, value: float):
     return cs.allsegs[0]
 
 
-def _contours_to_gdf(cs):
+def _contours_to_gdf(cs: list[np.ndarray]) -> GeoDataFrame:
     from geopandas import GeoDataFrame
     from shapely.geometry.polygon import LinearRing, orient
 
@@ -85,6 +94,59 @@ def _contours_to_gdf(cs):
 
     return GeoDataFrame(geometry=polys, crs="EPSG:4326")
     # ^ This crs indicates input in degrees
+
+
+def _data_in_contours_sjoin(
+    data: xr.DataArray | xr.Dataset,
+    contours: GeoDataFrame,
+    *,
+    agg=("mean", "std", "count"),
+) -> GeoDataFrame:
+    """Compute stats on `data` within `contours` using :func:`~geopandas.tools.sjoin`.
+
+    `data` must have ``'lat'`` and ``'lon'`` variables.
+    """
+    import geopandas as gpd
+    import xarray as xr
+
+    # Detect variables to run the agg on
+    if isinstance(data, xr.DataArray):
+        varnames = [data.name]
+    elif isinstance(data, xr.Dataset):
+        # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
+        raise NotImplementedError
+    else:
+        raise TypeError
+
+    # Convert possibly-2-D data to GeoDataFrame of points
+    data_df = data.to_dataframe().reset_index(drop=True)
+    lat = data_df["lat"].values
+    lon = data_df["lon"].values
+    geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points
+    points = gpd.GeoDataFrame(data_df, geometry=geom)
+
+    # Determine which contour (if any) each point is inside
+    points = points.sjoin(contours, predicate="within", how="left", rsuffix="contour")
+    points = points.dropna().convert_dtypes()
+    points["lat"] = points.geometry.y
+    points["lon"] = points.geometry.x
+
+    # Aggregate points inside contour
+    # TODO: a way to do this without groupby loop?
+    new_data = {}
+    for i, g in points.groupby("index_contour"):
+        r = g[varnames].agg(agg).T  # columns: aggs; rows: variables
+        new_data[i] = r
+    new_data = pd.concat(new_data).convert_dtypes()
+
+    # Convert to standard (non-multi) index and str columns
+    new_data = new_data.unstack()  # multi index -> (variable, agg) columns
+    new_data.columns = ["_".join(s for s in tup) for tup in new_data.columns]
+
+    # Merge with contours gdf
+    contours = contours.merge(new_data, left_index=True, right_index=True, how="left")
+
+    return contours
 
 
 def load_example_ir():
