@@ -1,4 +1,8 @@
-# TAMS
+<h1>
+  <!-- Token needed while private -->
+  <img src="https://raw.githubusercontent.com/knubez/TAMS/main/TAMS-logo.png?token=GHSAT0AAAAAABR6X2C2DKGATHR2IOPCKX6CYRFCQOA"
+       alt="TAMS logo" height="160" valign="bottom">
+</h1>
 
 [![CI status](https://github.com/knubez/TAMS/actions/workflows/ci.yml/badge.svg)](https://github.com/knubez/TAMS/actions/workflows/ci.yml)
 
