@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from geopandas import GeoDataFrame
 
 
-_tb_from_ir_coeffs = {
+_tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
     4: (2569.094, 0.9959, 3.471),
     5: (1598.566, 0.9963, 2.219),
     6: (1362.142, 0.9991, 0.485),
@@ -36,6 +36,11 @@ def tb_from_ir(r, ch: int):
         Radiance. Units: m2 m-2 sr-1 (cm-1)-1
     ch
         Channel number, in 4--11.
+
+    Returns
+    -------
+    tb
+        Brightness temperature (same type as `r`)
     """
     if ch not in range(4, 12):
         raise ValueError("channel must be in 4--11")
@@ -52,7 +57,7 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
-def contours(x, value: float):
+def contours(x: xr.DataArray, value: float) -> list[np.ndarray]:
     """Find contour definitions for 2-D data `x` at value `value`.
 
     Parameters
@@ -133,11 +138,11 @@ def _data_in_contours_sjoin(
 
     # Aggregate points inside contour
     # TODO: a way to do this without groupby loop?
-    new_data = {}
+    new_data_ = {}
     for i, g in points.groupby("index_contour"):
         r = g[varnames].agg(agg).T  # columns: aggs; rows: variables
-        new_data[i] = r
-    new_data = pd.concat(new_data).convert_dtypes()
+        new_data_[i] = r
+    new_data = pd.concat(new_data_).convert_dtypes()
 
     # Convert to standard (non-multi) index and str columns
     new_data = new_data.unstack()  # multi index -> (variable, agg) columns
@@ -149,7 +154,7 @@ def _data_in_contours_sjoin(
     return contours
 
 
-def load_example_ir():
+def load_example_ir() -> xr.DataArray:
     """Load the example radiance data (ch9) as a DataArray."""
     import xarray as xr
 
