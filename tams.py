@@ -6,10 +6,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 if TYPE_CHECKING:
-    import xarray as xr
-    from geopandas import GeoDataFrame
+    import geopandas as gpd
 
 
 _tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
@@ -85,7 +86,7 @@ def contours(x: xr.DataArray, value: float) -> list[np.ndarray]:
     return cs.allsegs[0]
 
 
-def _contours_to_gdf(cs: list[np.ndarray]) -> GeoDataFrame:
+def _contours_to_gdf(cs: list[np.ndarray]) -> gpd.GeoDataFrame:
     from geopandas import GeoDataFrame
     from shapely.geometry.polygon import LinearRing, orient
 
@@ -103,17 +104,15 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> GeoDataFrame:
 
 def _data_in_contours_sjoin(
     data: xr.DataArray | xr.Dataset,
-    contours: GeoDataFrame,
+    contours: gpd.GeoDataFrame,
     *,
     agg=("mean", "std", "count"),
-) -> GeoDataFrame:
+) -> gpd.GeoDataFrame:
     """Compute stats on `data` within `contours` using :func:`~geopandas.tools.sjoin`.
 
     `data` must have ``'lat'`` and ``'lon'`` variables.
     """
     import geopandas as gpd
-    import pandas as pd
-    import xarray as xr
 
     # Detect variables to run the agg on
     if isinstance(data, xr.DataArray):
@@ -157,13 +156,11 @@ def _data_in_contours_sjoin(
 
 def _data_in_contours_regionmask(
     data: xr.DataArray | xr.Dataset,
-    contours: GeoDataFrame,
+    contours: gpd.GeoDataFrame,
     *,
     agg=("mean", "std", "count"),
-) -> GeoDataFrame:
-    import pandas as pd
+) -> gpd.GeoDataFrame:
     import regionmask
-    import xarray as xr
 
     # TODO: DRY? (much of this fn is same as other one)
     if isinstance(data, xr.DataArray):
@@ -198,10 +195,12 @@ def _data_in_contours_regionmask(
 
 
 def _size_filter_contours(
-    cs235: GeoDataFrame, cs219: GeoDataFrame, *, debug=True
-) -> tuple[GeoDataFrame, GeoDataFrame]:
+    cs235: gpd.GeoDataFrame,
+    cs219: gpd.GeoDataFrame,
+    *,
+    debug=True,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """Compute areas and use to filter both sets of contours."""
-    import pandas as pd
 
     # Drop small 235s
     cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
@@ -209,7 +208,8 @@ def _size_filter_contours(
     big_enough = cs235.area_km2 >= 4000
     if debug:
         print(
-            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s are big enough"
+            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+            " of 235s are big enough"
         )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
@@ -232,7 +232,8 @@ def _size_filter_contours(
     big_enough = cs235.area219_km2 >= 4000
     if debug:
         print(
-            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s have enough 219"
+            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+            "of big-enough 235s have enough 219 area"
         )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
@@ -243,7 +244,6 @@ def _size_filter_contours(
 
 def load_example_ir() -> xr.DataArray:
     """Load the example radiance data (ch9) as a DataArray."""
-    import xarray as xr
 
     ds = xr.open_dataset("Satellite_data.nc").rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
@@ -277,6 +277,8 @@ if __name__ == "__main__":
     cs235 = _contours_to_gdf(cs)
     cs219 = _contours_to_gdf(contours(tb, 219))
 
+    cs235, cs219 = _size_filter_contours(cs235, cs219)
+
     # Trying regionmask
     shapes = cs235[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
@@ -284,7 +286,7 @@ if __name__ == "__main__":
 
     regions.plot(ax=ax)
 
-    # # tb.where(mask >= 0).plot.pcolormesh(ax=ax, transform=tran)  # takes long
+    # tb.where(mask >= 0).plot.pcolormesh(ax=ax, transform=tran)  # takes long
     tb.where(mask >= 0).plot.pcolormesh(size=4, aspect=2)
 
     plt.show()
