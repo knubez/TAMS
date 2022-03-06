@@ -93,7 +93,7 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> GeoDataFrame:
     for c in cs:
         x, y = c.T
         r = LinearRing(zip(x, y))
-        p0 = r.convex_hull
+        p0 = r.convex_hull  # TODO: optional, also add buffer option
         p = orient(p0)  # -> counter-clockwise
         polys.append(p)
 
@@ -229,13 +229,6 @@ if __name__ == "__main__":
     cs = sorted(cs, key=len, reverse=True)  # [:30]
     for c in cs:
         ax.plot(c[:, 0], c[:, 1], "g", transform=tran)
-
-    # # Matching with set and while loop?
-    # cs235 = cs
-    # cs219 = contours(tb, 219)
-    # j_cs219 = set(range(len(cs219)))
-    # for i, c_i in cs235:
-    #     for j, c_j in
 
     cs235 = _contours_to_gdf(cs)
     cs219 = _contours_to_gdf(contours(tb, 219))
