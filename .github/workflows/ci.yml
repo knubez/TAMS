@@ -29,8 +29,14 @@ jobs:
             'https://drive.google.com/uc?export=download&id=1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp' \
             -O Satellite_data.nc
 
-      - name: Try to run
+      - name: Run as script
         run: python tams.py
 
+      - name: pytest
+        run: pytest test_tams.py
+
       - name: mypy
-        run: mypy --install-types --non-interactive --ignore-missing-imports tams.py
+        run: |
+          mypy --install-types --non-interactive \
+            --ignore-missing-imports \
+            tams.py test_tams.py

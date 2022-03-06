@@ -112,6 +112,7 @@ def _data_in_contours_sjoin(
     `data` must have ``'lat'`` and ``'lon'`` variables.
     """
     import geopandas as gpd
+    import pandas as pd
     import xarray as xr
 
     # Detect variables to run the agg on
@@ -160,6 +161,7 @@ def _data_in_contours_regionmask(
     *,
     agg=("mean", "std", "count"),
 ) -> GeoDataFrame:
+    import pandas as pd
     import regionmask
     import xarray as xr
 
@@ -174,7 +176,7 @@ def _data_in_contours_regionmask(
     # Form regionmask(s)
     shapes = contours[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
+    mask = regions.mask(data)  # works but takes long (though shorter with pygeos)!
 
     # Aggregate points inside contour
     new_data_ = {
@@ -195,6 +197,50 @@ def _data_in_contours_regionmask(
     return contours
 
 
+def _size_filter_contours(
+    cs235: GeoDataFrame, cs219: GeoDataFrame, *, debug=True
+) -> tuple[GeoDataFrame, GeoDataFrame]:
+    """Compute areas and use to filter both sets of contours."""
+    import pandas as pd
+
+    # Drop small 235s
+    cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
+    # ^ This crs is equidistant cylindrical
+    big_enough = cs235.area_km2 >= 4000
+    if debug:
+        print(
+            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s are big enough"
+        )
+    cs235 = cs235[big_enough].reset_index(drop=True)
+
+    # Identify indices of 219s inside 235s
+    # Note that some 235s might not have any 219s inside
+    a = cs235.sjoin(cs219, predicate="contains", how="left").reset_index()
+    # ^ gives an Int64 index with duplicated values, for each 219 inside a certain 235
+    i219s = {  # convert to list
+        i235: g.index_right.astype(int).to_list()
+        for i235, g in a.groupby("index")
+        if not g.index_right.isna().all()
+    }
+
+    # Check 219 area sum inside the 235
+    sum219s = {
+        i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
+        for i235 in cs235.index
+    }
+    cs235["area219_km2"] = pd.Series(sum219s)
+    big_enough = cs235.area219_km2 >= 4000
+    if debug:
+        print(
+            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s have enough 219"
+        )
+    cs235 = cs235[big_enough].reset_index(drop=True)
+
+    # TODO: store 219 inds in the 235 df? optional output?
+
+    return cs235, cs219
+
+
 def load_example_ir() -> xr.DataArray:
     """Load the example radiance data (ch9) as a DataArray."""
     import xarray as xr
@@ -211,9 +257,7 @@ def load_example_ir() -> xr.DataArray:
 
 if __name__ == "__main__":
     import cartopy.crs as ccrs
-    import geopandas as gpd
     import matplotlib.pyplot as plt
-    import pandas as pd
     import regionmask
 
     r = load_example_ir().isel(time=0)
@@ -232,31 +276,6 @@ if __name__ == "__main__":
 
     cs235 = _contours_to_gdf(cs)
     cs219 = _contours_to_gdf(contours(tb, 219))
-
-    # Drop small 235s
-    cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
-    # ^ This crs is equidistant cylindrical
-    big_enough = cs235.area_km2 >= 4000
-    print(f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s are big enough")
-    cs235 = cs235[big_enough].reset_index(drop=True)
-
-    a = gpd.tools.sjoin(cs235, cs219, predicate="contains", how="left").reset_index()
-
-    i219s = {
-        i235: g.index_right.astype(int).to_list()
-        for i235, g in a.groupby("index")
-        if not g.index_right.isna().all()
-    }
-
-    # Check 219 area sum inside the 235
-    sum219s = {
-        i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
-        for i235 in cs235.index
-    }
-    cs235["area219_km2"] = pd.Series(sum219s)
-    big_enough = cs235.area219_km2 >= 4000
-    print(f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% of 235s have enough 219")
-    cs235 = cs235[big_enough].reset_index(drop=True)
 
     # Trying regionmask
     shapes = cs235[["geometry"]]

@@ -19,3 +19,4 @@ dependencies:
   #
   - jupyterlab
   - mypy
+  - pytest
