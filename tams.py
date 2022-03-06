@@ -154,6 +154,47 @@ def _data_in_contours_sjoin(
     return contours
 
 
+def _data_in_contours_regionmask(
+    data: xr.DataArray | xr.Dataset,
+    contours: GeoDataFrame,
+    *,
+    agg=("mean", "std", "count"),
+) -> GeoDataFrame:
+    import regionmask
+    import xarray as xr
+
+    # TODO: DRY? (much of this fn is same as other one)
+    if isinstance(data, xr.DataArray):
+        varnames = [data.name]
+    elif isinstance(data, xr.Dataset):
+        raise NotImplementedError
+    else:
+        raise TypeError
+
+    # Form regionmask(s)
+    shapes = contours[["geometry"]]
+    regions = regionmask.from_geopandas(shapes)
+    mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
+
+    # Aggregate points inside contour
+    new_data_ = {
+        i: data.where(mask == i).to_dataframe()[varnames].dropna().agg(agg).T
+        for i in regions.numbers
+    }
+    new_data = pd.concat(new_data_).convert_dtypes()
+    # TODO: also try with xarray methods instead of going through pandas
+    # TODO: try with xarray groupby
+
+    # Convert to standard (non-multi) index and str columns
+    new_data = new_data.unstack()  # multi index -> (variable, agg) columns
+    new_data.columns = ["_".join(s for s in tup) for tup in new_data.columns]
+
+    # Merge with contours gdf
+    contours = contours.merge(new_data, left_index=True, right_index=True, how="left")
+
+    return contours
+
+
 def load_example_ir() -> xr.DataArray:
     """Load the example radiance data (ch9) as a DataArray."""
     import xarray as xr
@@ -174,8 +215,6 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import pandas as pd
     import regionmask
-
-    # from shapely.geometry import Point
 
     r = load_example_ir().isel(time=0)
 
@@ -227,7 +266,7 @@ if __name__ == "__main__":
     cs235 = cs235[big_enough].reset_index(drop=True)
 
     # Trying regionmask
-    shapes = _contours_to_gdf(cs)
+    shapes = cs235[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
     mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
 
@@ -235,13 +274,5 @@ if __name__ == "__main__":
 
     # # tb.where(mask >= 0).plot.pcolormesh(ax=ax, transform=tran)  # takes long
     tb.where(mask >= 0).plot.pcolormesh(size=4, aspect=2)
-
-    # # Spatial join from GeoPandas
-    # points = tb.to_dataframe().drop("ch9", axis="columns").reset_index(drop=True)
-    # points["coords"] = list(zip(points.lon, points.lat))
-    # points["coords"] = points.coords.apply(Point)
-    # points = gpd.GeoDataFrame(points, geometry="coords")
-    # # or `gpd.points_from_xy(df.lon, df.lat)` but was slower?
-    # in_polys = gpd.tools.sjoin(points, shapes, predicate="within", how="left")
 
     plt.show()
