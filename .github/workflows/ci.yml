@@ -24,7 +24,8 @@ jobs:
 
       - name: Download the sample data
         run: |
-          wget --no-check-certificate \
+          wget --no-verbose \
+            --no-check-certificate \
             'https://drive.google.com/uc?export=download&id=1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp' \
             -O Satellite_data.nc
 
