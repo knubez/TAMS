@@ -18,7 +18,15 @@ tb1 = tb.isel(time=1)
 cs0 = tams.identify(tb0)
 cs1 = tams.identify(tb1)
 
-# TODO: sort by centroid lon value
+# TODO: sort by centroid lon value (optional somewhere?)
+# fmt: off
+cs0 = (
+    cs0
+    .assign(x=cs0.geometry.centroid.x)
+    .sort_values("x", ascending=False)
+    .drop(columns="x")
+)
+# fmt: on
 
 # For each in cs0, check overlap with all in cs1
 
