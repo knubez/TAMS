@@ -242,6 +242,19 @@ def _size_filter_contours(
     return cs235, cs219
 
 
+def identify(x, based_on="ctt") -> gpd.GeoDataFrame:
+    """Identify clouds."""
+    if based_on != "ctt":
+        raise NotImplementedError
+
+    cs235 = _contours_to_gdf(contours(x, 235))
+    cs219 = _contours_to_gdf(contours(x, 219))
+
+    cs235, _ = _size_filter_contours(cs235, cs219)
+
+    return cs235
+
+
 def load_example_ir() -> xr.DataArray:
     """Load the example radiance data (ch9) as a DataArray."""
 
