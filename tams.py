@@ -27,9 +27,11 @@ _tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
 
 def tb_from_ir(r, ch: int):
     """Compute brightness temperature from IR satellite radiances (`r`)
-    in channel `ch`.
+    in channel `ch` of the EUMETSAT MSG SEVIRI instrument.
 
     Reference: http://www.eumetrain.org/data/2/204/204.pdf page 13
+
+    https://www.eumetsat.int/seviri
 
     Parameters
     ----------
@@ -53,7 +55,8 @@ def tb_from_ir(r, ch: int):
 
     tb = (c2 * vc / np.log((c1 * vc**3) / r + 1) - b) / a
 
-    tb.attrs.update(units="K", long_name="Brightness temperature")
+    if isinstance(r, xr.DataArray):
+        tb.attrs.update(units="K", long_name="Brightness temperature")
 
     return tb
 
@@ -73,6 +76,8 @@ def contours(x: xr.DataArray, value: float) -> list[np.ndarray]:
         List of 2-D arrays describing contours.
         The arrays are shape (n, 2); each row is a coordinate pair.
     """
+    # TODO: have this return GDF instead
+    # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
     import matplotlib.pyplot as plt
 
     assert x.ndim == 2, "this is for a single image"
@@ -162,7 +167,7 @@ def _data_in_contours_regionmask(
 ) -> gpd.GeoDataFrame:
     import regionmask
 
-    # TODO: DRY? (much of this fn is same as other one)
+    # TODO: DRY? (much of this fn is same as other one; create user-facing fn to use either)
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
     elif isinstance(data, xr.Dataset):
@@ -256,7 +261,7 @@ def identify(x, based_on="ctt") -> gpd.GeoDataFrame:
 
 
 def load_example_ir() -> xr.DataArray:
-    """Load the example radiance data (ch9) as a DataArray."""
+    """Load the example IR radiance data (ch9) as a DataArray."""
 
     ds = xr.open_dataset("Satellite_data.nc").rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
@@ -266,6 +271,16 @@ def load_example_ir() -> xr.DataArray:
     ds.lat.attrs.update(long_name="Latitude")
 
     return ds.ch9
+
+
+def load_example_tb() -> xr.DataArray:
+    """Load the example derived brightness temperature data as a DataArray,
+    by first invoking :func:`load_example_ir` and then applying :func:`tb_from_ir`.
+    """
+
+    r = load_example_ir()
+
+    return tb_from_ir(r, ch=9)
 
 
 if __name__ == "__main__":
