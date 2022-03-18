@@ -1,81 +1,135 @@
 import warnings
-from pprint import pp
 
+import geopandas as gpd
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 import tams
 
 plt.close("all")
 
 
+def sort_ew(cs: gpd.GeoDataFrame):
+    """Sort the frame east to west descending, using the centroid lon value."""
+    # TODO: optional reset_index ?
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
+        )
+        # fmt: off
+        return (
+            cs
+            .assign(x=cs.geometry.centroid.x)
+            .sort_values("x", ascending=False)
+            .drop(columns="x")
+        )
+        # fmt: on
+
+
+def overlap(a: gpd.GeoDataFrame, b: gpd.GeoDataFrame):
+    """For each contour in `a`, determine those in `b` that overlap and by how much.
+
+    Currently the mapping is based on indices of the frames.
+    """
+    a_area = a.to_crs("EPSG:32663").area
+    res = {}
+    for i in range(len(a)):
+        a_i = a.iloc[i : i + 1]  # slicing preserves GeoDataFrame type
+        a_i_poly = a_i.values[0][0]
+        with warnings.catch_warnings():
+            # We get this warning when an empty intersection is found
+            warnings.filterwarnings(
+                "ignore",
+                category=RuntimeWarning,
+                message="invalid value encountered in intersection",
+            )
+            inter = b.intersection(a_i_poly)  # .dropna()
+        inter = inter[~inter.is_empty]
+        ov = inter.to_crs("EPSG:32663").area / a_area.iloc[i]
+        res[i] = ov.to_dict()
+
+    return res
+
+
 r = tams.load_example_ir()
 
 tb = tams.tb_from_ir(r, ch=9)
 
-tb0 = tb.isel(time=0)
-tb1 = tb.isel(time=1)
+nt = tb.time.size
+itimes = list(range(nt))
 
-cs0 = tams.identify(tb0)
-cs1 = tams.identify(tb1)
+# tb0 = tb.isel(time=0)
+# tb1 = tb.isel(time=1)
 
-# TODO: sort by centroid lon value like below (optional somewhere?)
-# fmt: off
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        "ignore",
-        category=UserWarning,
-        message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
-    )
-    cs0 = (
-        cs0
-        .assign(x=cs0.geometry.centroid.x)
-        .sort_values("x", ascending=False)
-        .drop(columns="x")
-    )
-# fmt: on
+# cs0 = tams.identify(tb0)
+# cs1 = tams.identify(tb1)
 
-# For each in cs0, check overlap with all in cs1
+# # For each in cs0, check overlap with all in cs1
+# res = overlap(cs0, cs1)
 
-cs0_area = cs0.to_crs("EPSG:32663").area
-res = {}
-for i in range(len(cs0)):
-    cs0_i = cs0.iloc[i : i + 1]  # slicing preserves GeoDataFrame type
-    cs0_i_poly = cs0_i.values[0][0]
-    with warnings.catch_warnings():
-        # We get
-        # pygeos\set_operations.py:129: RuntimeWarning: invalid value encountered in intersection
-        # when an empty intersection is found
-        warnings.filterwarnings(
-            "ignore", category=RuntimeWarning, message="invalid value encountered in intersection"
-        )
-        inter = cs1.intersection(cs0_i_poly)  # .dropna()
-    inter = inter[~inter.is_empty]
-    ov = inter.to_crs("EPSG:32663").area / cs0_area.iloc[i]
-    # print(ov)
-    res[i] = ov.to_dict()
 
-pp(res)
+# Loop over available times
+css = []
+for l in itimes[:3]:  # noqa: E741
+    tb_l = tb.isel(time=l)
+    cs_l = tams.identify(tb_l)
+    cs_l["itime"] = l
+    n_l = len(cs_l)
+    if l == 0:  # noqa: E741
+        # IDs all new for first time step
+        cs_l["id"] = range(n_l)
+        i_id = len(cs_l)  # next ID
+
+    else:
+        # Assign IDs using overlap threshold
+        # TODO: optional projection velocity
+        thresh = 0.5
+        ovs = overlap(cs_l, css[l - 1])
+        ids = []
+        for i, d in ovs.items():
+            j, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
+            if j is None or frac < thresh:
+                # New ID
+                ids.append(i_id)
+                i_id += 1
+            else:
+                # Has "parent"; use their "family" ID
+                ids.append(css[l - 1].loc[j].id)
+
+        cs_l["id"] = ids
+
+    css.append(cs_l)
+
+# Combine into one frame
+cs = pd.concat(css)
+
+
+# %% Plot
 
 fig, ax = plt.subplots(figsize=(16, 5))
 
-cs0.plot(ax=ax, fc="blue", alpha=0.5)
-cs1.plot(ax=ax, ec="green", fc="none", lw=2.5)
+colors = plt.cm.GnBu(np.linspace(0.2, 0.85, nt))
 
-# UserWarning: Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.
-# Use 'GeoSeries.to_crs()' to re-project geometries to a projected CRS before this operation.
+# Plot blobs at each time
+for i, g in cs.groupby("itime"):
+    color = colors[i]
 
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        "ignore",
-        category=UserWarning,
-        message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
-    )
+    # g.plot(ax=ax, fc=color, ec=color, alpha=0.3, lw=1.5)  # color arg aliases doesn't work for gpd
+    g.plot(ax=ax, facecolor=color, edgecolor=color, alpha=0.25, lw=1.5)
 
-    for i, (x, y) in enumerate(zip(cs0.centroid.x, cs0.centroid.y)):
-        ax.text(x, y, i, c="blue", fontsize=14)
+    # Label blobs with assigned ID
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
+        )
+        for id_, x, y in zip(g.id, g.centroid.x, g.centroid.y):
+            ax.text(x, y, id_, c=color, fontsize=14, zorder=10)
 
-    for i, (x, y) in enumerate(zip(cs1.centroid.x, cs1.centroid.y)):
-        ax.text(x, y, i, c="green", fontsize=14)
 
 fig.tight_layout()
 
