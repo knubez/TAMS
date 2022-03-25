@@ -29,6 +29,31 @@ def sort_ew(cs: gpd.GeoDataFrame):
         # fmt: on
 
 
+def _project_geometry(s: gpd.GeoSeries, *, dx: float) -> gpd.GeoSeries:
+    crs0 = s.crs.to_string()
+
+    return s.to_crs(crs="EPSG:32663").translate(xoff=dx).to_crs(crs0)
+
+
+# TODO: test
+
+
+def project(df: gpd.GeoDataFrame, *, u: float = 0, dt: float = 3600):
+    """Project the coordinates by `u`*`dt` meters.
+
+    Parameters
+    ----------
+    u
+        Speed [m s-1]
+    dt
+        Time [s]. Default: one hour.
+    """
+    dx = u * dt
+    new_geometry = _project_geometry(df.geometry, dx=dx)
+
+    return df.assign(geometry=new_geometry)
+
+
 def overlap(a: gpd.GeoDataFrame, b: gpd.GeoDataFrame):
     """For each contour in `a`, determine those in `b` that overlap and by how much.
 
