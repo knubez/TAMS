@@ -7,7 +7,7 @@ tb = tams.tb_from_ir(r, ch=9)
 
 def test_ch9_tb_loaded():
     assert tb.name == "ch9"
-    assert tuple(tb.coords) == ("lon", "lat")
+    assert tuple(tb.coords) == ("lon", "lat", "time")
 
 
 def test_data_in_contours_methods_same_result():

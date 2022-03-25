@@ -270,6 +270,9 @@ def load_example_ir() -> xr.DataArray:
     ds.lon.attrs.update(long_name="Longitude")
     ds.lat.attrs.update(long_name="Latitude")
 
+    # Times are 2006-Sep-01 00 -- 10, every 2 hours
+    ds["time"] = pd.date_range("2006-Sep-01", freq="2H", periods=6)
+
     return ds.ch9
 
 
