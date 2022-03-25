@@ -111,9 +111,20 @@ for l in itimes[:3]:  # noqa: E741
 
     else:
         # Assign IDs using overlap threshold
-        # TODO: optional projection velocity
         thresh = 0.5
-        ovs = overlap(cs_l, css[l - 1])
+        u = -5  # 5--13 m/s are typical values to use
+        cs_lm1 = css[l - 1]
+
+        assert "time" in cs_lm1.columns and "time" in cs_l.columns
+        try:
+            (t_lm1,) = cs_lm1.time.unique()
+            (t_l,) = cs_l.time.unique()
+        except ValueError as e:
+            raise ValueError("expected single times") from e
+        dt = pd.Timedelta(t_l - t_lm1).total_seconds()
+        assert dt > 0
+
+        ovs = overlap(cs_l, project(cs_lm1, u=u, dt=dt))
         ids = []
         for i, d in ovs.items():
             j, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
@@ -123,7 +134,7 @@ for l in itimes[:3]:  # noqa: E741
                 i_id += 1
             else:
                 # Has "parent"; use their "family" ID
-                ids.append(css[l - 1].loc[j].id)
+                ids.append(cs_lm1.loc[j].id)
 
         cs_l["id"] = ids
 
