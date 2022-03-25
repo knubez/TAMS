@@ -76,6 +76,7 @@ css = []
 for l in itimes[:3]:  # noqa: E741
     tb_l = tb.isel(time=l)
     cs_l = tams.identify(tb_l)
+    cs_l["time"] = tb_l.time.values
     cs_l["itime"] = l
     n_l = len(cs_l)
     if l == 0:  # noqa: E741
