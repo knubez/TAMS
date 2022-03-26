@@ -74,6 +74,7 @@ def overlap(a: gpd.GeoDataFrame, b: gpd.GeoDataFrame):
             inter = b.intersection(a_i_poly)  # .dropna()
         inter = inter[~inter.is_empty]
         ov = inter.to_crs("EPSG:32663").area / a_area.iloc[i]
+        # TODO: original TAMS normalized by the *min* area between a and b, could offer option
         res[i] = ov.to_dict()
 
     return res
@@ -98,7 +99,7 @@ itimes = list(range(nt))
 
 # Loop over available times
 css = []
-for l in itimes[:3]:  # noqa: E741
+for l in itimes[:4]:  # noqa: E741
     tb_l = tb.isel(time=l)
     cs_l = tams.identify(tb_l)
     cs_l["time"] = tb_l.time.values
@@ -124,9 +125,11 @@ for l in itimes[:3]:  # noqa: E741
         dt = pd.Timedelta(t_l - t_lm1).total_seconds()
         assert dt > 0
 
+        # TODO: option to overlap in other direction, match with all that meet the condition
         ovs = overlap(cs_l, project(cs_lm1, u=u, dt=dt))
         ids = []
         for i, d in ovs.items():
+            # TODO: option to pick bigger one to "continue the trajectory", as in jevans paper
             j, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
             if j is None or frac < thresh:
                 # New ID
