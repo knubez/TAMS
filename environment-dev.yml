@@ -5,7 +5,7 @@ dependencies:
   - python=3.9
   #
   - cartopy
-  - geopandas
+  - geopandas>=0.10
   - matplotlib>=3.4
   - netcdf4
   - numpy
