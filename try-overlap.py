@@ -96,6 +96,7 @@ itimes = list(range(nt))
 # # For each in cs0, check overlap with all in cs1
 # res = overlap(cs0, cs1)
 
+# IDEA: even at initial time, could put CEs together in groups based on edge-to-edge distance
 
 # Loop over available times
 css = []
@@ -172,5 +173,147 @@ for i, g in cs.groupby("itime"):
 
 
 fig.tight_layout()
+
+
+# %% Classify
+
+
+def calc_eccen(p):
+    """Compute the eccentricity of the best-fit ellipse to the Polygon's exterior.
+
+    Parameters
+    ----------
+    p : shapely.geometry.Polygon
+    """
+    # Based on https://scipython.com/book/chapter-8-scipy/examples/non-linear-fitting-to-an-ellipse/
+    from scipy import optimize
+
+    x, y = np.asarray(p.exterior.coords).T
+    r = np.hypot(x, y)
+    theta = np.arctan2(y, x)
+
+    def f(p):
+        # a - semi-major axis length
+        # e - eccentricity
+        a, e = p
+        return a * (1 - e**2) / (1 - e * np.cos(theta))
+
+    def residuals(p):
+        return r - f(p)
+
+    def jac(p):  # of the residuals
+        a, e = p
+        da = (1 - e**2) / (1 - e * np.cos(theta))
+        de = (-2 * a * e * (1 - e * np.cos(theta)) + a * (1 - e**2) * np.cos(theta)) / (
+            1 - e * np.cos(theta)
+        ) ** 2
+        # return -da,  -de
+        return np.column_stack((-da, -de))
+
+    # a0 = np.mean(r)
+    a0 = np.ptp(r) * 0.7
+    e0 = 0.2  # note that a circle has e of 0 and 1 is the max
+    # plsq = optimize.leastsq(residuals, x0=(a0, e0), Dfun=jac, col_deriv=True)
+    # return plsq[0]#[1]
+
+    # TODO: try with newer `least_squares` interface
+    # print(a0, e0)
+    # print(theta)
+    # print(np.ptp(r), np.ptp(theta))
+    res = optimize.least_squares(
+        residuals,
+        x0=(a0, e0),
+        bounds=((0, 0), (r.max() * np.ptp(theta), 1)),
+        jac=jac,
+    )
+    # return res.x
+    # r_ = f(res.x)
+    a, e = res.x
+    theta_ = np.linspace(0, 2 * np.pi, 100)
+    r_ = a * (1 - e**2) / (1 - e * np.cos(theta_))
+    return r_ * np.cos(theta_), r_ * np.sin(theta_)
+
+
+def calc_eccen2(p):
+    """Compute the eccentricity of the best-fit ellipse to the Polygon's exterior.
+
+    Parameters
+    ----------
+    p : shapely.geometry.Polygon
+    """
+    # using skimage https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.EllipseModel
+    from skimage.measure import EllipseModel
+
+    xy = np.asarray(p.exterior.coords)
+
+    m = EllipseModel()
+    m.estimate(xy)
+    _, _, xhw, yhw, _ = m.params
+    # ^ xc, yc, a, b, theta; from the docs
+    #   a with x, b with y (after subtracting the rotation), but they are half-widths
+    #   theta is in radians
+
+    rat = yhw / xhw if xhw > yhw else xhw / yhw
+
+    return np.sqrt(1 - rat**2)
+
+
+from matplotlib.patches import Ellipse
+from shapely.geometry import Polygon
+from skimage.measure import EllipseModel
+
+fig, ax = plt.subplots()
+
+for w, h, c in [(1, 1, "r"), (0.5, 1, "g"), (1, 0.5, "b")]:
+    ell = Ellipse((1, 1), w, h, np.rad2deg(np.pi / 4), color=c, alpha=0.3)
+    p = Polygon(ell.get_verts())
+    b, a = sorted([w, h])
+    eps = np.sqrt(1 - b**2 / a**2)
+    print(
+        eps,
+        eps / np.sqrt(1 - eps**2),
+        eps / np.sqrt(2 - eps**2),
+        np.arcsin(eps),
+        "|",
+        calc_eccen2(p),
+    )
+
+    ax.add_patch(ell)
+    # ax.plot(*calc_eccen(p), "o-", color=c)
+
+    m = EllipseModel()
+    m.estimate(np.asarray(p.exterior.coords))
+    xc, yc, a, b, theta = m.params
+    ell2 = Ellipse((xc, yc), 2 * a, 2 * b, np.rad2deg(theta), ec=c, fc="none", ls=":", lw=2)
+    ax.add_patch(ell2)
+
+ax.set(xlim=(0, 2), ylim=(0, 2))
+ax.axis("equal")
+
+
+# eps = sqrt(1 - (b^2/a^2)) -- ellipse "first eccentricity"
+#
+# Below from most to least strict:
+#
+# MCCs (organized)
+# - 219 K region >= 25k km2
+# - 235 K region >= 59k km2
+# - size durations have to be met for >= 6 hours
+# - eps <= 0.7
+#
+# CCCs (organized)
+# - 219 K region >= 25k km2
+# - size durations have to be met for >= 6 hours
+# - no shape criterion
+#
+# DLL (disorganized)
+# - >= 6 hour duration
+# - (no size or shape criterion)
+#
+# DSL (disorganized)
+# - < 6 hour duration
+#
+# Classification is for the "family" groups
+
 
 plt.show()
