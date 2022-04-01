@@ -85,7 +85,16 @@ r = tams.load_example_ir()
 tb = tams.tb_from_ir(r, ch=9)
 
 nt = tb.time.size
+assert nt > 1
 itimes = list(range(nt))
+
+# Compute assumed duration of each time step based on the dataset time resolution
+dti = pd.DatetimeIndex(tb.time)
+dt = dti[1:] - dti[:-1]
+assert (dt.astype(int) > 0).all()
+if not dt.unique().size == 1:
+    warnings.warn("unequal time spacing")
+dt = dt.insert(-1, dt[-1])
 
 # tb0 = tb.isel(time=0)
 # tb1 = tb.isel(time=1)
@@ -105,6 +114,7 @@ for l in itimes[:4]:  # noqa: E741
     cs_l = tams.identify(tb_l)
     cs_l["time"] = tb_l.time.values
     cs_l["itime"] = l
+    cs_l["duration"] = dt[l]
     n_l = len(cs_l)
     if l == 0:  # noqa: E741
         # IDs all new for first time step
@@ -123,11 +133,11 @@ for l in itimes[:4]:  # noqa: E741
             (t_l,) = cs_l.time.unique()
         except ValueError as e:
             raise ValueError("expected single times") from e
-        dt = pd.Timedelta(t_l - t_lm1).total_seconds()
-        assert dt > 0
+        dt_l = pd.Timedelta(t_l - t_lm1).total_seconds()
+        assert dt_l > 0
 
         # TODO: option to overlap in other direction, match with all that meet the condition
-        ovs = overlap(cs_l, project(cs_lm1, u=u, dt=dt))
+        ovs = overlap(cs_l, project(cs_lm1, u=u, dt=dt_l))
         ids = []
         for i, d in ovs.items():
             # TODO: option to pick bigger one to "continue the trajectory", as in jevans paper
@@ -245,6 +255,7 @@ def calc_eccen2(p):
     from skimage.measure import EllipseModel
 
     xy = np.asarray(p.exterior.coords)
+    assert xy.shape[1] == 2
 
     m = EllipseModel()
     m.estimate(xy)
@@ -297,7 +308,7 @@ ax.axis("equal")
 #
 # MCCs (organized)
 # - 219 K region >= 25k km2
-# - 235 K region >= 59k km2
+# - 235 K region >= 50k km2
 # - size durations have to be met for >= 6 hours
 # - eps <= 0.7
 #
@@ -315,5 +326,58 @@ ax.axis("equal")
 #
 # Classification is for the "family" groups
 
+
+def _the_unique(s: pd.Series):
+    """Return the one unique value or raise ValueError."""
+    u = s.unique()
+    if u.size == 1:
+        return u[0]
+    else:
+        raise ValueError(f"the Series has more than one unique value: {u}")
+
+
+def classify(cs: gpd.GeoDataFrame):
+    assert cs.id.unique().size == 1, "for a certain family group"
+
+    # Sum areas over cloud elements
+    time_groups = cs.groupby("time")
+    area = time_groups[["area_km2", "area219_km2"]].apply(sum)
+
+    # # Assume duration from the time index
+    # dt = area.index[1:] - area.index[:-1]
+    # if not dt.unique().size == 1:
+    #     warnings.warn("unequally spaced times")
+    # dt = dt.insert(-1, dt[-1])
+
+    # Get duration
+    dt = time_groups["duration"].apply(_the_unique)
+
+    # Compute area-duration criteria
+    dur_219_25k = dt[area.area219_km2 >= 25_000].sum()
+    dur_235_50k = dt[area.area_km2 >= 50_000].sum()
+    six_hours = pd.Timedelta(hours=6)
+
+    if dur_219_25k >= six_hours:  # organized
+        # Compute ellipse eccentricity
+        eps = time_groups[["geometry"]].apply(
+            lambda g: calc_eccen2(g.dissolve().geometry.convex_hull.iloc[0])
+        )
+        dur_eps = dt[eps <= 0.7].sum()
+        if dur_235_50k >= six_hours and dur_eps >= six_hours:
+            class_ = "MCC"
+        else:
+            class_ = "CCC"
+
+    else:  # disorganized
+        if dt.sum() >= six_hours:
+            class_ = "DLL"
+        else:
+            class_ = "DSL"
+
+    return class_
+
+
+classes = cs.groupby("id").apply(classify)
+cs["class"] = cs.id.map(classes)
 
 plt.show()
