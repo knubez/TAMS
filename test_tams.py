@@ -15,8 +15,9 @@ def test_data_in_contours_methods_same_result():
     cs219 = tams._contours_to_gdf(tams.contours(tb, 219))
     cs235, _ = tams._size_filter_contours(cs235, cs219)
 
-    x1 = tams._data_in_contours_sjoin(tb, cs235)
-    x2 = tams._data_in_contours_regionmask(tb, cs235)
+    varnames = ["ch9"]
+    x1 = tams._data_in_contours_sjoin(tb, cs235, varnames=varnames)
+    x2 = tams._data_in_contours_regionmask(tb, cs235, varnames=varnames)
     assert (x1.count_ch9 > 0).all()
     assert x1.count_ch9.equals(x2.count_ch9)
     assert x1.std_ch9.equals(x2.std_ch9)

@@ -111,6 +111,7 @@ def _data_in_contours_sjoin(
     data: xr.DataArray | xr.Dataset,
     contours: gpd.GeoDataFrame,
     *,
+    varnames: list[str],
     agg=("mean", "std", "count"),
 ) -> gpd.GeoDataFrame:
     """Compute stats on `data` within `contours` using :func:`~geopandas.tools.sjoin`.
@@ -118,15 +119,6 @@ def _data_in_contours_sjoin(
     `data` must have ``'lat'`` and ``'lon'`` variables.
     """
     import geopandas as gpd
-
-    # Detect variables to run the agg on
-    if isinstance(data, xr.DataArray):
-        varnames = [data.name]
-    elif isinstance(data, xr.Dataset):
-        # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
-        raise NotImplementedError
-    else:
-        raise TypeError
 
     # Convert possibly-2-D data to GeoDataFrame of points
     data_df = data.to_dataframe().reset_index(drop=True)
@@ -153,27 +145,17 @@ def _data_in_contours_sjoin(
     new_data = new_data.unstack()  # multi index -> (variable, agg) columns
     new_data.columns = ["_".join(s for s in tup) for tup in new_data.columns]
 
-    # Merge with contours gdf
-    contours = contours.merge(new_data, left_index=True, right_index=True, how="left")
-
-    return contours
+    return new_data
 
 
 def _data_in_contours_regionmask(
     data: xr.DataArray | xr.Dataset,
     contours: gpd.GeoDataFrame,
     *,
+    varnames: list[str],
     agg=("mean", "std", "count"),
 ) -> gpd.GeoDataFrame:
     import regionmask
-
-    # TODO: DRY? (much of this fn is same as other one; create user-facing fn to use either)
-    if isinstance(data, xr.DataArray):
-        varnames = [data.name]
-    elif isinstance(data, xr.Dataset):
-        raise NotImplementedError
-    else:
-        raise TypeError
 
     # Form regionmask(s)
     shapes = contours[["geometry"]]
@@ -193,10 +175,50 @@ def _data_in_contours_regionmask(
     new_data = new_data.unstack()  # multi index -> (variable, agg) columns
     new_data.columns = ["_".join(s for s in tup) for tup in new_data.columns]
 
-    # Merge with contours gdf
-    contours = contours.merge(new_data, left_index=True, right_index=True, how="left")
+    return new_data
 
-    return contours
+
+def data_in_contours(
+    data: xr.DataArray | xr.Dataset,
+    contours: gpd.GeoDataFrame,
+    *,
+    agg=("mean", "std", "count"),
+    method: str = "sjoin",
+    merge: bool = False,
+) -> gpd.GeoDataFrame:
+    """Compute statistics on `data` within `contours`.
+
+    Parameters
+    ----------
+    agg : sequence of str or callable
+        Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
+    method : {'sjoin', 'regionmask'}
+    merge
+        Whether to merge the new data with `contours` or return a separate frame.
+    """
+    if isinstance(data, xr.DataArray):
+        varnames = [data.name]
+    elif isinstance(data, xr.Dataset):
+        # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
+        raise NotImplementedError
+    else:
+        raise TypeError
+
+    args = (data, contours)
+    kwargs = dict(varnames=varnames, agg=agg)
+
+    if method in {"sjoin", "geopandas", "gpd"}:
+        new_data = _data_in_contours_sjoin(*args, **kwargs)
+    elif method in {"regionmask"}:
+        new_data = _data_in_contours_regionmask(*args, **kwargs)
+    else:
+        raise ValueError(f"method {method!r} not recognized")
+
+    if merge:
+        # Merge with the `contours` gdf, appending columns
+        new_data = contours.merge(new_data, left_index=True, right_index=True, how="left")
+
+    return new_data
 
 
 def _size_filter_contours(
