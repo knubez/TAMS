@@ -336,7 +336,7 @@ def _the_unique(s: pd.Series):
         raise ValueError(f"the Series has more than one unique value: {u}")
 
 
-def classify(cs: gpd.GeoDataFrame):
+def classify(cs: gpd.GeoDataFrame) -> str:
     assert cs.id.unique().size == 1, "for a certain family group"
 
     # Sum areas over cloud elements

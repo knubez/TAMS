@@ -21,3 +21,9 @@ def test_data_in_contours_methods_same_result():
     assert x1.count_ch9.equals(x2.count_ch9)
     assert x1.std_ch9.equals(x2.std_ch9)
     # TODO: mean values aren't exactly the same
+
+
+def test_load_mpas_sample():
+    ds = tams.load_example_mpas()
+    assert tuple(ds.data_vars) == ("tb", "precip")
+    assert tuple(ds.coords) == ("time", "lon", "lat")

@@ -261,7 +261,7 @@ def identify(x, based_on="ctt") -> gpd.GeoDataFrame:
 
 
 def load_example_ir() -> xr.DataArray:
-    """Load the example IR radiance data (ch9) as a DataArray."""
+    """Load the example satellite IR radiance data (ch9) as a DataArray."""
 
     ds = xr.open_dataset("Satellite_data.nc").rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
@@ -284,6 +284,24 @@ def load_example_tb() -> xr.DataArray:
     r = load_example_ir()
 
     return tb_from_ir(r, ch=9)
+
+
+def load_example_mpas() -> xr.DataArray:
+    """Load the example MPAS dataset, which has ``tb`` (estimated brightness temperature)
+    and ``precip`` (precipitation, derived by summing the MPAS accumulated
+    grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
+    """
+
+    ds = xr.open_dataset("MPAS_data.nc").rename(xtime="time")
+
+    # lat has attrs but not lon
+    ds.lon.attrs.update(long_name="Longitude", units="degrees_east")
+    ds.lat.attrs.update(long_name="Latitude")
+
+    ds.tb.attrs.update(long_name="Brightness temperature", units="K")
+    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
+
+    return ds
 
 
 if __name__ == "__main__":
