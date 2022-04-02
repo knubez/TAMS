@@ -4,6 +4,7 @@ TAMS
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -14,6 +15,8 @@ if TYPE_CHECKING:
     import geopandas as gpd
     from shapely.geometry import Polygon
 
+
+HERE = Path(__file__).parent
 
 _tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
     4: (2569.094, 0.9959, 3.471),
@@ -542,7 +545,7 @@ def classify(cs: gpd.GeoDataFrame) -> str:
 def load_example_ir() -> xr.DataArray:
     """Load the example satellite IR radiance data (ch9) as a DataArray."""
 
-    ds = xr.open_dataset("Satellite_data.nc").rename_dims(
+    ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
     )
 
@@ -571,7 +574,7 @@ def load_example_mpas() -> xr.DataArray:
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
     """
 
-    ds = xr.open_dataset("MPAS_data.nc").rename(xtime="time")
+    ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
 
     # lat has attrs but not lon
     ds.lon.attrs.update(long_name="Longitude", units="degrees_east")

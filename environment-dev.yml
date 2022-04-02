@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.9
   #
+  # Core dependencies
   - cartopy
   - geopandas>=0.10
   - matplotlib>=3.4
@@ -17,6 +18,14 @@ dependencies:
   - shapely
   - xarray
   #
+  # Development and tests
   - jupyterlab
   - mypy
   - pytest
+  #
+  # Docs
+  - myst-nb
+  - myst-parser
+  - sphinx>=4.0
+  - sphinx-autobuild
+  - sphinx-book-theme
