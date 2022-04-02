@@ -1,3 +1,6 @@
+import numpy as np
+import pytest
+
 import tams
 
 r = tams.load_example_ir().isel(time=0)
@@ -28,3 +31,33 @@ def test_load_mpas_sample():
     ds = tams.load_example_mpas()
     assert tuple(ds.data_vars) == ("tb", "precip")
     assert tuple(ds.coords) == ("time", "lon", "lat")
+
+
+@pytest.mark.parametrize(
+    "wh",
+    [
+        (1, 1),
+        (1, 0.5),
+        (0.5, 1),
+        (0.2, 1),
+    ],
+)
+def test_ellipse_eccen(wh):
+    from matplotlib.patches import Ellipse
+    from shapely.geometry import Polygon
+
+    w, h = wh
+    ell = Ellipse((1, 1), w, h, np.rad2deg(np.pi / 4))
+    p = Polygon(ell.get_verts())
+
+    b, a = sorted([w, h])
+    eps_expected = np.sqrt(1 - b**2 / a**2)
+
+    eps = tams.calc_ellipse_eccen(p)
+
+    if w == h:  # the model gives ~ 0.06 for the circle
+        check = dict(abs=0.07)
+    else:
+        check = dict(rel=1e-3)
+
+    assert eps == pytest.approx(eps_expected, **check)

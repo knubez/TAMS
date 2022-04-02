@@ -3,6 +3,7 @@ TAMS
 """
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -11,6 +12,7 @@ import xarray as xr
 
 if TYPE_CHECKING:
     import geopandas as gpd
+    from shapely.geometry import Polygon
 
 
 _tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
@@ -59,6 +61,25 @@ def tb_from_ir(r, ch: int):
         tb.attrs.update(units="K", long_name="Brightness temperature")
 
     return tb
+
+
+def sort_ew(cs: gpd.GeoDataFrame):
+    """Sort the frame east to west descending, using the centroid lon value."""
+    # TODO: optional reset_index ?
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
+        )
+        # fmt: off
+        return (
+            cs
+            .assign(x=cs.geometry.centroid.x)
+            .sort_values("x", ascending=False)
+            .drop(columns="x")
+        )
+        # fmt: on
 
 
 def contours(x: xr.DataArray, value: float) -> list[np.ndarray]:
@@ -279,7 +300,243 @@ def identify(x, based_on="ctt") -> gpd.GeoDataFrame:
 
     cs235, _ = _size_filter_contours(cs235, cs219)
 
-    return cs235
+    return sort_ew(cs235)
+
+
+def _project_geometry(s: gpd.GeoSeries, *, dx: float) -> gpd.GeoSeries:
+    crs0 = s.crs.to_string()
+
+    return s.to_crs(crs="EPSG:32663").translate(xoff=dx).to_crs(crs0)
+
+
+# TODO: test
+
+
+def project(df: gpd.GeoDataFrame, *, u: float = 0, dt: float = 3600):
+    """Project the coordinates by `u`*`dt` meters.
+
+    Parameters
+    ----------
+    u
+        Speed [m s-1]
+    dt
+        Time [s]. Default: one hour.
+    """
+    dx = u * dt
+    new_geometry = _project_geometry(df.geometry, dx=dx)
+
+    return df.assign(geometry=new_geometry)
+
+
+def overlap(a: gpd.GeoDataFrame, b: gpd.GeoDataFrame):
+    """For each contour in `a`, determine those in `b` that overlap and by how much.
+
+    Currently the mapping is based on indices of the frames.
+    """
+    a_area = a.to_crs("EPSG:32663").area
+    res = {}
+    for i in range(len(a)):
+        a_i = a.iloc[i : i + 1]  # slicing preserves GeoDataFrame type
+        a_i_poly = a_i.values[0][0]
+        with warnings.catch_warnings():
+            # We get this warning when an empty intersection is found
+            warnings.filterwarnings(
+                "ignore",
+                category=RuntimeWarning,
+                message="invalid value encountered in intersection",
+            )
+            inter = b.intersection(a_i_poly)  # .dropna()
+        inter = inter[~inter.is_empty]
+        ov = inter.to_crs("EPSG:32663").area / a_area.iloc[i]
+        # TODO: original TAMS normalized by the *min* area between a and b, could offer option
+        res[i] = ov.to_dict()
+
+    return res
+
+
+def track(
+    contours_sets: list[gpd.GeoDataFrame],
+    times,  # TODO: could replace these two with single dict?
+    *,
+    overlap_threshold: float = 0.5,
+    u_projection: float = 0,
+    durations=None,
+) -> list[gpd.GeoDataFrame]:
+    """Assign group IDs to the CEs, returning a new list of contour sets.
+
+    Currently this works by: for each CE at the current time step,
+    searching for a "parent" from the previous time step by computing
+    overlap with all previous CEs.
+
+    Parameters
+    ----------
+    contour_sets
+        List of identified contours, in GeoDataFrame format.
+    times
+        Timestamps associated with each identified set of contours.
+    overlap_threshold
+        In [0, 1] (i.e., fractional), the overlap threshold.
+    u_projection
+        Zonal projection velocity, to project previous time step CEs by before
+        computing overlap.
+        5--13 m/s are typical magnitudes to use.
+        For AEWs, a negative value should be used.
+    durations
+        Durations associated with the times in `times`.
+        If not provided, they will be estimated using ``times[1:] - times[:-1]``.
+    """
+    assert len(contours_sets) == len(times) and len(times) > 1
+    times = pd.DatetimeIndex(times)
+    itimes = list(range(times.size))
+
+    if durations is not None:
+        assert len(durations) == len(times)
+    else:
+        # Estimate
+        dt = times[1:] - times[:-1]
+        assert (dt.astype(int) > 0).all()
+        if not dt.unique().size == 1:
+            warnings.warn("unequal time spacing")
+        dt = dt.insert(-1, dt[-1])
+
+    # IDEA: even at initial time, could put CEs together in groups based on edge-to-edge distance
+
+    css: list[gpd.GeoDataFrame] = []
+    for i in itimes:
+        cs_i = contours_sets[i]
+        cs_i["time"] = times[i]
+        cs_i["itime"] = itimes[i]
+        cs_i["duration"] = dt[i]
+        n_i = len(cs_i)
+        if i == 0:
+            # IDs all new for first time step
+            cs_i["id"] = range(n_i)
+            next_id = n_i
+        else:
+            # Assign IDs using overlap threshold
+            cs_im1 = css[i - 1]
+            dt_im1_s = dt[i - 1].total_seconds()
+
+            # TODO: option to overlap in other direction, match with all that meet the condition
+            ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s))
+            ids = []
+            for j, d in ovs.items():
+                # TODO: option to pick bigger one to "continue the trajectory", as in jevans paper
+                k, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
+                if k is None or frac < overlap_threshold:
+                    # No parent or not enough overlap => new ID
+                    ids.append(next_id)
+                    next_id += 1
+                else:
+                    # Has parent; use their family ID
+                    ids.append(cs_im1.loc[k].id)
+
+            cs_i["id"] = ids
+
+        css.append(cs_i)
+
+    # Combine into one frame
+    cs = pd.concat(css)
+
+    return cs
+
+
+def calc_ellipse_eccen(p: Polygon):
+    """Compute the (first) eccentricity of the least-squares best-fit ellipse
+    to the coordinates of the polygon's exterior.
+    """
+    # TODO: Ellipse class with methods to convert to shapely Polygon/LinearRing and mpl Ellipse Patch
+
+    # using skimage https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.EllipseModel
+    from skimage.measure import EllipseModel
+
+    xy = np.asarray(p.exterior.coords)
+    assert xy.shape[1] == 2
+
+    m = EllipseModel()
+    m.estimate(xy)
+    _, _, xhw, yhw, _ = m.params
+    # ^ xc, yc, a, b, theta; from the docs
+    #   a with x, b with y (after subtracting the rotation), but they are half-widths
+    #   theta is in radians
+
+    rat = yhw / xhw if xhw > yhw else xhw / yhw
+
+    return np.sqrt(1 - rat**2)
+
+
+def _the_unique(s: pd.Series):
+    """Return the one unique value or raise ValueError."""
+    u = s.unique()
+    if u.size == 1:
+        return u[0]
+    else:
+        raise ValueError(f"the Series has more than one unique value: {u}")
+
+
+def classify(cs: gpd.GeoDataFrame) -> str:
+    # eps = sqrt(1 - (b^2/a^2)) -- ellipse "first eccentricity"
+    #
+    # Below from most to least strict:
+    #
+    # MCCs (organized)
+    # - 219 K region >= 25k km2
+    # - 235 K region >= 50k km2
+    # - size durations have to be met for >= 6 hours
+    # - eps <= 0.7
+    #
+    # CCCs (organized)
+    # - 219 K region >= 25k km2
+    # - size durations have to be met for >= 6 hours
+    # - no shape criterion
+    #
+    # DLL (disorganized)
+    # - >= 6 hour duration
+    # - (no size or shape criterion)
+    #
+    # DSL (disorganized)
+    # - < 6 hour duration
+    #
+    # Classification is for the "family" groups
+
+    assert cs.id.unique().size == 1, "this is for a certain family group"
+
+    # Sum areas over cloud elements
+    time_groups = cs.groupby("time")
+    area = time_groups[["area_km2", "area219_km2"]].apply(sum)
+
+    # # Assume duration from the time index
+    # dt = area.index[1:] - area.index[:-1]
+    # if not dt.unique().size == 1:
+    #     warnings.warn("unequally spaced times")
+    # dt = dt.insert(-1, dt[-1])
+
+    # Get duration
+    dt = time_groups["duration"].apply(_the_unique)
+
+    # Compute area-duration criteria
+    dur_219_25k = dt[area.area219_km2 >= 25_000].sum()
+    dur_235_50k = dt[area.area_km2 >= 50_000].sum()
+    six_hours = pd.Timedelta(hours=6)
+
+    if dur_219_25k >= six_hours:  # organized
+        # Compute ellipse eccentricity
+        eps = time_groups[["geometry"]].apply(
+            lambda g: calc_ellipse_eccen(g.dissolve().geometry.convex_hull.iloc[0])
+        )
+        dur_eps = dt[eps <= 0.7].sum()
+        if dur_235_50k >= six_hours and dur_eps >= six_hours:
+            class_ = "MCC"
+        else:
+            class_ = "CCC"
+
+    else:  # disorganized
+        if dt.sum() >= six_hours:
+            class_ = "DLL"
+        else:
+            class_ = "DSL"
+
+    return class_
 
 
 def load_example_ir() -> xr.DataArray:
