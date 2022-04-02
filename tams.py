@@ -477,7 +477,8 @@ def _the_unique(s: pd.Series):
         raise ValueError(f"the Series has more than one unique value: {u}")
 
 
-def classify(cs: gpd.GeoDataFrame) -> str:  # TODO: take the full CE gdf
+def _classify_one(cs: gpd.GeoDataFrame) -> str:
+    """Classify one CE family group."""
     # eps = sqrt(1 - (b^2/a^2)) -- ellipse "first eccentricity"
     #
     # Below from most to least strict:
@@ -534,6 +535,19 @@ def classify(cs: gpd.GeoDataFrame) -> str:  # TODO: take the full CE gdf
             class_ = "DSL"
 
     return class_
+
+
+def classify(cs: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Classify the CE groups into MCS classes, adding a categorical ``'class'`` column
+    to the input frame.
+    """
+
+    assert {"id", "time", "duration"} < set(cs.columns)
+
+    classes = cs.groupby("id").apply(_classify_one)
+    cs["class"] = cs.id.map(classes).astype("category")
+
+    return cs
 
 
 def load_example_ir() -> xr.DataArray:
