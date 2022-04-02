@@ -145,7 +145,7 @@ def _data_in_contours_sjoin(
     import geopandas as gpd
 
     # Convert possibly-2-D data to GeoDataFrame of points
-    data_df = data.to_dataframe().reset_index(drop=True)
+    data_df = data.to_dataframe().reset_index(drop=set(data.dims) != {"lat", "lon"})
     lat = data_df["lat"].values
     lon = data_df["lon"].values
     geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points

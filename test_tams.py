@@ -27,6 +27,17 @@ def test_data_in_contours_methods_same_result():
     # TODO: mean values aren't exactly the same
 
 
+def test_data_in_contours_non_xy():
+    # The MPAS one has real lat/lon 1-D dim-coords, not x/y with 2-D lat/lon
+    # so with `to_dataframe().reset_index(drop=True)` lat/lon were lost
+    ds = tams.load_example_mpas().isel(time=1)
+    cs = tams.identify(ds.tb)
+    data = ds.precip
+    cs_precip = tams.data_in_contours(data, cs, method="sjoin")
+    assert cs_precip.mean_precip.sum() > 0
+    assert (cs_precip.count_precip > 0).all()
+
+
 def test_load_mpas_sample():
     ds = tams.load_example_mpas()
     assert tuple(ds.data_vars) == ("tb", "precip")
