@@ -385,7 +385,7 @@ def track(
         5--13 m/s are typical magnitudes to use.
         For AEWs, a negative value should be used.
     durations
-        Durations associated with the times in `times`.
+        Durations associated with the times in `times` (akin to the time resolution).
         If not provided, they will be estimated using ``times[1:] - times[:-1]``.
     """
     assert len(contours_sets) == len(times) and len(times) > 1
@@ -395,7 +395,7 @@ def track(
     if durations is not None:
         assert len(durations) == len(times)
     else:
-        # Estimate
+        # Estimate dt values
         dt = times[1:] - times[:-1]
         assert (dt.astype(int) > 0).all()
         if not dt.unique().size == 1:
@@ -407,13 +407,13 @@ def track(
     css: list[gpd.GeoDataFrame] = []
     for i in itimes:
         cs_i = contours_sets[i]
-        cs_i["time"] = times[i]
-        cs_i["itime"] = itimes[i]
-        cs_i["duration"] = dt[i]
+        cs_i["time"] = times[i]  # actual time
+        cs_i["itime"] = itimes[i]  # time index (from 0)
+        cs_i["dtime"] = dt[i]  # delta time
         n_i = len(cs_i)
         if i == 0:
             # IDs all new for first time step
-            cs_i["id"] = range(n_i)
+            cs_i["mcs_id"] = range(n_i)
             next_id = n_i
         else:
             # Assign IDs using overlap threshold
@@ -432,9 +432,9 @@ def track(
                     next_id += 1
                 else:
                     # Has parent; use their family ID
-                    ids.append(cs_im1.loc[k].id)
+                    ids.append(cs_im1.loc[k].mcs_id)
 
-            cs_i["id"] = ids
+            cs_i["mcs_id"] = ids
 
         css.append(cs_i)
 
@@ -503,14 +503,15 @@ def _classify_one(cs: gpd.GeoDataFrame) -> str:
     #
     # Classification is for the "family" groups
 
-    assert cs.id.unique().size == 1, "this is for a certain CE family group"
+    assert cs.mcs_id.unique().size == 1, "this is for a certain CE family group"
 
     # Sum areas over cloud elements
     time_groups = cs.groupby("time")
     area = time_groups[["area_km2", "area219_km2"]].apply(sum)
 
     # Get duration (time resolution of our CE data)
-    dt = time_groups["duration"].apply(_the_unique)
+    dt = time_groups["dtime"].apply(_the_unique)
+    dur_tot = dt.sum()
 
     # Compute area-duration criteria
     dur_219_25k = dt[area.area219_km2 >= 25_000].sum()
@@ -529,7 +530,7 @@ def _classify_one(cs: gpd.GeoDataFrame) -> str:
             class_ = "CCC"
 
     else:  # disorganized
-        if dt.sum() >= six_hours:
+        if dur_tot >= six_hours:
             class_ = "DLL"
         else:
             class_ = "DSL"
@@ -538,14 +539,14 @@ def _classify_one(cs: gpd.GeoDataFrame) -> str:
 
 
 def classify(cs: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Classify the CE groups into MCS classes, adding a categorical ``'class'`` column
+    """Classify the CE groups into MCS classes, adding a categorical ``'mcs_class'`` column
     to the input frame.
     """
 
-    assert {"id", "time", "duration"} < set(cs.columns)
+    assert {"mcs_id", "time", "dtime"} < set(cs.columns), "needed by the classify algo"
 
-    classes = cs.groupby("id").apply(_classify_one)
-    cs["class"] = cs.id.map(classes).astype("category")
+    classes = cs.groupby("mcs_id").apply(_classify_one)
+    cs["mcs_class"] = cs.mcs_id.map(classes).astype("category")
 
     return cs
 
