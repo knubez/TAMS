@@ -477,7 +477,7 @@ def _the_unique(s: pd.Series):
         raise ValueError(f"the Series has more than one unique value: {u}")
 
 
-def classify(cs: gpd.GeoDataFrame) -> str:
+def classify(cs: gpd.GeoDataFrame) -> str:  # TODO: take the full CE gdf
     # eps = sqrt(1 - (b^2/a^2)) -- ellipse "first eccentricity"
     #
     # Below from most to least strict:
@@ -502,19 +502,13 @@ def classify(cs: gpd.GeoDataFrame) -> str:
     #
     # Classification is for the "family" groups
 
-    assert cs.id.unique().size == 1, "this is for a certain family group"
+    assert cs.id.unique().size == 1, "this is for a certain CE family group"
 
     # Sum areas over cloud elements
     time_groups = cs.groupby("time")
     area = time_groups[["area_km2", "area219_km2"]].apply(sum)
 
-    # # Assume duration from the time index
-    # dt = area.index[1:] - area.index[:-1]
-    # if not dt.unique().size == 1:
-    #     warnings.warn("unequally spaced times")
-    # dt = dt.insert(-1, dt[-1])
-
-    # Get duration
+    # Get duration (time resolution of our CE data)
     dt = time_groups["duration"].apply(_the_unique)
 
     # Compute area-duration criteria
