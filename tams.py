@@ -206,6 +206,9 @@ def _size_filter_contours(
     )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
+    # TODO: some elegant way to drop 219s that aren't inside a 235, resetting index
+    # but preserving the matching of 235 to 219s
+
     return cs235, cs219
 
 
