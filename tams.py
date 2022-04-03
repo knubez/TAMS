@@ -103,7 +103,10 @@ def contours(x: xr.DataArray, value: float) -> list[np.ndarray]:
         List of 2-D arrays describing contours.
         The arrays are shape (n, 2); each row is a coordinate pair.
     """
-    # TODO: have this return GDF instead
+    if x.isnull().all():
+        raise ValueError("Input array `x` is all null (e.g. NaN)")
+
+    # TODO: have this return GDF instead?
     # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
     import matplotlib.pyplot as plt
 
@@ -590,6 +593,9 @@ def load_example_mpas() -> xr.DataArray:
     """
 
     ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
+
+    # Mask 0 values of T (e.g. at initial time since OLR is zero then)
+    ds["tb"] = ds.tb.where(ds.tb > 0)
 
     # lat has attrs but not lon
     ds.lon.attrs.update(long_name="Longitude", units="degrees_east")
