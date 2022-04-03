@@ -3,6 +3,7 @@ TAMS
 """
 from __future__ import annotations
 
+import logging
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,6 +16,8 @@ if TYPE_CHECKING:
     import geopandas as gpd
     from shapely.geometry import Polygon
 
+
+logger = logging.getLogger(__name__)
 
 HERE = Path(__file__).parent
 
@@ -122,6 +125,9 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> gpd.GeoDataFrame:
     polys = []
     for c in cs:
         x, y = c.T
+        if x.size < 3:
+            logger.info(f"skipping an input contour with less than 3 points: {c}")
+            continue
         r = LinearRing(zip(x, y))
         p0 = r.convex_hull  # TODO: optional, also add buffer option
         p = orient(p0)  # -> counter-clockwise

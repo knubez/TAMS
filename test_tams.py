@@ -72,3 +72,19 @@ def test_ellipse_eccen(wh):
         check = dict(rel=1e-3)
 
     assert eps == pytest.approx(eps_expected, **check)
+
+
+def test_contour_too_small_skipped():
+    # With a few of the sample MPAS data time steps (e.g. `.isel(time=22)`)
+    # the current contouring algo returns some with less than 3 points,
+    # which can't make a LinearRing (it raises ValueError)
+
+    contours = [np.array([[0, 0], [1, 1]])]
+    gdf = tams._contours_to_gdf(contours)
+    assert len(contours) == 1
+    assert len(gdf) == 0
+
+    contours = [np.array([[0, 0], [1, 1], [0, 0.5]])]
+    gdf = tams._contours_to_gdf(contours)
+    assert len(contours) == 1
+    assert len(gdf) == 1
