@@ -3,6 +3,7 @@ TAMS
 """
 from __future__ import annotations
 
+import functools
 import logging
 import warnings
 from pathlib import Path
@@ -140,6 +141,143 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> gpd.GeoDataFrame:
     # ^ This crs indicates input in degrees
 
 
+def _size_filter_contours(
+    cs235: gpd.GeoDataFrame,
+    cs219: gpd.GeoDataFrame,
+    *,
+    threshold: float = 4000,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """Compute areas and use to filter both sets of contours.
+    `threshold` is for the total 219 K contour area within a given 235 K contour
+    (units: km2).
+    """
+
+    # from shapely.geometry import MultiPolygon
+
+    # Drop small 235s (a 235 with area < 4000 km2 can't have 219 area of 4000)
+    cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
+    # ^ This crs is equidistant cylindrical
+    big_enough = cs235.area_km2 >= threshold
+    logger.info(
+        f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+        f" of 235s are big enough ({threshold} km2)"
+    )
+    cs235 = cs235[big_enough].reset_index(drop=True)
+
+    # Drop very small 219s (insignificant)
+    # Note: This wasn't done in original TAMS, but here we are sometimes seeing
+    # tiny 219 contours inside larger ones.
+    individual_219_threshold = 10  # km2
+    cs219["area_km2"] = cs219.to_crs("EPSG:32663").area / 10**6
+    big_enough = cs219.area_km2 >= individual_219_threshold
+    logger.info(
+        f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+        f" of 235s are big enough ({individual_219_threshold} km2)"
+    )
+    cs219 = cs219[big_enough].reset_index(drop=True)
+
+    # Identify indices of 219s inside 235s
+    # Note that some 235s might not have any 219s inside
+    a = cs235.sjoin(cs219, predicate="contains", how="left").reset_index()
+    # ^ gives an Int64 index with duplicated values, for each 219 inside a certain 235
+    i219s = {  # convert to list
+        i235: sorted(g.index_right.astype(int).to_list())
+        for i235, g in a.groupby("index")
+        if not g.index_right.isna().all()
+    }
+
+    # Store 219 info inside the 235 df
+    cs235["inds219"] = [i219s.get(i235, []) for i235 in cs235.index]
+    # TODO: possible to instead cleanly store the 219 `MultiPolygon`s in a column?
+    # cs235["cs219"] = cs235.inds219.apply(lambda inds: cs219.iloc[inds][["geometry"]].dissolve().geometry)
+    # cs235["cs219"] = cs235.inds219.apply(lambda inds: MultiPolygon(cs219.geometry.iloc[inds].values))
+
+    # Check 219 area sum inside the 235 (total 219 area 4000 km2)
+    sum219s = {
+        i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
+        for i235 in cs235.index
+    }
+    cs235["area219_km2"] = pd.Series(sum219s)
+    big_enough = cs235.area219_km2 >= threshold
+    logger.info(
+        f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+        f"of big-enough 235s have enough 219 area ({threshold} km2)"
+    )
+    cs235 = cs235[big_enough].reset_index(drop=True)
+
+    return cs235, cs219
+
+
+def _identify_one(
+    ctt: xr.DataArray,
+    *,
+    size_filter: bool = True,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
+
+    cs235 = sort_ew(_contours_to_gdf(contours(ctt, 235))).reset_index(drop=True)
+    cs219 = sort_ew(_contours_to_gdf(contours(ctt, 219))).reset_index(drop=True)
+
+    if size_filter:
+        cs235, cs219 = _size_filter_contours(cs235, cs219)
+
+    return cs235, cs219
+
+
+def identify(
+    ctt: xr.DataArray,
+    *,
+    size_filter: bool = True,
+    parallel: bool = False,
+) -> tuple[list[gpd.GeoDataFrame], list[gpd.GeoDataFrame]]:
+    """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
+    The 235 K contours returned (first list) serve to identify cloud elements (CEs).
+    In a given frame from this list, each row corresponds to a certain CE.
+
+    This is the first step in a TAMS workflow.
+
+    Parameters
+    ----------
+    size_filter
+        Whether to apply size-filtering
+        (using 235 K and 219 K areas to filter out CEs that are not MCS material).
+        Filtering at this stage makes TAMS more computationally efficient overall.
+        Disable this option to return all identified CEs.
+        Note that all 219s are returned regardless of this setting.
+
+        When enabled, this also identifies the 219s (if any) that are within each 235.
+    parallel
+        Identify in parallel along 'time' dimension for 3-D `ctt` (requires `joblib`).
+    """
+    f = functools.partial(_identify_one, size_filter=size_filter)
+    dims = tuple(ctt.dims)
+    if len(dims) == 2:
+        cs235, cs219 = f(ctt)
+        css235, css219 = (cs235,), (cs219,)  # to tuple for consistency
+
+    elif len(dims) == 3 and "time" in dims:
+        assert ctt.time.ndim == 1
+        itimes = np.arange(ctt.time.size)
+
+        if parallel:
+            try:
+                import joblib
+            except ImportError as e:
+                raise RuntimeError("joblib required") from e
+
+            res = joblib.Parallel(n_jobs=-2)(joblib.delayed(f)(ctt.isel(time=i)) for i in itimes)
+
+        else:
+            res = [f(ctt.isel(time=i)) for i in itimes]
+
+        css235, css219 = zip(*res)
+
+    else:
+        raise ValueError("The dims of `ctt` either are not 2-D or are not 3-D with a 'time' dim")
+
+    return list(css235), list(css219)
+
+
 def _data_in_contours_sjoin(
     data: xr.DataArray | xr.Dataset,
     contours: gpd.GeoDataFrame,
@@ -252,67 +390,6 @@ def data_in_contours(
         new_data = contours.merge(new_data, left_index=True, right_index=True, how="left")
 
     return new_data
-
-
-def _size_filter_contours(
-    cs235: gpd.GeoDataFrame,
-    cs219: gpd.GeoDataFrame,
-    *,
-    debug=True,
-) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    """Compute areas and use to filter both sets of contours."""
-
-    # Drop small 235s
-    cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
-    # ^ This crs is equidistant cylindrical
-    big_enough = cs235.area_km2 >= 4000
-    if debug:
-        print(
-            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
-            " of 235s are big enough"
-        )
-    cs235 = cs235[big_enough].reset_index(drop=True)
-
-    # Identify indices of 219s inside 235s
-    # Note that some 235s might not have any 219s inside
-    a = cs235.sjoin(cs219, predicate="contains", how="left").reset_index()
-    # ^ gives an Int64 index with duplicated values, for each 219 inside a certain 235
-    i219s = {  # convert to list
-        i235: g.index_right.astype(int).to_list()
-        for i235, g in a.groupby("index")
-        if not g.index_right.isna().all()
-    }
-
-    # Check 219 area sum inside the 235
-    sum219s = {
-        i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
-        for i235 in cs235.index
-    }
-    cs235["area219_km2"] = pd.Series(sum219s)
-    big_enough = cs235.area219_km2 >= 4000
-    if debug:
-        print(
-            f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
-            "of big-enough 235s have enough 219 area"
-        )
-    cs235 = cs235[big_enough].reset_index(drop=True)
-
-    # TODO: store 219 inds in the 235 df? optional output?
-
-    return cs235, cs219
-
-
-def identify(x, based_on="ctt") -> gpd.GeoDataFrame:
-    """Identify clouds."""
-    if based_on != "ctt":
-        raise NotImplementedError
-
-    cs235 = _contours_to_gdf(contours(x, 235))
-    cs219 = _contours_to_gdf(contours(x, 219))
-
-    cs235, _ = _size_filter_contours(cs235, cs219)
-
-    return sort_ew(cs235)
 
 
 def _project_geometry(s: gpd.GeoSeries, *, dx: float) -> gpd.GeoSeries:

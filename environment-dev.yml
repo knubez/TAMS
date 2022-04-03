@@ -18,6 +18,10 @@ dependencies:
   - shapely
   - xarray
   #
+  # Extras
+  - joblib
+  - ptitprince
+  #
   # Development and tests
   - jupyterlab
   - mypy

@@ -31,7 +31,7 @@ def test_data_in_contours_non_xy():
     # The MPAS one has real lat/lon 1-D dim-coords, not x/y with 2-D lat/lon
     # so with `to_dataframe().reset_index(drop=True)` lat/lon were lost
     ds = tams.load_example_mpas().isel(time=1)
-    cs = tams.identify(ds.tb)
+    cs = tams.identify(ds.tb)[0][0]
     data = ds.precip
     cs_precip = tams.data_in_contours(data, cs, method="sjoin")
     assert cs_precip.mean_precip.sum() > 0
