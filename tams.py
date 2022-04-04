@@ -801,6 +801,8 @@ def run(
     assert {"ctt", "pr"} <= set(ds.data_vars)
     assert "time" in ds.dims
 
+    # TODO: timing and progress indicators, possibly with Rich
+
     #
     # 1. Identify
     #
