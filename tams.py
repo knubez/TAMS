@@ -152,8 +152,8 @@ def _size_filter_contours(
     `threshold` is for the total 219 K contour area within a given 235 K contour
     (units: km2).
     """
-
-    # from shapely.geometry import MultiPolygon
+    import geopandas as gpd
+    from shapely.geometry import MultiPolygon
 
     # Drop small 235s (a 235 with area < 4000 km2 can't have 219 area of 4000)
     cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
@@ -205,6 +205,23 @@ def _size_filter_contours(
         f"of big-enough 235s have enough 219 area ({threshold} km2)"
     )
     cs235 = cs235[big_enough].reset_index(drop=True)
+
+    # Store 219s inside the 235 frame as `MultiPolygon`s
+    cs235["cs219"] = gpd.GeoSeries(
+        cs235.inds219.apply(lambda inds: MultiPolygon(cs219.geometry.iloc[inds].values))
+    )
+    # NOTE: above method I found to be ~ 10x faster than this alternative:
+    #   gpd.GeoSeries(cs235.inds219.apply(lambda inds: cs219.iloc[inds][["geometry"]].dissolve().geometry[0]))
+    # The other benefit of applying `MultiPolygon` directly is that we get `MultiPolygon`
+    # even in the case of only one, whereas dissolve gives `Polygon` in that case (row).
+    #
+    # TODO: alternative method dissolve on the 219s for each row like below leads to
+    # slightly different data-in-contours pixel counts (greater?) in some cases
+    #   f = lambda row: data_in_contours(tb, cs219.iloc[row.inds219].dissolve())
+    #   res_ = cs235.apply(f, axis="columns")  # Series of DataFrames
+    #   res = pd.concat(res_.to_list()).reset_index(drop=True)
+    # TODO: unary_union (like dissolve uses), might be better unless can properly deal with
+    # the small holes we sometimes get, otherwise some area gets counted extra
 
     # TODO: some elegant way to drop 219s that aren't inside a 235, resetting index
     # but preserving the matching of 235 to 219s
@@ -455,7 +472,7 @@ def track(
     u_projection: float = 0,
     durations=None,
 ) -> list[gpd.GeoDataFrame]:
-    """Assign group IDs to the CEs, returning a new list of contour sets.
+    """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
     Currently this works by: for each CE at the current time step,
     searching for a "parent" from the previous time step by computing
@@ -531,7 +548,7 @@ def track(
     # Combine into one frame
     cs = pd.concat(css)
 
-    return cs
+    return cs.reset_index(drop=True)  # drop nested time, CE ind index
 
 
 def plot_tracked(
