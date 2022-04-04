@@ -286,7 +286,9 @@ def identify(
             except ImportError as e:
                 raise RuntimeError("joblib required") from e
 
-            res = joblib.Parallel(n_jobs=-2)(joblib.delayed(f)(ctt.isel(time=i)) for i in itimes)
+            res = joblib.Parallel(n_jobs=-2, verbose=10)(
+                joblib.delayed(f)(ctt.isel(time=i)) for i in itimes
+            )
 
         else:
             res = [f(ctt.isel(time=i)) for i in itimes]
@@ -471,7 +473,7 @@ def track(
     overlap_threshold: float = 0.5,
     u_projection: float = 0,
     durations=None,
-) -> list[gpd.GeoDataFrame]:
+) -> gpd.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
     Currently this works by: for each CE at the current time step,
@@ -606,7 +608,7 @@ def plot_tracked(
     colors = plt.cm.GnBu(np.linspace(0.2, 0.85, nt))
 
     # Plot blobs at each time
-    for i, g in cs.groupby("itime"):
+    for i, (_, g) in enumerate(cs.groupby("time")):
         color = colors[i]
         blob_kwargs.update(facecolor=color, edgecolor=color)
         text_kwargs.update(color=color)
@@ -776,6 +778,190 @@ def load_example_mpas() -> xr.DataArray:
     ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
 
     return ds
+
+
+def run(
+    ds: xr.DataArray,
+    *,
+    parallel: bool = True,
+    u_projection: float = 0,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """Run all TAMS steps, including precip.
+    `ds` must have a 'ctt' (cloud-top temperature) and a 'pr' (precip rate) variable.
+    Also 'time'.
+    'lon' should be in -180 -- 180 format.
+
+    """
+    import itertools
+
+    import geopandas as gpd
+    from shapely.errors import ShapelyDeprecationWarning
+    from shapely.geometry import MultiPolygon
+
+    assert {"ctt", "pr"} <= set(ds.data_vars)
+    assert "time" in ds.dims
+
+    #
+    # 1. Identify
+    #
+
+    print("Starting `identify`")
+    cs235, cs219 = identify(ds.ctt, parallel=parallel)
+
+    #
+    # 2. Track
+    #
+
+    print("Starting `track`")
+    times = ds.time.values
+    dt = pd.Timedelta(times[1] - times[0])  # TODO: equal spacing check here?
+    ce = track(cs235, times, u_projection=u_projection)
+
+    #
+    # 3. Classify
+    #
+
+    print("Starting `classify`")
+    ce = classify(ce)
+
+    #
+    # 4. Stats (including precip)
+    #
+
+    print("Starting statistics calculations")
+
+    # Cleanup
+    ce = ce.drop(columns=["inds219", "itime", "dtime"]).convert_dtypes()
+    ce = ce.rename(columns={"geometry": "cs235"}).set_geometry("cs235")
+    ce.cs219 = ce.cs219.set_crs("EPSG:4326")  # TODO: ensure set in `identify`
+
+    print("Starting CE aggregation (into MCS time series)")
+    dfs_t = []
+    ds_nt = []
+    for mcs_id, mcs_ in ce.groupby("mcs_id"):
+
+        # Time-varying
+        time_group = mcs_.groupby("time")
+        d = {}
+
+        with warnings.catch_warnings():
+            # ShapelyDeprecationWarning: __len__ for multi-part geometries is deprecated ...
+            warnings.filterwarnings(
+                "ignore",
+                category=ShapelyDeprecationWarning,
+                message="__len__ for multi-part geometries is deprecated",
+            )
+            d["cs235"] = gpd.GeoSeries(time_group.apply(lambda g: MultiPolygon(g.geometry.values)))
+            d["cs219"] = gpd.GeoSeries(
+                time_group.apply(
+                    lambda g: MultiPolygon(
+                        itertools.chain.from_iterable(mp.geoms for mp in g.cs219.values)
+                    )
+                )
+            )
+
+        d["nce"] = len(mcs_)
+        d["area_km2"] = time_group.area_km2.sum()
+        d["area219_km2"] = time_group.area219_km2.sum()
+        # TODO: compare to re-computing area after (could be different if shift to dissolve)?
+
+        df = pd.DataFrame(d).reset_index()  # time -> column
+        df["mcs_id"] = mcs_id
+        assert mcs_.mcs_class.unique().size == 1
+        df["mcs_class"] = mcs_.mcs_class.values[0]
+
+        # Summary stuff
+        d2 = {}
+        times = mcs_.time.unique()
+        d2["first_time"] = times.min()
+        d2["last_time"] = times.max()
+        d2["duration"] = d2["last_time"] - d2["first_time"] + dt
+        d2["mcs_id"] = mcs_id
+        d2["mcs_class"] = mcs_.mcs_class.values[0]
+
+        dfs_t.append(df)
+        ds_nt.append(d2)
+
+    # Initial MCS time-resolved
+    mcs = (
+        gpd.GeoDataFrame(pd.concat(dfs_t).reset_index(drop=True))
+        .set_geometry("cs235", crs="EPSG:4326")
+        .convert_dtypes()
+    )
+    mcs.cs219 = mcs.cs219.set_crs("EPSG:4326")
+    mcs.mcs_class = mcs.mcs_class.astype("category")
+
+    # Add CTT and PR data stats (time-resolved)
+    print("Starting gridded data aggregation")
+    dfs = []
+    for t, g in mcs.groupby("time"):
+        df1 = data_in_contours(ds.pr.sel(time=t), g, merge=True)
+        df2 = data_in_contours(
+            ds.pr.sel(time=t), g.set_geometry("cs219", drop=True), merge=False
+        ).add_suffix("219")
+        df3 = data_in_contours(
+            ds.ctt.sel(time=t), g.set_geometry("cs219", drop=True), merge=False
+        ).add_suffix("219")
+        df = (
+            df1.join(df2)
+            .join(df3)
+            .drop(
+                columns=[
+                    "count_pr219",
+                ]
+            )
+            .rename(columns={"count_pr": "npixel", "count_ctt219": "npixel219"})
+        )
+        dfs.append(df)
+
+    mcs = pd.concat(dfs)
+
+    # Initial MCS summary
+    mcs_summary = pd.DataFrame(ds_nt).reset_index(drop=True).convert_dtypes()
+    mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
+
+    # Add some CTT and PR stats to summary dataset
+    print("Computing stats for MCS summary dataset")
+    vns = ["mean_pr", "mean_pr219", "mean_ctt219", "std_ctt219", "area_km2", "area219_km2"]
+    mcs_summary = mcs_summary.join(
+        mcs.groupby("mcs_id")[vns].mean().rename(columns={vn: f"mean_{vn}" for vn in vns})
+    )
+
+    # Add first and last points and distance to MCS summary dataset,
+    # setting first point as the `geometry`
+
+    def f(g):
+        g.sort_values(by="time")  # should be already but just in case...
+        cen = g.geometry.to_crs("EPSG:32663").centroid.to_crs("EPSG:4326")
+        return gpd.GeoSeries({"first_centroid": cen.iloc[0], "last_centroid": cen.iloc[-1]})
+
+    mcs_summary_points = gpd.GeoDataFrame(mcs.groupby("mcs_id").apply(f).astype("geometry"))
+    # ^ Initially we have GeoDataFrame but the columns don't have dtype geometry
+    # `.astype("geometry")` makes that conversion but we lose GeoDataFrame
+
+    # `.set_crs()` only works on a dtype=geometry column in a GeoDataFrame
+    mcs_summary_points.first_centroid = mcs_summary_points.first_centroid.set_crs("EPSG:4326")
+    mcs_summary_points.last_centroid = mcs_summary_points.last_centroid.set_crs("EPSG:4326")
+    assert (
+        mcs_summary_points.first_centroid.crs == mcs_summary_points.last_centroid.crs == "EPSG:4326"
+    )
+
+    mcs_summary_points["distance_km"] = (
+        mcs_summary_points.first_centroid.to_crs("EPSG:32663").distance(
+            mcs_summary_points.last_centroid.to_crs("EPSG:32663")
+        )
+        / 10**3
+    ).astype("Float64")
+
+    mcs_summary = (
+        gpd.GeoDataFrame(mcs_summary).join(mcs_summary_points).set_geometry("first_centroid")
+    )
+
+    # Final cleanup
+    mcs = mcs.reset_index(drop=True)
+    mcs_summary = mcs_summary.reset_index(drop=True)
+
+    return ce, mcs, mcs_summary
 
 
 if __name__ == "__main__":

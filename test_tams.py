@@ -88,3 +88,7 @@ def test_contour_too_small_skipped():
     gdf = tams._contours_to_gdf(contours)
     assert len(contours) == 1
     assert len(gdf) == 1
+
+
+# TODO: test to check crs of all geometry columns returned by `run` are correct
+# and all have a RangeIndex
