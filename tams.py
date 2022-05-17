@@ -14,7 +14,7 @@ import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
-    from typing import Iterable
+    from typing import Sequence
 
     import geopandas as gpd
     import matplotlib as mpl
@@ -782,7 +782,7 @@ def load_example_mpas() -> xr.DataArray:
     return ds
 
 
-def load_mpas_precip(paths: str | Iterable[str]) -> xr.DataArray:
+def load_mpas_precip(paths: str | Sequence[str]) -> xr.DataArray:
     """Load data from MPAS runs for the PRECIP field campaign."""
     import pandas as pd
     import xarray as xr
