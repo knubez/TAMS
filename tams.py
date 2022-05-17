@@ -14,6 +14,8 @@ import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
+    from typing import Iterable
+
     import geopandas as gpd
     import matplotlib as mpl
     from shapely.geometry import Polygon
@@ -780,6 +782,80 @@ def load_example_mpas() -> xr.DataArray:
     return ds
 
 
+def load_mpas_precip(paths: str | Iterable[str]) -> xr.DataArray:
+    """Load data from MPAS runs for the PRECIP field campaign."""
+    import pandas as pd
+    import xarray as xr
+
+    if isinstance(paths, str):
+        from glob import glob
+
+        paths = sorted(glob(paths))
+
+    if len(paths) == 0:
+        raise ValueError("no paths")
+
+    def load_one(p):
+        import re
+        from pathlib import Path
+
+        from scipy.constants import sigma
+
+        p = Path(p)
+
+        ds = xr.open_dataset(p)
+        ds_ = ds[["olrtoa", "rainc", "rainnc"]]
+        ds_ = ds_.rename(Time="time")
+
+        # Detect time from file name and assign
+        fn = p.name
+        m = re.fullmatch(
+            r"mpas_init_20[0-9]{8}_valid_(?P<dt>[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2})_.+\.nc",
+            fn,
+        )
+        s_dt = m.groupdict()["dt"]
+        t = pd.to_datetime(s_dt, format="%Y-%m-%d_%H")
+        ds_["time"] = ("time", [t])
+
+        # Compute CTT from TOA OLR
+        ds_["tb"] = (ds_.olrtoa / sigma) ** (1 / 4)  # TODO: epsilon?
+        ds_.tb.attrs.update(
+            long_name="Brightness temperature",
+            units="K",
+            info="Estimated from 'olrtoa' using the S-B law",
+        )
+
+        # Combine precip vars
+        ds_["aprecip"] = ds_.rainc + ds_.rainnc
+        ds_.aprecip.attrs.update(long_name="Accumulated precip", units="mm")
+
+        # Drop other vars
+        ds_ = ds_.drop_vars(["olrtoa", "rainc", "rainnc"])
+
+        return ds_
+
+    # Load combined
+    ds = xr.concat((load_one(p) for p in paths), dim="time")
+    # TODO: support parallel load?
+
+    # Compute precip by diffing the accumulated precip variable
+    # In MPAS output, precip outputs are accumulated *up to* the output timestamp
+    # Here, we left-label average rain rate over output time step
+    t = pd.to_datetime(ds.time.values)
+    dt = t[1:] - t[:-1]
+    dt_h = dt.total_seconds() / 3600
+    da_dt_h = xr.DataArray(
+        dims="time",
+        data=np.r_[dt_h, np.nan].astype(np.float32),
+        coords={"time": ds.time},
+    )
+    ds["precip"] = ds.aprecip.diff("time", label="lower") / da_dt_h
+    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
+    ds = ds.drop_vars(["aprecip"])
+
+    return ds
+
+
 def run(
     ds: xr.DataArray,
     *,
@@ -924,7 +1000,14 @@ def run(
 
     # Add some CTT and PR stats to summary dataset
     print("Computing stats for MCS summary dataset")
-    vns = ["mean_pr", "mean_pr219", "mean_ctt219", "std_ctt219", "area_km2", "area219_km2"]
+    vns = [
+        "mean_pr",
+        "mean_pr219",
+        "mean_ctt219",
+        "std_ctt219",
+        "area_km2",
+        "area219_km2",
+    ]
     mcs_summary = mcs_summary.join(
         mcs.groupby("mcs_id")[vns].mean().rename(columns={vn: f"mean_{vn}" for vn in vns})
     )
