@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -6,6 +8,8 @@ import tams
 r = tams.load_example_ir().isel(time=0)
 
 tb = tams.tb_from_ir(r, ch=9)
+
+glade_avail = Path("/glade").is_dir()
 
 
 def test_ch9_tb_loaded():
@@ -92,3 +96,15 @@ def test_contour_too_small_skipped():
 
 # TODO: test to check crs of all geometry columns returned by `run` are correct
 # and all have a RangeIndex
+
+
+@pytest.mark.skipif(not glade_avail, reason="need to have GLADE fs available")
+def test_mpas_precip_loader():
+    ds = tams.load_mpas_precip(
+        "/glade/scratch/rberrios/cpex-aw/"
+        "2021082500/intrp_output/mpas_init_2021082500_valid_2021-08-25_*_latlon_wpac.nc"
+    )
+
+    assert set(ds.data_vars) == {"tb", "precip"}
+    assert tuple(ds.dims) == ("time", "lat", "lon")
+    assert ds.dims["time"] == 24
