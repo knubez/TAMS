@@ -761,7 +761,7 @@ def load_example_tb() -> xr.DataArray:
     return tb_from_ir(r, ch=9)
 
 
-def load_example_mpas() -> xr.DataArray:
+def load_example_mpas() -> xr.Dataset:
     """Load the example MPAS dataset, which has ``tb`` (estimated brightness temperature)
     and ``precip`` (precipitation, derived by summing the MPAS accumulated
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
@@ -782,8 +782,21 @@ def load_example_mpas() -> xr.DataArray:
     return ds
 
 
-def load_mpas_precip(paths: str | Sequence[str]) -> xr.DataArray:
-    """Load data from MPAS runs for the PRECIP field campaign."""
+def load_mpas_precip(paths: str | Sequence[str]) -> xr.Dataset:
+    """Derive data from post-processed MPAS runs for the PRECIP field campaign.
+
+    Parameters
+    ----------
+    paths
+        Corresponding to the post-processed datasets to load from.
+
+        Pass a string glob or a sequence of string paths.
+        (Ensure sorted if doing the latter.)
+
+        .. important::
+           Currently it is assumed that each individual file corresponds
+           to a single time, which is detected from the file name.
+    """
     import pandas as pd
     import xarray as xr
 
