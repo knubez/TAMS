@@ -335,6 +335,8 @@ def _data_in_contours_sjoin(
     for i, g in points.groupby("index_contour"):
         r = g[varnames].agg(agg).T  # columns: aggs; rows: variables
         new_data_[i] = r
+    if not new_data_:
+        raise ValueError("no data found in contours")
     new_data = pd.concat(new_data_).convert_dtypes()
 
     # Convert to standard (non-multi) index and str columns
@@ -363,6 +365,8 @@ def _data_in_contours_regionmask(
         i: data.where(mask == i).to_dataframe()[varnames].dropna().agg(agg).T
         for i in regions.numbers
     }
+    if not new_data_:
+        raise ValueError("no data found in contours")
     new_data = pd.concat(new_data_).convert_dtypes()
     # TODO: also try with xarray methods instead of going through pandas
     # TODO: try with xarray groupby
@@ -394,6 +398,9 @@ def data_in_contours(
     """
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
+        if data.isnull().all():
+            raise ValueError("Input array `data` is all null (e.g. NaN)")
+            # TODO: warn instead for this and return cols of NaNs?
     elif isinstance(data, xr.Dataset):
         # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
         raise NotImplementedError
@@ -850,6 +857,9 @@ def load_mpas_precip(paths: str | Sequence[str]) -> xr.Dataset:
     # Load combined
     ds = xr.concat((load_one(p) for p in paths), dim="time")
     # TODO: support parallel load?
+
+    # Mask 0 values of T (e.g. at initial time since OLR is zero then)
+    ds["tb"] = ds.tb.where(ds.tb > 0)
 
     # Compute precip by diffing the accumulated precip variable
     # In MPAS output, precip outputs are accumulated *up to* the output timestamp

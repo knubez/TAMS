@@ -42,6 +42,14 @@ def test_data_in_contours_non_xy():
     assert (cs_precip.count_precip > 0).all()
 
 
+def test_data_in_contours_raises_full_nan():
+    data = tams.load_example_mpas().isel(time=0).tb
+    cs = tams.identify(tams.load_example_mpas().isel(time=1).tb)[0][0]
+    assert data.isnull().all()
+    with pytest.raises(ValueError, match="all null"):
+        tams.data_in_contours(data, cs)
+
+
 def test_load_mpas_sample():
     ds = tams.load_example_mpas()
     assert tuple(ds.data_vars) == ("tb", "precip")
