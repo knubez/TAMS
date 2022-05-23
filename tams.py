@@ -789,7 +789,7 @@ def load_example_mpas() -> xr.Dataset:
     return ds
 
 
-def load_mpas_precip(paths: str | Sequence[str]) -> xr.Dataset:
+def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> xr.Dataset:
     """Derive data from post-processed MPAS runs for the PRECIP field campaign.
 
     Parameters
@@ -803,6 +803,9 @@ def load_mpas_precip(paths: str | Sequence[str]) -> xr.Dataset:
         .. important::
            Currently it is assumed that each individual file corresponds
            to a single time, which is detected from the file name.
+    parallel
+        If set, do the initial processing (each file) in parallel.
+        Currently uses joblib.
     """
     import pandas as pd
     import xarray as xr
@@ -855,8 +858,14 @@ def load_mpas_precip(paths: str | Sequence[str]) -> xr.Dataset:
         return ds_
 
     # Load combined
-    ds = xr.concat((load_one(p) for p in paths), dim="time")
-    # TODO: support parallel load?
+    if parallel:
+        import joblib
+
+        dss = joblib.Parallel(n_jobs=-2, verbose=10)(joblib.delayed(load_one)(p) for p in paths)
+    else:
+        dss = (load_one(p) for p in paths)
+
+    ds = xr.concat(dss, dim="time")
 
     # Mask 0 values of T (e.g. at initial time since OLR is zero then)
     ds["tb"] = ds.tb.where(ds.tb > 0)
