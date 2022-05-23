@@ -911,18 +911,25 @@ def run(
 
     # TODO: timing and progress indicators, possibly with Rich
 
+    def printt(s):
+        """Print message and current time"""
+        import datetime
+
+        st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(s, st)
+
     #
     # 1. Identify
     #
 
-    print("Starting `identify`")
+    printt("Starting `identify`")
     cs235, cs219 = identify(ds.ctt, parallel=parallel)
 
     #
     # 2. Track
     #
 
-    print("Starting `track`")
+    printt("Starting `track`")
     times = ds.time.values
     dt = pd.Timedelta(times[1] - times[0])  # TODO: equal spacing check here?
     ce = track(cs235, times, u_projection=u_projection)
@@ -931,21 +938,21 @@ def run(
     # 3. Classify
     #
 
-    print("Starting `classify`")
+    printt("Starting `classify`")
     ce = classify(ce)
 
     #
     # 4. Stats (including precip)
     #
 
-    print("Starting statistics calculations")
+    printt("Starting statistics calculations")
 
     # Cleanup
     ce = ce.drop(columns=["inds219", "itime", "dtime"]).convert_dtypes()
     ce = ce.rename(columns={"geometry": "cs235"}).set_geometry("cs235")
     ce.cs219 = ce.cs219.set_crs("EPSG:4326")  # TODO: ensure set in `identify`
 
-    print("Starting CE aggregation (into MCS time series)")
+    printt("Starting CE aggregation (into MCS time series)")
     dfs_t = []
     ds_nt = []
     for mcs_id, mcs_ in ce.groupby("mcs_id"):
@@ -1002,15 +1009,15 @@ def run(
     mcs.mcs_class = mcs.mcs_class.astype("category")
 
     # Add CTT and PR data stats (time-resolved)
-    print("Starting gridded data aggregation")
-    dfs = []
-    for t, g in mcs.groupby("time"):
-        df1 = data_in_contours(ds.pr.sel(time=t), g, merge=True)
-        df2 = data_in_contours(
-            ds.pr.sel(time=t), g.set_geometry("cs219", drop=True), merge=False
-        ).add_suffix("219")
+    printt("Starting gridded data aggregation")
+
+    def _agg_one(ds_t, g):
+        df1 = data_in_contours(ds_t.pr, g, merge=True)
+        df2 = data_in_contours(ds_t.pr, g.set_geometry("cs219", drop=True), merge=False).add_suffix(
+            "219"
+        )
         df3 = data_in_contours(
-            ds.ctt.sel(time=t), g.set_geometry("cs219", drop=True), merge=False
+            ds_t.ctt, g.set_geometry("cs219", drop=True), merge=False
         ).add_suffix("219")
         df = (
             df1.join(df2)
@@ -1022,7 +1029,23 @@ def run(
             )
             .rename(columns={"count_pr": "npixel", "count_ctt219": "npixel219"})
         )
-        dfs.append(df)
+        return df
+
+    if parallel:
+        import joblib
+
+        # TODO: Sometimes getting
+        # > UserWarning: A worker stopped while some jobs were given to the executor.
+        # > This can be caused by a too short worker timeout or by a memory leak.
+        # Increasing `batch_size` reduces the number of these (e.g. to 1 with batch 10, 119 jobs, 11 workers).
+        # Probably better to leave on auto to keep more general though.
+        # Run time doesn't seem affected.
+        dfs = joblib.Parallel(n_jobs=-2, verbose=10, batch_size="auto")(
+            joblib.delayed(_agg_one)(ds.sel(time=t).copy(deep=True), g.copy())
+            for t, g in mcs.groupby("time")
+        )
+    else:
+        dfs = [_agg_one(ds.sel(time=t), g) for t, g in mcs.groupby("time")]
 
     mcs = pd.concat(dfs)
 
@@ -1031,7 +1054,7 @@ def run(
     mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
 
     # Add some CTT and PR stats to summary dataset
-    print("Computing stats for MCS summary dataset")
+    printt("Computing stats for MCS summary dataset")
     vns = [
         "mean_pr",
         "mean_pr219",
@@ -1077,6 +1100,8 @@ def run(
     # Final cleanup
     mcs = mcs.reset_index(drop=True)
     mcs_summary = mcs_summary.reset_index(drop=True)
+
+    printt("Done")
 
     return ce, mcs, mcs_summary
 
