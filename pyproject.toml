@@ -22,3 +22,11 @@ dependencies = [
 
 [project.urls]
 Home = "https://github.com/knubez/TAMS"
+
+
+[tool.isort]
+line_length = 100
+profile = "black"
+
+[tool.black]
+line-length = 100
