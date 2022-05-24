@@ -29,7 +29,12 @@ repos:
     rev: "4.0.1"
     hooks:
       - id: flake8
-        args: [--max-line-length=100, "--ignore=E203,E402,E501,W503,E226"]
+        args:
+          [
+            --max-line-length=100,
+            "--ignore=E203,E402,E501,W503,E226",
+            "--per-file-ignores=tams/__init__.py:F401",
+          ]
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: "v2.6.2"
