@@ -235,10 +235,11 @@ def _identify_one(
     ctt: xr.DataArray,
     *,
     size_filter: bool = True,
+    ctt235: float = 235,
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
-    cs235 = sort_ew(_contours_to_gdf(contours(ctt, 235))).reset_index(drop=True)
+    cs235 = sort_ew(_contours_to_gdf(contours(ctt, ctt235))).reset_index(drop=True)
     cs219 = sort_ew(_contours_to_gdf(contours(ctt, 219))).reset_index(drop=True)
 
     if size_filter:
@@ -252,6 +253,7 @@ def identify(
     *,
     size_filter: bool = True,
     parallel: bool = False,
+    ctt235: float = 235,
 ) -> tuple[list[gpd.GeoDataFrame], list[gpd.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The 235 K contours returned (first list) serve to identify cloud elements (CEs).
@@ -272,7 +274,7 @@ def identify(
     parallel
         Identify in parallel along 'time' dimension for 3-D `ctt` (requires `joblib`).
     """
-    f = functools.partial(_identify_one, size_filter=size_filter)
+    f = functools.partial(_identify_one, size_filter=size_filter, ctt235=ctt235)
     dims = tuple(ctt.dims)
     if len(dims) == 2:
         cs235, cs219 = f(ctt)
@@ -648,7 +650,12 @@ def calc_ellipse_eccen(p: Polygon):
     assert xy.shape[1] == 2
 
     m = EllipseModel()
-    m.estimate(xy)
+    success = m.estimate(xy)
+
+    if not success:
+        warnings.warn(f"ellipse model failed for {p}")
+        return np.nan
+
     _, _, xhw, yhw, _ = m.params
     # ^ xc, yc, a, b, theta; from the docs
     #   a with x, b with y (after subtracting the rotation), but they are half-widths
@@ -893,6 +900,7 @@ def run(
     *,
     parallel: bool = True,
     u_projection: float = 0,
+    ctt235: float = 235,
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """Run all TAMS steps, including precip.
     `ds` must have a 'ctt' (cloud-top temperature) and a 'pr' (precip rate) variable.
@@ -923,7 +931,7 @@ def run(
     #
 
     printt("Starting `identify`")
-    cs235, cs219 = identify(ds.ctt, parallel=parallel)
+    cs235, cs219 = identify(ds.ctt, parallel=parallel, ctt235=ctt235)
 
     #
     # 2. Track
