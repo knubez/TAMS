@@ -814,8 +814,6 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
         If set, do the initial processing (each file) in parallel.
         Currently uses joblib.
     """
-    import pandas as pd
-    import xarray as xr
 
     if isinstance(paths, str):
         from glob import glob
@@ -827,7 +825,6 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
 
     def load_one(p):
         import re
-        from pathlib import Path
 
         from scipy.constants import sigma
 
