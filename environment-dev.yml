@@ -23,6 +23,7 @@ dependencies:
   - ptitprince
   #
   # Development and tests
+  - flit
   - jupyterlab
   - mypy
   - pytest
