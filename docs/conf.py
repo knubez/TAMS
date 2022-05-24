@@ -4,6 +4,8 @@ sys.path.append("../")
 
 
 project = "tams"
+html_title = "TAMS"
+html_logo = "_static/TAMS-logo.png"
 copyright = "2022, K. M. Núñez Ocasio and TAMS developers"
 
 extensions = [
