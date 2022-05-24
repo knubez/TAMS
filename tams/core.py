@@ -613,12 +613,26 @@ def run(
     u_projection: float = 0,
     ctt235: float = 235,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
-    """Run all TAMS steps, including precip.
+    r"""Run all TAMS steps, including precip.
 
-    `ds` must have a ``'ctt'`` (cloud-top temperature) and a ``'pr'`` (precip rate) variable.
-    Also ``'time'``.
-    ``'lon'`` should be in -180 -- 180 format.
+    .. important::
+       `ds` must have ``'ctt'`` (cloud-top temperature) and ``'pr'`` (precip rate) variables.
+       Dims should be ``'time'``, ``'lat'``, ``'lon'``.
+       ``'lon'`` should be in -180 -- 180 format.
 
+
+    Usage:
+
+    >>> ce, mcs, mcs_summary = tams.run(ds)
+
+    Parameters
+    ----------
+    ds
+        Dataset containing 3-D cloud-top temperature and precipitation rate.
+    parallel
+        Whether to apply parallelization (where possible).
+    u_projection
+        *x*\-direction projection velocity to apply before computing overlaps.
     """
     import itertools
 

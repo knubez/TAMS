@@ -22,8 +22,8 @@ exclude_patterns = [
     "_build/**/*",
     "**.ipynb_checkpoints",
     # "gen/**/*",
-    "t2.ipynb",
-    "t3.ipynb",
+    "examples/t2.ipynb",
+    "examples/t3.ipynb",
 ]
 
 html_theme = "sphinx_book_theme"

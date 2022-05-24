@@ -9,7 +9,7 @@ The original TAMS is described in {cite:t}`TAMS1.0`.
 :caption: Examples
 :hidden:
 
-t.ipynb
+examples/sample-satellite-data.ipynb
 ```
 
 ```{toctree}
@@ -34,7 +34,8 @@ Then, you can install TAMS directly:
 pip install --no-deps --force-reinstall https://github.com/knubez/TAMS/archive/main.zip
 ```
 
-Or if you want to modify the code, you can first clone the repo:
+Or if you want to modify the code, you can first clone the repo
+and then do an editable install:
 
 ```sh
 git clone https://github.com/knubez/TAMS.git
