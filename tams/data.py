@@ -13,6 +13,8 @@ import xarray as xr
 if TYPE_CHECKING:
     from typing import Sequence
 
+    import xarray
+
 
 _tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
     4: (2569.094, 0.9959, 3.471),
@@ -82,7 +84,7 @@ def download_examples():
             raise
 
 
-def load_example_ir() -> xr.DataArray:
+def load_example_ir() -> xarray.DataArray:
     """Load the example satellite IR radiance data (ch9) as a DataArray."""
 
     ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
@@ -98,7 +100,7 @@ def load_example_ir() -> xr.DataArray:
     return ds.ch9
 
 
-def load_example_tb() -> xr.DataArray:
+def load_example_tb() -> xarray.DataArray:
     """Load the example derived brightness temperature data as a DataArray,
     by first invoking :func:`load_example_ir` and then applying :func:`tb_from_ir`.
     """
@@ -108,8 +110,10 @@ def load_example_tb() -> xr.DataArray:
     return tb_from_ir(r, ch=9)
 
 
-def load_example_mpas() -> xr.Dataset:
-    """Load the example MPAS dataset, which has ``tb`` (estimated brightness temperature)
+def load_example_mpas() -> xarray.Dataset:
+    """Load the example MPAS dataset.
+
+    It has ``tb`` (estimated brightness temperature)
     and ``precip`` (precipitation, derived by summing the MPAS accumulated
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
     """
@@ -129,8 +133,8 @@ def load_example_mpas() -> xr.Dataset:
     return ds
 
 
-def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> xr.Dataset:
-    """Derive data from post-processed MPAS runs for the PRECIP field campaign.
+def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> xarray.Dataset:
+    """Derive a TAMS input dataset from post-processed MPAS runs for the PRECIP field campaign.
 
     Parameters
     ----------

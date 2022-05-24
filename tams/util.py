@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    import geopandas as gpd
-    import matplotlib as mpl
-    import pandas as pd
+    import geopandas
+    import matplotlib
+    import pandas
 
 
-def sort_ew(cs: gpd.GeoDataFrame):
+def sort_ew(cs: geopandas.GeoDataFrame):
     """Sort the frame east to west descending, using the centroid lon value."""
     # TODO: optional reset_index ?
     with warnings.catch_warnings():
@@ -31,11 +31,11 @@ def sort_ew(cs: gpd.GeoDataFrame):
 
 
 def plot_tracked(
-    cs: gpd.GeoDataFrame,
+    cs: geopandas.GeoDataFrame,
     *,
     alpha: float = 0.25,
     background: str = "countries",
-    ax: mpl.axes.Axes | None = None,
+    ax: matplotlib.axes.Axes | None = None,
     size: float = 4,
 ):
     """Plot CEs at a range of times (colors) with CE group ID (MCS ID) identified."""
@@ -106,7 +106,7 @@ def plot_tracked(
                 ax.text(x, y, id_, **text_kwargs)
 
 
-def _the_unique(s: pd.Series):
+def _the_unique(s: pandas.Series):
     """Return the one unique value or raise ValueError."""
     u = s.unique()
     if u.size == 1:

@@ -15,19 +15,31 @@ extensions = [
     "myst_nb",
 ]
 
+exclude_patterns = [
+    "_build/**/*",
+    "**.ipynb_checkpoints",
+    # "gen/**/*",
+    "t2.ipynb",
+    "t3.ipynb",
+]
+
 html_theme = "sphinx_book_theme"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
-    "xarray": ("https://xarray.pydata.org/en/stable/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "xarray": ("https://docs.xarray.dev/en/stable/", None),
+    "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
     "geopandas": ("https://geopandas.org/en/stable/", None),
-    "dask": ("https://docs.dask.org/en/latest", None),
+    "dask": ("https://docs.dask.org/en/latest/", None),
+    "shapely": ("https://shapely.readthedocs.io/en/stable/", None),
 }
 
+napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 napoleon_preprocess_types = True
-napoleon_use_param = False
+napoleon_use_param = True
 napoleon_use_rtype = False
 
 napoleon_type_aliases = {
@@ -36,12 +48,26 @@ napoleon_type_aliases = {
     "Figure": "~matplotlib.figure.Figure",
     "Axes": "~matplotlib.axes.Axes",
     "Callable": "~typing.Callable",
+    "gpd.GeoDataFrame": "geopandas.GeoDataFrame",
+    # General terms
+    "sequence": ":term:`sequence`",
+    "iterable": ":term:`iterable`",
+    "callable": ":py:func:`callable`",
+    "dict_like": ":term:`dict-like <mapping>`",
+    "dict-like": ":term:`dict-like <mapping>`",
+    "path-like": ":term:`path-like <path-like object>`",
+    "mapping": ":term:`mapping`",
+    "file-like": ":term:`file-like <file-like object>`",
+    # NumPy terms
+    "array_like": ":term:`array_like`",
+    "array-like": ":term:`array-like <array_like>`",
+    "scalar": ":term:`scalar`",
+    "array": ":term:`array`",
+    "hashable": ":term:`hashable <name>`",
 }
 
 nb_execution_mode = "cache"
-nb_execution_excludepatterns = [
-    "t2.ipynb",
-    "t3.ipynb",
-    "_build/**/*",
-]
-exclude_patterns = nb_execution_excludepatterns
+nb_execution_excludepatterns = exclude_patterns
+
+autodoc_typehints = "description"
+autosummary_generate = True
