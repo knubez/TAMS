@@ -35,4 +35,4 @@ jobs:
         run: |
           mypy --install-types --non-interactive \
             --ignore-missing-imports \
-            tams.py test_tams.py
+            tams test_tams.py
