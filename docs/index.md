@@ -14,4 +14,5 @@ t.ipynb
 :hidden:
 
 api.rst
+differences.md
 ```

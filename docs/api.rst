@@ -2,16 +2,55 @@
 API
 ===
 
+Core
+----
+
 These functions make up the core of the TAMS algorithm:
 
 .. autosummary::
+   :toctree: gen/
 
    tams.identify
    tams.track
    tams.classify
 
+
+The helper function :func:`tams.run` combines the above plus additional processing,
+including computing stats on gridded data within the identified cloud element regions.
+
+.. autosummary::
+   :toctree: gen/
+
+   tams.run
+
+
+Lower level functions used in the above include:
+
+.. autosummary::
+   :toctree: gen/
+
+   tams.calc_ellipse_eccen
+   tams.contours
+   tams.data_in_contours
+   tams.overlap
+   tams.project
+
+
+Data
 ----
 
-.. autofunction:: tams.identify
-.. autofunction:: tams.track
-.. autofunction:: tams.classify
+.. autosummary::
+   :toctree: gen/
+
+   tams.load_example_mpas
+   tams.load_example_tb
+   tams.load_mpas_precip
+
+
+Utilities
+---------
+
+.. autosummary::
+   :toctree: gen/
+
+   tams.plot_tracked

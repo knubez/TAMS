@@ -37,3 +37,11 @@ napoleon_type_aliases = {
     "Axes": "~matplotlib.axes.Axes",
     "Callable": "~typing.Callable",
 }
+
+nb_execution_mode = "cache"
+nb_execution_excludepatterns = [
+    "t2.ipynb",
+    "t3.ipynb",
+    "_build/**/*",
+]
+exclude_patterns = nb_execution_excludepatterns

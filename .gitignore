@@ -1,6 +1,7 @@
 *.ipynb_checkpoints
 Satellite_data.nc
 MPAS_data.nc
+docs/gen/
 
 
 # GitHub Python default gitignore below:
