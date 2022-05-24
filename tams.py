@@ -589,7 +589,10 @@ def plot_tracked(
     text_kwargs = dict(fontsize=14, zorder=10)
     if ax is None:
         if background in {"map", "countries"}:
-            import cartopy.crs as ccrs
+            try:
+                import cartopy.crs as ccrs
+            except ImportError as e:
+                raise RuntimeError("cartopy required") from e
 
             proj = ccrs.Mercator()
             tran = ccrs.PlateCarree()
@@ -826,7 +829,10 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
     def load_one(p):
         import re
 
-        from scipy.constants import sigma
+        try:
+            from scipy.constants import sigma
+        except ImportError:
+            sigma = 5.67037442e-8
 
         p = Path(p)
 
@@ -863,7 +869,10 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
 
     # Load combined
     if parallel:
-        import joblib
+        try:
+            import joblib
+        except ImportError as e:
+            raise RuntimeError("joblib required") from e
 
         dss = joblib.Parallel(n_jobs=-2, verbose=10)(joblib.delayed(load_one)(p) for p in paths)
     else:
@@ -1037,7 +1046,10 @@ def run(
         return df
 
     if parallel:
-        import joblib
+        try:
+            import joblib
+        except ImportError as e:
+            raise RuntimeError("joblib required") from e
 
         # TODO: Sometimes getting
         # > UserWarning: A worker stopped while some jobs were given to the executor.

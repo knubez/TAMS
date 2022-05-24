@@ -5,22 +5,22 @@ dependencies:
   - python=3.9
   #
   # Core dependencies
-  - cartopy
   - geopandas>=0.10
   - matplotlib>=3.4
-  - netcdf4
   - numpy
-  - pygeos
-  - pyproj
-  - regionmask
+  - pandas
   - scikit-image
-  - scipy
   - shapely
   - xarray
   #
   # Extras
+  - cartopy
   - joblib
+  - netcdf4
   - ptitprince
+  - pygeos
+  - regionmask
+  - scipy
   #
   # Development and tests
   - flit
