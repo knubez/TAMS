@@ -2,6 +2,9 @@
 
 TAMS (**T**racking **A**lgorithm for **M**esoscale Convective **S**ystems) in Python and with more flexibility.
 
+The original TAMS is described in {cite:t}`TAMS1.0`.
+{cite:t}`AEW-MCS` applied TAMS to African Easterly Wave research.
+
 ```{toctree}
 :caption: Examples
 :hidden:
@@ -36,4 +39,10 @@ Or if you want to modify the code, you can first clone the repo:
 ```sh
 git clone https://github.com/knubez/TAMS.git
 pip install -e TAMS --no-deps
+```
+
+## References
+
+```{bibliography}
+:all:
 ```

@@ -6,7 +6,7 @@ sys.path.append("../")
 project = "tams"
 html_title = "TAMS"
 html_logo = "_static/TAMS-logo.png"
-copyright = "2022, K. M. Núñez Ocasio and TAMS developers"
+copyright = "2022, K. M. Núñez Ocasio and Z. Moon"
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -14,6 +14,7 @@ extensions = [
     "sphinx.ext.extlinks",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
+    "sphinxcontrib.bibtex",
     "myst_nb",
 ]
 
@@ -73,3 +74,6 @@ nb_execution_excludepatterns = exclude_patterns
 
 autodoc_typehints = "description"
 autosummary_generate = True
+
+bibtex_bibfiles = ["refs.bib"]
+bibtex_default_style = "plain"

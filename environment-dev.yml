@@ -34,3 +34,4 @@ dependencies:
   - sphinx>=4.0
   - sphinx-autobuild
   - sphinx-book-theme
+  - sphinxcontrib-bibtex
