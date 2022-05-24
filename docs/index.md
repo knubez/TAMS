@@ -18,6 +18,7 @@ examples/sample-satellite-data.ipynb
 
 api.rst
 differences.md
+GitHub <https://github.com/knubez/TAMS>
 ```
 
 ## Installing
