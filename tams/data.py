@@ -64,6 +64,24 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
+def download_examples():
+    """Download the example datasets (using wget)."""
+    import subprocess
+
+    for id_, fn in [
+        ("1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp", "Satellite_data.nc"),
+        ("1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E", "MPAS_data.nc"),
+    ]:
+        url = f"https://drive.google.com/uc?export=download&id={id_}"
+        cmd = ["wget", "--no-verbose", "--no-check-certificate", url, "-O", (HERE / fn).as_posix()]
+
+        try:
+            subprocess.run(cmd)
+        except Exception:
+            print(f"Running\n  {' '.join(cmd)}\nfailed:")
+            raise
+
+
 def load_example_ir() -> xr.DataArray:
     """Load the example satellite IR radiance data (ch9) as a DataArray."""
 
