@@ -4,7 +4,10 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "tams"
-authors = [{name = "knubez", email = "knocasio@ucar.edu"}]
+authors = [
+    {name = "knubez", email = "knocasio@ucar.edu"},
+    {name = "zmoon", email = "zmoon92@gmail.com"},
+]
 readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
