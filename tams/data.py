@@ -85,7 +85,11 @@ def download_examples():
 
 
 def load_example_ir() -> xarray.DataArray:
-    """Load the example satellite IR radiance data (ch9) as a DataArray."""
+    """Load the example satellite IR radiance data (ch9) as a DataArray.
+
+    This dataset contains 6 time steps of 2-hourly data (every 2 hours):
+    2006-09-01 00--10
+    """
 
     ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
@@ -101,8 +105,13 @@ def load_example_ir() -> xarray.DataArray:
 
 
 def load_example_tb() -> xarray.DataArray:
-    """Load the example derived brightness temperature data as a DataArray,
-    by first invoking :func:`load_example_ir` and then applying :func:`tb_from_ir`.
+    """Load the example derived brightness temperature data as a DataArray.
+
+    This works by first invoking :func:`tams.data.load_example_ir`
+    and then applying :func:`tams.data.tb_from_ir`.
+
+    This dataset contains 6 time steps of 2-hourly data (every 2 hours):
+    2006-09-01 00--10
     """
 
     r = load_example_ir()
@@ -116,6 +125,9 @@ def load_example_mpas() -> xarray.Dataset:
     It has ``tb`` (estimated brightness temperature)
     and ``precip`` (precipitation, derived by summing the MPAS accumulated
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
+
+    This dataset contains 127 time steps of hourly data:
+    2006-09-08 00 -- 2006-09-13 18
     """
 
     ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
