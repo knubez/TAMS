@@ -8,7 +8,7 @@ Core
 These functions make up the core of the TAMS algorithm:
 
 .. autosummary::
-   :toctree: gen/
+   :toctree: api/
 
    tams.identify
    tams.track
@@ -19,7 +19,7 @@ The helper function :func:`tams.run` combines the above plus additional processi
 including computing stats on gridded data within the identified cloud element regions.
 
 .. autosummary::
-   :toctree: gen/
+   :toctree: api/
 
    tams.run
 
@@ -27,7 +27,7 @@ including computing stats on gridded data within the identified cloud element re
 Lower level functions used in the above include:
 
 .. autosummary::
-   :toctree: gen/
+   :toctree: api/
 
    tams.calc_ellipse_eccen
    tams.contours
@@ -40,7 +40,7 @@ Data
 ----
 
 .. autosummary::
-   :toctree: gen/
+   :toctree: api/
 
    tams.load_example_mpas
    tams.load_example_tb
@@ -54,6 +54,6 @@ Utilities
 ---------
 
 .. autosummary::
-   :toctree: gen/
+   :toctree: api/
 
    tams.plot_tracked

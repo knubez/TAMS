@@ -21,7 +21,7 @@ extensions = [
 exclude_patterns = [
     "_build/**/*",
     "**.ipynb_checkpoints",
-    # "gen/**/*",
+    # "api/**/*",
     "examples/t2.ipynb",
     "examples/t3.ipynb",
 ]
