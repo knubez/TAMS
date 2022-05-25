@@ -38,4 +38,9 @@ repos:
     hooks:
       - id: prettier
 
+  - repo: https://github.com/kynan/nbstripout
+    rev: "0.5.0"
+    hooks:
+      - id: nbstripout
+
 exclude: "^TAMS-MATLAB_IMERGv6_2008"
