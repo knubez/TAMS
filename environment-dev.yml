@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python=3.9
+  - pip
   #
   # Core dependencies
   - geopandas>=0.10
@@ -35,3 +36,5 @@ dependencies:
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinxcontrib-bibtex
+  - pip:
+      - sphinxext-opengraph

@@ -16,6 +16,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinxcontrib.bibtex",
     "myst_nb",
+    "sphinxext.opengraph",
 ]
 
 exclude_patterns = [
@@ -77,3 +78,5 @@ autosummary_generate = True
 
 bibtex_bibfiles = ["refs.bib"]
 bibtex_default_style = "plain"
+
+ogp_image = "_static/TAMS-logo.png"
