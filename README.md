@@ -5,7 +5,7 @@
 </h1>
 
 [![CI status](https://github.com/knubez/TAMS/actions/workflows/ci.yml/badge.svg)](https://github.com/knubez/TAMS/actions/workflows/ci.yml)
-[![Documentation status](https://readthedocs.org/projects/tams/badge/?version=latest)](https://tams.readthedocs.io/en/latest/?badge=latest)
+[![Documentation status](https://readthedocs.org/projects/tams/badge/?version=latest)](https://tams.readthedocs.io/en/latest/)
 
 TAMS
 (**T**racking **A**lgorithm for [**M**esoscale Convective **S**ystems](https://en.wikipedia.org/wiki/Mesoscale_convective_system))
