@@ -85,7 +85,8 @@ def _size_filter_contours(
     threshold: float = 4000,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Compute areas and use to filter both sets of contours.
-    `threshold` is for the total 219 K contour area within a given 235 K contour
+
+    `threshold` is for the total cold-core contour area within a given CE contour
     (units: km2).
     """
     import geopandas as gpd
@@ -169,12 +170,13 @@ def _identify_one(
     ctt: xr.DataArray,
     *,
     size_filter: bool = True,
-    ctt235: float = 235,
+    ctt_threshold: float = 235,
+    ctt_core_threshold: float = 219,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
-    cs235 = sort_ew(_contours_to_gdf(contours(ctt, ctt235))).reset_index(drop=True)
-    cs219 = sort_ew(_contours_to_gdf(contours(ctt, 219))).reset_index(drop=True)
+    cs235 = sort_ew(_contours_to_gdf(contours(ctt, ctt_threshold))).reset_index(drop=True)
+    cs219 = sort_ew(_contours_to_gdf(contours(ctt, ctt_core_threshold))).reset_index(drop=True)
 
     if size_filter:
         cs235, cs219 = _size_filter_contours(cs235, cs219)
@@ -187,7 +189,8 @@ def identify(
     *,
     size_filter: bool = True,
     parallel: bool = False,
-    ctt235: float = 235,
+    ctt_threshold: float = 235,
+    ctt_core_threshold: float = 219,
 ) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The 235 K contours returned (first list) serve to identify cloud elements (CEs).
@@ -209,8 +212,20 @@ def identify(
         When enabled, this also identifies the 219s (if any) that are within each 235.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
+    ctt_threshold
+        Used to identify the edges of cloud elements.
+    ctt_core_threshold
+        Used to identify deep convective cloud regions within larger cloud areas.
+        This is used to determine whether or not a system is eligible for being classified
+        as an organized system.
+        It helps target raining clouds.
     """
-    f = functools.partial(_identify_one, size_filter=size_filter, ctt235=ctt235)
+    f = functools.partial(
+        _identify_one,
+        size_filter=size_filter,
+        ctt_threshold=ctt_threshold,
+        ctt_core_threshold=ctt_core_threshold,
+    )
     dims = tuple(ctt.dims)
     if len(dims) == 2:
         cs235, cs219 = f(ctt)
@@ -611,7 +626,8 @@ def run(
     *,
     parallel: bool = True,
     u_projection: float = 0,
-    ctt235: float = 235,
+    ctt_threshold: float = 235,
+    ctt_core_threshold: float = 219,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     r"""Run all TAMS steps, including precip.
 
@@ -633,6 +649,13 @@ def run(
         Whether to apply parallelization (where possible).
     u_projection
         *x*\-direction projection velocity to apply before computing overlaps.
+    ctt_threshold
+        Used to identify the edges of cloud elements.
+    ctt_core_threshold
+        Used to identify deep convective cloud regions within larger cloud areas.
+        This is used to determine whether or not a system is eligible for being classified
+        as an organized system.
+        It helps target raining clouds.
     """
     import itertools
 
@@ -657,7 +680,12 @@ def run(
     #
 
     printt("Starting `identify`")
-    cs235, cs219 = identify(ds.ctt, parallel=parallel, ctt235=ctt235)
+    cs235, cs219 = identify(
+        ds.ctt,
+        parallel=parallel,
+        ctt_threshold=ctt_threshold,
+        ctt_core_threshold=ctt_core_threshold,
+    )
 
     #
     # 2. Track
