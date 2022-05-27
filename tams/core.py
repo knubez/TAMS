@@ -96,7 +96,7 @@ def _size_filter_contours(
     # ^ This crs is equidistant cylindrical
     big_enough = cs235.area_km2 >= threshold
     logger.info(
-        f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
         f" of 235s are big enough ({threshold} km2)"
     )
     cs235 = cs235[big_enough].reset_index(drop=True)
@@ -108,7 +108,7 @@ def _size_filter_contours(
     cs219["area_km2"] = cs219.to_crs("EPSG:32663").area / 10**6
     big_enough = cs219.area_km2 >= individual_219_threshold
     logger.info(
-        f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
         f" of 235s are big enough ({individual_219_threshold} km2)"
     )
     cs219 = cs219[big_enough].reset_index(drop=True)
@@ -137,7 +137,7 @@ def _size_filter_contours(
     cs235["area219_km2"] = pd.Series(sum219s)
     big_enough = cs235.area219_km2 >= threshold
     logger.info(
-        f"{big_enough.value_counts()[True] / big_enough.size * 100:.1f}% "
+        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
         f"of big-enough 235s have enough 219 area ({threshold} km2)"
     )
     cs235 = cs235[big_enough].reset_index(drop=True)
