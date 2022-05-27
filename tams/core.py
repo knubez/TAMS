@@ -1,111 +1,45 @@
 """
-TAMS
+Core routines that make up the TAMS algorithm.
 """
 from __future__ import annotations
 
 import functools
 import logging
 import warnings
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-if TYPE_CHECKING:
-    from typing import Sequence
+from .util import _the_unique, sort_ew
 
-    import geopandas as gpd
-    import matplotlib as mpl
-    from shapely.geometry import Polygon
+if TYPE_CHECKING:
+    import geopandas
+    import numpy
+    import shapely
+    import xarray
 
 
 logger = logging.getLogger(__name__)
 
-HERE = Path(__file__).parent
 
-_tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
-    4: (2569.094, 0.9959, 3.471),
-    5: (1598.566, 0.9963, 2.219),
-    6: (1362.142, 0.9991, 0.485),
-    7: (1149.083, 0.9996, 0.181),
-    8: (1034.345, 0.9999, 0.060),
-    9: (930.659, 0.9983, 0.627),
-    10: (839.661, 0.9988, 0.397),
-    11: (752.381, 0.9981, 0.576),
-}
-
-
-def tb_from_ir(r, ch: int):
-    """Compute brightness temperature from IR satellite radiances (`r`)
-    in channel `ch` of the EUMETSAT MSG SEVIRI instrument.
-
-    Reference: http://www.eumetrain.org/data/2/204/204.pdf page 13
-
-    https://www.eumetsat.int/seviri
-
-    Parameters
-    ----------
-    r : array-like
-        Radiance. Units: m2 m-2 sr-1 (cm-1)-1
-    ch
-        Channel number, in 4--11.
-
-    Returns
-    -------
-    tb
-        Brightness temperature (same type as `r`)
-    """
-    if ch not in range(4, 12):
-        raise ValueError("channel must be in 4--11")
-
-    c1 = 1.19104e-5
-    c2 = 1.43877
-
-    vc, a, b = _tb_from_ir_coeffs[ch]
-
-    tb = (c2 * vc / np.log((c1 * vc**3) / r + 1) - b) / a
-
-    if isinstance(r, xr.DataArray):
-        tb.attrs.update(units="K", long_name="Brightness temperature")
-
-    return tb
-
-
-def sort_ew(cs: gpd.GeoDataFrame):
-    """Sort the frame east to west descending, using the centroid lon value."""
-    # TODO: optional reset_index ?
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            category=UserWarning,
-            message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
-        )
-        # fmt: off
-        return (
-            cs
-            .assign(x=cs.geometry.centroid.x)
-            .sort_values("x", ascending=False)
-            .drop(columns="x")
-        )
-        # fmt: on
-
-
-def contours(x: xr.DataArray, value: float) -> list[np.ndarray]:
+def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
     """Find contour definitions for 2-D data `x` at value `value`.
 
     Parameters
     ----------
-    x : xarray.DataArray
+    x
         Data to be contoured.
-        Currently needs to have 'lat' and 'lon' coordinates.
+        Currently needs to have ``'lat'`` and ``'lon'`` coordinates.
+    value
+        Find contours where `x` has this value.
 
     Returns
     -------
-    list of numpy.ndarray
+    :
         List of 2-D arrays describing contours.
-        The arrays are shape (n, 2); each row is a coordinate pair.
+        The arrays are shape ``(n, 2)``; each row is a coordinate pair.
     """
     if x.isnull().all():
         raise ValueError("Input array `x` is all null (e.g. NaN)")
@@ -125,7 +59,7 @@ def contours(x: xr.DataArray, value: float) -> list[np.ndarray]:
     return cs.allsegs[0]
 
 
-def _contours_to_gdf(cs: list[np.ndarray]) -> gpd.GeoDataFrame:
+def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
     from geopandas import GeoDataFrame
     from shapely.geometry.polygon import LinearRing, orient
 
@@ -145,11 +79,11 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> gpd.GeoDataFrame:
 
 
 def _size_filter_contours(
-    cs235: gpd.GeoDataFrame,
-    cs219: gpd.GeoDataFrame,
+    cs235: geopandas.GeoDataFrame,
+    cs219: geopandas.GeoDataFrame,
     *,
     threshold: float = 4000,
-) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Compute areas and use to filter both sets of contours.
     `threshold` is for the total 219 K contour area within a given 235 K contour
     (units: km2).
@@ -236,7 +170,7 @@ def _identify_one(
     *,
     size_filter: bool = True,
     ctt235: float = 235,
-) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
     cs235 = sort_ew(_contours_to_gdf(contours(ctt, ctt235))).reset_index(drop=True)
@@ -249,12 +183,12 @@ def _identify_one(
 
 
 def identify(
-    ctt: xr.DataArray,
+    ctt: xarray.DataArray,
     *,
     size_filter: bool = True,
     parallel: bool = False,
     ctt235: float = 235,
-) -> tuple[list[gpd.GeoDataFrame], list[gpd.GeoDataFrame]]:
+) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The 235 K contours returned (first list) serve to identify cloud elements (CEs).
     In a given frame from this list, each row corresponds to a certain CE.
@@ -263,6 +197,8 @@ def identify(
 
     Parameters
     ----------
+    ctt
+        Cloud-top temperature array.
     size_filter
         Whether to apply size-filtering
         (using 235 K and 219 K areas to filter out CEs that are not MCS material).
@@ -272,7 +208,7 @@ def identify(
 
         When enabled, this also identifies the 219s (if any) that are within each 235.
     parallel
-        Identify in parallel along 'time' dimension for 3-D `ctt` (requires `joblib`).
+        Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
     """
     f = functools.partial(_identify_one, size_filter=size_filter, ctt235=ctt235)
     dims = tuple(ctt.dims)
@@ -307,11 +243,11 @@ def identify(
 
 def _data_in_contours_sjoin(
     data: xr.DataArray | xr.Dataset,
-    contours: gpd.GeoDataFrame,
+    contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
     agg=("mean", "std", "count"),
-) -> gpd.GeoDataFrame:
+) -> geopandas.GeoDataFrame:
     """Compute stats on `data` within `contours` using :func:`~geopandas.tools.sjoin`.
 
     `data` must have ``'lat'`` and ``'lon'`` variables.
@@ -350,11 +286,11 @@ def _data_in_contours_sjoin(
 
 def _data_in_contours_regionmask(
     data: xr.DataArray | xr.Dataset,
-    contours: gpd.GeoDataFrame,
+    contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
     agg=("mean", "std", "count"),
-) -> gpd.GeoDataFrame:
+) -> geopandas.GeoDataFrame:
     import regionmask
 
     # Form regionmask(s)
@@ -381,17 +317,18 @@ def _data_in_contours_regionmask(
 
 
 def data_in_contours(
-    data: xr.DataArray | xr.Dataset,
-    contours: gpd.GeoDataFrame,
+    data: xarray.DataArray | xarray.Dataset,
+    contours: geopandas.GeoDataFrame,
     *,
     agg=("mean", "std", "count"),
     method: str = "sjoin",
     merge: bool = False,
-) -> gpd.GeoDataFrame:
+) -> geopandas.GeoDataFrame:
     """Compute statistics on `data` within `contours`.
 
     Parameters
     ----------
+    data
     agg : sequence of str or callable
         Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
     method : {'sjoin', 'regionmask'}
@@ -426,7 +363,7 @@ def data_in_contours(
     return new_data
 
 
-def _project_geometry(s: gpd.GeoSeries, *, dx: float) -> gpd.GeoSeries:
+def _project_geometry(s: geopandas.GeoSeries, *, dx: float) -> geopandas.GeoSeries:
     crs0 = s.crs.to_string()
 
     return s.to_crs(crs="EPSG:32663").translate(xoff=dx).to_crs(crs0)
@@ -435,13 +372,15 @@ def _project_geometry(s: gpd.GeoSeries, *, dx: float) -> gpd.GeoSeries:
 # TODO: test
 
 
-def project(df: gpd.GeoDataFrame, *, u: float = 0, dt: float = 3600):
-    """Project the coordinates by `u`*`dt` meters.
+def project(df: geopandas.GeoDataFrame, *, u: float = 0, dt: float = 3600):
+    """Project the coordinates by `u` * `dt` meters in the *x* direction.
 
     Parameters
     ----------
+    df
+        Dataframe of objects to be spatially projected.
     u
-        Speed [m s-1]
+        Speed [m s-1].
     dt
         Time [s]. Default: one hour.
     """
@@ -451,7 +390,7 @@ def project(df: gpd.GeoDataFrame, *, u: float = 0, dt: float = 3600):
     return df.assign(geometry=new_geometry)
 
 
-def overlap(a: gpd.GeoDataFrame, b: gpd.GeoDataFrame):
+def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame):
     """For each contour in `a`, determine those in `b` that overlap and by how much.
 
     Currently the mapping is based on indices of the frames.
@@ -478,13 +417,13 @@ def overlap(a: gpd.GeoDataFrame, b: gpd.GeoDataFrame):
 
 
 def track(
-    contours_sets: list[gpd.GeoDataFrame],
+    contours_sets: list[geopandas.GeoDataFrame],
     times,  # TODO: could replace these two with single dict?
     *,
     overlap_threshold: float = 0.5,
     u_projection: float = 0,
     durations=None,
-) -> gpd.GeoDataFrame:
+) -> geopandas.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
     Currently this works by: for each CE at the current time step,
@@ -493,7 +432,7 @@ def track(
 
     Parameters
     ----------
-    contour_sets
+    contours_sets
         List of identified contours, in GeoDataFrame format.
     times
         Timestamps associated with each identified set of contours.
@@ -524,7 +463,7 @@ def track(
 
     # IDEA: even at initial time, could put CEs together in groups based on edge-to-edge distance
 
-    css: list[gpd.GeoDataFrame] = []
+    css: list[geopandas.GeoDataFrame] = []
     for i in itimes:
         cs_i = contours_sets[i]
         cs_i["time"] = times[i]  # actual time
@@ -564,80 +503,7 @@ def track(
     return cs.reset_index(drop=True)  # drop nested time, CE ind index
 
 
-def plot_tracked(
-    cs: gpd.GeoDataFrame,
-    *,
-    alpha: float = 0.25,
-    background: str = "countries",
-    ax: mpl.axes.Axes | None = None,
-    size: float = 4,
-):
-    """Plot CEs at a range of times (colors) with CE group ID (MCS ID) identified."""
-
-    import matplotlib.pyplot as plt
-
-    valid_backgrounds = {"map", "countries", "none"}
-    if background not in valid_backgrounds:
-        raise ValueError(f"`background` must be one of {valid_backgrounds}")
-
-    x0, y0, x1, y1 = cs.total_bounds
-    aspect = (x1 - x0) / (y1 - y0)
-    # ^ estimate for controlling figure size like in xarray
-    # https://xarray.pydata.org/en/stable/user-guide/plotting.html#controlling-the-figure-size
-
-    blob_kwargs = dict(alpha=alpha, lw=1.5)
-    text_kwargs = dict(fontsize=14, zorder=10)
-    if ax is None:
-        if background in {"map", "countries"}:
-            import cartopy.crs as ccrs
-
-            proj = ccrs.Mercator()
-            tran = ccrs.PlateCarree()
-            fig = plt.figure(figsize=(size * aspect, size))
-            ax = fig.add_subplot(projection=proj)
-            ax.set_extent([x0, x1, y0, y1])
-            ax.gridlines(draw_labels=True)
-
-            if background == "map":
-                # TODO: a more high-res image
-                ax.stock_img()
-            else:  # countries
-                import cartopy.feature as cfeature
-
-                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")
-                ax.coastlines()
-
-            blob_kwargs.update(transform=tran)
-            text_kwargs.update(transform=tran)
-
-        else:  # none
-            _, ax = plt.subplots()
-
-            ax.set(xlabel="lon [°E]", ylabel="lat [°N]")
-
-    nt = cs.time.unique().size
-    colors = plt.cm.GnBu(np.linspace(0.2, 0.85, nt))
-
-    # Plot blobs at each time
-    for i, (_, g) in enumerate(cs.groupby("time")):
-        color = colors[i]
-        blob_kwargs.update(facecolor=color, edgecolor=color)
-        text_kwargs.update(color=color)
-
-        g.plot(ax=ax, **blob_kwargs)
-
-        # Label blobs with assigned ID
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                category=UserWarning,
-                message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
-            )
-            for id_, x, y in zip(g.mcs_id, g.centroid.x, g.centroid.y):
-                ax.text(x, y, id_, **text_kwargs)
-
-
-def calc_ellipse_eccen(p: Polygon):
+def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
     """Compute the (first) eccentricity of the least-squares best-fit ellipse
     to the coordinates of the polygon's exterior.
     """
@@ -666,16 +532,7 @@ def calc_ellipse_eccen(p: Polygon):
     return np.sqrt(1 - rat**2)
 
 
-def _the_unique(s: pd.Series):
-    """Return the one unique value or raise ValueError."""
-    u = s.unique()
-    if u.size == 1:
-        return u[0]
-    else:
-        raise ValueError(f"the Series has more than one unique value: {u}")
-
-
-def _classify_one(cs: gpd.GeoDataFrame) -> str:
+def _classify_one(cs: geopandas.GeoDataFrame) -> str:
     """Classify one CE family group."""
     # eps = sqrt(1 - (b^2/a^2)) -- ellipse "first eccentricity"
     #
@@ -736,7 +593,7 @@ def _classify_one(cs: gpd.GeoDataFrame) -> str:
     return class_
 
 
-def classify(cs: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
     """Classify the CE groups into MCS classes, adding a categorical ``'mcs_class'`` column
     to the input frame.
     """
@@ -749,164 +606,33 @@ def classify(cs: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return cs
 
 
-def load_example_ir() -> xr.DataArray:
-    """Load the example satellite IR radiance data (ch9) as a DataArray."""
-
-    ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
-        {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
-    )
-
-    ds.lon.attrs.update(long_name="Longitude")
-    ds.lat.attrs.update(long_name="Latitude")
-
-    # Times are 2006-Sep-01 00 -- 10, every 2 hours
-    ds["time"] = pd.date_range("2006-Sep-01", freq="2H", periods=6)
-
-    return ds.ch9
-
-
-def load_example_tb() -> xr.DataArray:
-    """Load the example derived brightness temperature data as a DataArray,
-    by first invoking :func:`load_example_ir` and then applying :func:`tb_from_ir`.
-    """
-
-    r = load_example_ir()
-
-    return tb_from_ir(r, ch=9)
-
-
-def load_example_mpas() -> xr.Dataset:
-    """Load the example MPAS dataset, which has ``tb`` (estimated brightness temperature)
-    and ``precip`` (precipitation, derived by summing the MPAS accumulated
-    grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
-    """
-
-    ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
-
-    # Mask 0 values of T (e.g. at initial time since OLR is zero then)
-    ds["tb"] = ds.tb.where(ds.tb > 0)
-
-    # lat has attrs but not lon
-    ds.lon.attrs.update(long_name="Longitude", units="degrees_east")
-    ds.lat.attrs.update(long_name="Latitude")
-
-    ds.tb.attrs.update(long_name="Brightness temperature", units="K")
-    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
-
-    return ds
-
-
-def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> xr.Dataset:
-    """Derive data from post-processed MPAS runs for the PRECIP field campaign.
-
-    Parameters
-    ----------
-    paths
-        Corresponding to the post-processed datasets to load from.
-
-        Pass a string glob or a sequence of string paths.
-        (Ensure sorted if doing the latter.)
-
-        .. important::
-           Currently it is assumed that each individual file corresponds
-           to a single time, which is detected from the file name.
-    parallel
-        If set, do the initial processing (each file) in parallel.
-        Currently uses joblib.
-    """
-    import pandas as pd
-    import xarray as xr
-
-    if isinstance(paths, str):
-        from glob import glob
-
-        paths = sorted(glob(paths))
-
-    if len(paths) == 0:
-        raise ValueError("no paths")
-
-    def load_one(p):
-        import re
-        from pathlib import Path
-
-        from scipy.constants import sigma
-
-        p = Path(p)
-
-        ds = xr.open_dataset(p)
-        ds_ = ds[["olrtoa", "rainc", "rainnc"]]
-        ds_ = ds_.rename(Time="time")
-
-        # Detect time from file name and assign
-        fn = p.name
-        m = re.fullmatch(
-            r"mpas_init_20[0-9]{8}_valid_(?P<dt>[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2})_.+\.nc",
-            fn,
-        )
-        s_dt = m.groupdict()["dt"]
-        t = pd.to_datetime(s_dt, format="%Y-%m-%d_%H")
-        ds_["time"] = ("time", [t])
-
-        # Compute CTT from TOA OLR
-        ds_["tb"] = (ds_.olrtoa / sigma) ** (1 / 4)  # TODO: epsilon?
-        ds_.tb.attrs.update(
-            long_name="Brightness temperature",
-            units="K",
-            info="Estimated from 'olrtoa' using the S-B law",
-        )
-
-        # Combine precip vars
-        ds_["aprecip"] = ds_.rainc + ds_.rainnc
-        ds_.aprecip.attrs.update(long_name="Accumulated precip", units="mm")
-
-        # Drop other vars
-        ds_ = ds_.drop_vars(["olrtoa", "rainc", "rainnc"])
-
-        return ds_
-
-    # Load combined
-    if parallel:
-        import joblib
-
-        dss = joblib.Parallel(n_jobs=-2, verbose=10)(joblib.delayed(load_one)(p) for p in paths)
-    else:
-        dss = (load_one(p) for p in paths)
-
-    ds = xr.concat(dss, dim="time")
-
-    # Mask 0 values of T (e.g. at initial time since OLR is zero then)
-    ds["tb"] = ds.tb.where(ds.tb > 0)
-
-    # Compute precip by diffing the accumulated precip variable
-    # In MPAS output, precip outputs are accumulated *up to* the output timestamp
-    # Here, we left-label average rain rate over output time step
-    t = pd.to_datetime(ds.time.values)
-    dt = t[1:] - t[:-1]
-    dt_h = dt.total_seconds() / 3600
-    da_dt_h = xr.DataArray(
-        dims="time",
-        data=np.r_[dt_h, np.nan].astype(np.float32),
-        coords={"time": ds.time},
-    )
-    ds["precip"] = ds.aprecip.diff("time", label="lower") / da_dt_h
-    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
-    ds = ds.drop_vars(["aprecip"])
-
-    return ds
-
-
 def run(
-    ds: xr.DataArray,
+    ds: xarray.DataArray,
     *,
     parallel: bool = True,
     u_projection: float = 0,
     ctt235: float = 235,
-) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    """Run all TAMS steps, including precip.
-    `ds` must have a 'ctt' (cloud-top temperature) and a 'pr' (precip rate) variable.
-    Also 'time'.
-    'lon' should be in -180 -- 180 format.
+) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
+    r"""Run all TAMS steps, including precip.
 
+    .. important::
+       `ds` must have ``'ctt'`` (cloud-top temperature) and ``'pr'`` (precip rate) variables.
+       Dims should be ``'time'``, ``'lat'``, ``'lon'``.
+       ``'lon'`` should be in -180 -- 180 format.
+
+
+    Usage:
+
+    >>> ce, mcs, mcs_summary = tams.run(ds)
+
+    Parameters
+    ----------
+    ds
+        Dataset containing 3-D cloud-top temperature and precipitation rate.
+    parallel
+        Whether to apply parallelization (where possible).
+    u_projection
+        *x*\-direction projection velocity to apply before computing overlaps.
     """
     import itertools
 
@@ -1040,7 +766,10 @@ def run(
         return df
 
     if parallel:
-        import joblib
+        try:
+            import joblib
+        except ImportError as e:
+            raise RuntimeError("joblib required") from e
 
         # TODO: Sometimes getting
         # > UserWarning: A worker stopped while some jobs were given to the executor.
@@ -1118,6 +847,8 @@ if __name__ == "__main__":
     import cartopy.crs as ccrs
     import matplotlib.pyplot as plt
     import regionmask
+
+    from .data import load_example_ir, tb_from_ir
 
     r = load_example_ir().isel(time=0)
 

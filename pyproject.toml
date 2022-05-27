@@ -1,0 +1,40 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "tams"
+authors = [
+    {name = "knubez", email = "knocasio@ucar.edu"},
+    {name = "zmoon", email = "zmoon92@gmail.com"},
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+classifiers = ["License :: OSI Approved :: MIT License"]
+dynamic = ["version", "description"]
+requires-python = "~=3.7"
+dependencies = [
+    "geopandas >=0.10",
+    "matplotlib >=3.4",
+    "numpy",
+    "pandas",
+    "scikit-image",
+    "shapely",
+    "xarray",
+]
+
+[project.urls]
+Home = "https://github.com/knubez/TAMS"
+
+
+[tool.isort]
+line_length = 100
+profile = "black"
+
+[tool.black]
+line-length = 100
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    'ignore:distutils Version classes are deprecated\. Use packaging\.version instead\.:DeprecationWarning',
+]

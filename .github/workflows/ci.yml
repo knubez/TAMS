@@ -23,24 +23,16 @@ jobs:
           cache-env: true
 
       - name: Download the sample data
-        run: |
-          wget --no-verbose \
-            --no-check-certificate \
-            'https://drive.google.com/uc?export=download&id=1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp' \
-            -O Satellite_data.nc
-          wget --no-verbose \
-            --no-check-certificate \
-            'https://drive.google.com/uc?export=download&id=1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E' \
-            -O MPAS_data.nc
+        run: python -c "from tams.data import download_examples; download_examples()"
 
       - name: pytest
         run: pytest test_tams.py
 
       - name: Run as script
-        run: python tams.py
+        run: python -m tams.core
 
       - name: mypy
         run: |
           mypy --install-types --non-interactive \
             --ignore-missing-imports \
-            tams.py test_tams.py
+            tams test_tams.py

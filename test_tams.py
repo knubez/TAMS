@@ -5,9 +5,9 @@ import pytest
 
 import tams
 
-r = tams.load_example_ir().isel(time=0)
+r = tams.data.load_example_ir().isel(time=0)
 
-tb = tams.tb_from_ir(r, ch=9)
+tb = tams.data.tb_from_ir(r, ch=9)
 
 glade_avail = Path("/glade").is_dir()
 
@@ -18,13 +18,13 @@ def test_ch9_tb_loaded():
 
 
 def test_data_in_contours_methods_same_result():
-    cs235 = tams._contours_to_gdf(tams.contours(tb, 235))
-    cs219 = tams._contours_to_gdf(tams.contours(tb, 219))
-    cs235, _ = tams._size_filter_contours(cs235, cs219)
+    cs235 = tams.core._contours_to_gdf(tams.contours(tb, 235))
+    cs219 = tams.core._contours_to_gdf(tams.contours(tb, 219))
+    cs235, _ = tams.core._size_filter_contours(cs235, cs219)
 
     varnames = ["ch9"]
-    x1 = tams._data_in_contours_sjoin(tb, cs235, varnames=varnames)
-    x2 = tams._data_in_contours_regionmask(tb, cs235, varnames=varnames)
+    x1 = tams.core._data_in_contours_sjoin(tb, cs235, varnames=varnames)
+    x2 = tams.core._data_in_contours_regionmask(tb, cs235, varnames=varnames)
     assert (x1.count_ch9 > 0).all()
     assert x1.count_ch9.equals(x2.count_ch9)
     assert x1.std_ch9.equals(x2.std_ch9)
@@ -92,12 +92,12 @@ def test_contour_too_small_skipped():
     # which can't make a LinearRing (it raises ValueError)
 
     contours = [np.array([[0, 0], [1, 1]])]
-    gdf = tams._contours_to_gdf(contours)
+    gdf = tams.core._contours_to_gdf(contours)
     assert len(contours) == 1
     assert len(gdf) == 0
 
     contours = [np.array([[0, 0], [1, 1], [0, 0.5]])]
-    gdf = tams._contours_to_gdf(contours)
+    gdf = tams.core._contours_to_gdf(contours)
     assert len(contours) == 1
     assert len(gdf) == 1
 
