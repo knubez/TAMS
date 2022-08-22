@@ -42,5 +42,3 @@ repos:
     rev: "0.6.0"
     hooks:
       - id: nbstripout
-
-exclude: "^TAMS-MATLAB_IMERGv6_2008"
