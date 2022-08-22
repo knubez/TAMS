@@ -51,7 +51,7 @@ def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
     assert x.ndim == 2, "this is for a single image"
     with plt.ioff():  # requires mpl 3.4
         fig = plt.figure()
-        cs = x.plot.contour(x="lon", y="lat", levels=[value])
+        cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
 
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
