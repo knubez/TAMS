@@ -4,6 +4,7 @@ MOSA - MCSs over South America
 import warnings
 from pathlib import Path
 
+import numpy as np
 import xarray as xr
 
 BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking")
@@ -75,7 +76,17 @@ def preproc_wrf_file(fp, *, out_dir=None):
     )
 
     # Get precip stats
-    df = tams.data_in_contours(ds.pr, ce, agg=("mean", "max", "min", "count"), merge=True)
+    agg = ("mean", "max", "min", "count")
+    try:
+        df = tams.data_in_contours(ds.pr, ce, agg=agg, merge=True)
+    except ValueError as e:
+        if str(e) == "no data found in contours":
+            print(f"warning: no pr data in contours for {fp.name}")
+            df = ce
+            for a in agg:
+                df[f"{a}_pr"] = np.nan
+        else:
+            raise
 
     # Save to file
     # Get `pyarrow` from conda-forge
