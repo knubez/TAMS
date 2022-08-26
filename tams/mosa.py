@@ -46,13 +46,16 @@ def load_wrf(files):
     return ds
 
 
-def preproc_wrf_file(fp):
+def preproc_wrf_file(fp, *, out_dir=None):
     """Pre-process file, saving CE dataset including CE precip stats to file."""
     import tams
 
     fp = Path(fp)
     ofn = f"{fp.stem}_ce.parquet"
-    ofp = OUT_BASE_DIR / "pre" / ofn
+    if out_dir is None:
+        ofp = OUT_BASE_DIR / "pre" / ofn
+    else:
+        ofp = Path(out_dir) / ofn
 
     ds = (
         xr.open_dataset(fp)
