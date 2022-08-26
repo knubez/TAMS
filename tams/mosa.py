@@ -1,6 +1,7 @@
 """
 MOSA - MCSs over South America
 """
+import warnings
 from pathlib import Path
 
 import xarray as xr
@@ -29,6 +30,8 @@ Files in the first GPM dir are like `merg_2000081011_4km-pixel.nc`.
 WRF files are like `tb_rainrate_2010-11-30_02:00.nc`.
 """
 
+OUT_BASE_DIR = Path("/glade/scratch/knocasio/SAAG")
+
 
 def load_wrf(files):
     # with dask.config.set(**{'array.slicing.split_large_chunks': False}):
@@ -43,35 +46,51 @@ def load_wrf(files):
     return ds
 
 
-import warnings
+def preproc_wrf_file(fp):
+    """Pre-process file, saving CE dataset including CE precip stats to file."""
+    import tams
 
-import geopandas as gpd
+    fp = Path(fp)
+    ofn = f"{fp.stem}_ce.parquet"
+    ofp = OUT_BASE_DIR / "pre" / ofn
 
-import tams
+    ds = (
+        xr.open_dataset(fp)
+        .rename({"rainrate": "pr", "tb": "ctt"})
+        .rename_dims({"rlat": "y", "rlon": "x"})
+        .squeeze()
+    )
+    ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
+    assert len(ds.dims) == 2
 
-ds = tams.load_example_mpas().rename(tb="ctt", precip="pr").isel(time=1)
+    # Identify CEs
+    ce, _ = tams.core._identify_one(ds.ctt, ctt_threshold=241, ctt_core_threshold=225)
+    ce = (
+        ce[["geometry", "area_km2", "area219_km2"]]
+        .rename(columns={"area219_km2": "area_core_km2"})
+        .convert_dtypes()
+    )
 
-# Pre-process one time (for MOSA one file)
+    # Get precip stats
+    df = tams.data_in_contours(ds.pr, ce, agg=("mean", "max", "min", "count"), merge=True)
 
-# Identify CEs
-ce, _ = tams.core._identify_one(ds.ctt, ctt_threshold=241, ctt_core_threshold=225)
-ce = (
-    ce[["geometry", "area_km2", "area219_km2"]]
-    .rename(columns={"area219_km2": "area_core_km2"})
-    .convert_dtypes()
-)
+    # Save to file
+    # Get `pyarrow` from conda-forge
+    # GeoParquet spec v0.4.0 requires GeoPandas v0.11 (which no longer warns)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
+        df.to_parquet(ofp)
 
-# Get precip stats
-df = tams.data_in_contours(ds.pr, ce, agg=("mean", "max", "min", "count"), merge=True)
+    ds.close()
 
-# Save to file
-# Get `pyarrow` from conda-forge
-# GeoParquet spec v0.4.0 requires GeoPandas v0.11 (which no longer warns)
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
-    df.to_parquet("t.parquet")
 
-# Load and check
-df2 = gpd.read_parquet("t.parquet")
+if __name__ == "__main__":
+    # import geopandas as gpd
 
-assert df2.equals(df)
+    import tams
+
+    ds = tams.load_example_mpas().rename(tb="ctt", precip="pr").isel(time=1)
+
+    # # Load and check
+    # df2 = gpd.read_parquet("t.parquet")
+    # assert df2.equals(df)
