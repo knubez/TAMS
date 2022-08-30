@@ -103,14 +103,10 @@ def run_wrf_preproced(fps: list[Path]):
     """On preprocessed files, do the remaining steps:
     track, classify.
     """
-    import time
-
     import geopandas as gpd
     import pandas as pd
 
     import tams
-
-    tic = time.perf_counter()
 
     #
     # Read
@@ -121,8 +117,7 @@ def run_wrf_preproced(fps: list[Path]):
         import datetime
 
         st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        toc = time.perf_counter()
-        print(f"{st}: {s} (elapsed: {toc - tic:.3g} s)")
+        print(f"{st}: {s}")
 
     printt("Reading pre-processed files")
     sts = []  # datetime strings
