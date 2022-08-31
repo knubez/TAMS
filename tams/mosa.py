@@ -112,7 +112,7 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
     # Read
     #
 
-    pre = f"[{id_}]" if id_ is not None else ""
+    pre = f"[{id_}] " if id_ is not None else ""
 
     def printt(s):
         """Print message and current time"""
@@ -121,7 +121,7 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
         st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{pre}{st}: {s}")
 
-    printt("Reading pre-processed files")
+    printt(f"Reading {len(fps)} pre-processed files")
     sts = []  # datetime strings
     dfs = []
     for fp in sorted(fps):
