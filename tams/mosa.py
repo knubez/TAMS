@@ -142,6 +142,7 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
     #
 
     printt("Classifying")
+    ce["mcs_id"] = ce.mcs_id.astype(int)  # TODO: should be already
     n_ = ce.mcs_id.max() + 1
     n = int(n_)
     if n != n_:
