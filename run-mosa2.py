@@ -11,8 +11,6 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
-import joblib
-
 from tams.mosa import run_wrf_preproced
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa-pre")
@@ -67,6 +65,9 @@ def run_wy(wy: int, files: list[Path]):
     mcs.to_csv(OUT_DIR / f"wrf_wy{wy}.csv.gz", index=False)
 
 
-joblib.Parallel(n_jobs=-2, verbose=1)(
-    joblib.delayed(run_wy)(wy, files) for wy, files in wy_files.items()
-)
+if __name__ == "__main__":
+    import joblib
+
+    joblib.Parallel(n_jobs=-2, verbose=1)(
+        joblib.delayed(run_wy)(wy, files) for wy, files in wy_files.items()
+    )
