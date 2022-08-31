@@ -58,7 +58,7 @@ assert not extra
 def run_wy(wy: int, files: list[Path]):
     # Run
     print(f"using {len(files)} files")
-    ce = run_wrf_preproced(files)
+    ce = run_wrf_preproced(files, id_=f"WY{wy}")
 
     # Only CEs associated to MCS (as defined by MOSA)
     mcs = ce[ce.is_mcs].reset_index(drop=True).drop(columns=["is_mcs", "not_is_mcs_reason"])

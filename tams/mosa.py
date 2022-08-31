@@ -99,7 +99,7 @@ def preproc_wrf_file(fp, *, out_dir=None):
     ds.close()
 
 
-def run_wrf_preproced(fps: list[Path]):
+def run_wrf_preproced(fps: list[Path], *, id_: str = None):
     """On preprocessed files, do the remaining steps:
     track, classify.
     """
@@ -116,8 +116,9 @@ def run_wrf_preproced(fps: list[Path]):
         """Print message and current time"""
         import datetime
 
+        pre = f"[{id_}]" if id_ is not None else ""
         st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"{st}: {s}")
+        print(f"{pre}{st}: {s}")
 
     printt("Reading pre-processed files")
     sts = []  # datetime strings
@@ -140,7 +141,10 @@ def run_wrf_preproced(fps: list[Path]):
     #
 
     printt("Classifying")
-    n = ce.mcs_id.max() + 1
+    n_ = ce.mcs_id.max() + 1
+    n = int(n_)
+    if n != n_:
+        warnings.warn(f"max MCS ID + 1 was {n_} but using {n}", stacklevel=2)
     is_mcs_list = [None] * n
     reason_list = [None] * n
     for mcs_id, g in ce.groupby("mcs_id"):
