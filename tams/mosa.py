@@ -112,11 +112,12 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
     # Read
     #
 
+    pre = f"[{id_}]" if id_ is not None else ""
+
     def printt(s):
         """Print message and current time"""
         import datetime
 
-        pre = f"[{id_}]" if id_ is not None else ""
         st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{pre}{st}: {s}")
 
@@ -144,7 +145,7 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
     n_ = ce.mcs_id.max() + 1
     n = int(n_)
     if n != n_:
-        warnings.warn(f"max MCS ID + 1 was {n_} but using {n}", stacklevel=2)
+        warnings.warn(f"{pre}max MCS ID + 1 was {n_} but using {n}", stacklevel=2)
     is_mcs_list = [None] * n
     reason_list = [None] * n
     for mcs_id, g in ce.groupby("mcs_id"):
