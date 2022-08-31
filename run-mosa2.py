@@ -49,8 +49,6 @@ for p in files:
 
 assert not extra
 
-print(f"using {len(files)} files")
-
 
 #
 # Run WYs
@@ -59,6 +57,7 @@ print(f"using {len(files)} files")
 
 def run_wy(wy: int, files: list[Path]):
     # Run
+    print(f"using {len(files)} files")
     ce = run_wrf_preproced(files)
 
     # Only CEs associated to MCS (as defined by MOSA)
