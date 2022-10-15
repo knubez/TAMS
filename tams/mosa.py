@@ -1,10 +1,13 @@
 """
 MOSA - MCSs over South America
 """
+from __future__ import annotations
+
 import warnings
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking")
@@ -99,14 +102,40 @@ def preproc_wrf_file(fp, *, out_dir=None):
     ds.close()
 
 
-def run_wrf_preproced(fps: list[Path], *, id_: str = None):
+def run_wrf_preproced(
+    fps: list[Path], *, id_: str = None, rt: str = "df", grid: xr.Dataset | None = None
+) -> xr.Dataset | pd.DataFrame:
     """On preprocessed files, do the remaining steps:
     track, classify.
+
+    Note that this returns all tracked CEs, including those not classified as MCS
+    (output df includes reason).
+
+    Parameters
+    ----------
+    id_
+        Just used for the info messages, to differentiate when running multiple at same time.
+    rt : {'df', 'ds'}
+        Return type.
+        - df -- return pandas dataframe (only stats, no contours/geometry)
+        - ds -- return xarray dataset (mask to identify MCSs)
+          - `mcs_mask` variable, with dims (time, y, x)
+          - 'lat'/'lon' with dims (y, x) (even if they only vary in one dim)
+          - file name: `<last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc`
+    grid : xarray.Dataset, optional
+        If using ``rt='ds'``, need a file to get the lat/lon grid from in order to make the masks.
+        This assumes that the grid is constant.
     """
     import geopandas as gpd
-    import pandas as pd
 
     import tams
+
+    allowed_rt = {"df", "ds"}
+    if rt not in allowed_rt:
+        raise ValueError(f"`rt` must be one of {allowed_rt}")
+
+    if rt == "ds" and grid is None:
+        raise ValueError("`grid` dataset must be provided")
 
     #
     # Read
@@ -238,7 +267,7 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
     # Clean up the table
     #
 
-    printt("Cleaning up the table")
+    printt("Processing CE output")
     cen = ce.geometry.to_crs("EPSG:32663").centroid.to_crs("EPSG:4326")
 
     with warnings.catch_warnings():
@@ -249,43 +278,84 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
 
     # TODO: include computed stats from above like duration somehow?
 
-    col_order = [
-        "time",
-        "lat",
-        "lon",
-        "area_km2",
-        "area_core_km2",
-        "eccen",
-        "mcs_id",
-        "mean_pr",
-        "max_pr",
-        "min_pr",
-        "count_pr",
-        "is_mcs",
-        "not_is_mcs_reason",
-    ]
+    if rt == "df":
 
-    ce_ = (
-        ce.drop(
-            columns=[
-                # "inds219", "area219_km2", "cs219",
-                "itime",
-                "dtime",
-                "geometry",
-            ]
+        col_order = [
+            "time",
+            "lat",
+            "lon",
+            "area_km2",
+            "area_core_km2",
+            "eccen",
+            "mcs_id",
+            "mean_pr",
+            "max_pr",
+            "min_pr",
+            "count_pr",
+            "is_mcs",
+            "not_is_mcs_reason",
+        ]
+
+        ce_ = (
+            ce.drop(
+                columns=[
+                    # "inds219", "area219_km2", "cs219",
+                    "itime",
+                    "dtime",
+                    "geometry",
+                ]
+            )
+            .assign(eccen=eccen)
+            .assign(lat=cen.y, lon=cen.x)
         )
-        .assign(eccen=eccen)
-        .assign(lat=cen.y, lon=cen.x)
-    )
 
-    assert set(ce_.columns) == set(col_order)
+        assert set(ce_.columns) == set(col_order)
 
-    df = pd.DataFrame(ce_)[col_order]
-    df
+        df = pd.DataFrame(ce_)[col_order]
+        df
 
-    printt("Done")
+        printt("Done")
 
-    return df
+        return df
+
+    elif rt == "ds":
+        import regionmask
+        from shapely.errors import ShapelyDeprecationWarning
+
+        time = sorted(ce.time.unique())
+
+        masks = []
+        for t in time:  # TODO: joblib?
+            ce_t = ce.loc[ce.time == t]
+            # NOTE: `numbers` can't have duplicates, so we use `.dissolve()` to combine
+            regions = regionmask.from_geopandas(
+                ce_t[["geometry", "mcs_id"]].dissolve(by="mcs_id").reset_index(),
+                numbers="mcs_id",
+            )
+            with warnings.catch_warnings():
+                # ShapelyDeprecationWarning: __len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.
+                warnings.filterwarnings(
+                    "ignore",
+                    category=ShapelyDeprecationWarning,
+                    message="__len__ for multi-part geometries is deprecated",
+                )
+                mask = regions.mask(grid)
+            masks.append(mask)
+
+        da = xr.concat(masks, dim="time")
+        da["time"] = time
+
+        # Our IDs start at 0, but we want to use 0 for missing/null value
+        # (the sample file looks to be doing this)
+        assert da.min() == 0
+        da = (da + 1).fillna(0).astype(np.int64)
+        da.attrs.update(long_name="MCS ID mask", description="Value 0 indicates null (no MCS).")
+
+        ds = da.to_dataset().rename_vars(mask="mcs_mask")
+
+        printt("Done")
+
+        return ds
 
 
 if __name__ == "__main__":
