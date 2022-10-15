@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xarray as xr
+from typing_extensions import Literal, assert_never
 
 BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking")
 """Base location on NCAR GLADE.
@@ -103,7 +104,11 @@ def preproc_wrf_file(fp, *, out_dir=None):
 
 
 def run_wrf_preproced(
-    fps: list[Path], *, id_: str = None, rt: str = "df", grid: xr.Dataset | None = None
+    fps: list[Path],
+    *,
+    id_: str = None,
+    rt: Literal["df", "ds"] = "df",
+    grid: xr.Dataset | None = None,
 ) -> xr.Dataset | pd.DataFrame:
     """On preprocessed files, do the remaining steps:
     track, classify.
@@ -186,8 +191,8 @@ def run_wrf_preproced(
     n = int(n_)
     if n != n_:
         warnings.warn(f"{pre}max MCS ID + 1 was {n_} but using {n}", stacklevel=2)
-    is_mcs_list = [None] * n
-    reason_list = [None] * n
+    is_mcs_list: list[None | bool] = [None] * n
+    reason_list: list[None | str] = [None] * n
     for mcs_id, g in ce.groupby("mcs_id"):
         # Compute time
         t = g.time.unique()
@@ -356,6 +361,8 @@ def run_wrf_preproced(
         printt("Done")
 
         return ds
+
+    assert_never(rt)
 
 
 if __name__ == "__main__":
