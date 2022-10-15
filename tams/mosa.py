@@ -126,7 +126,17 @@ def run_wrf_preproced(fps: list[Path], *, id_: str = None):
     dfs = []
     for fp in sorted(fps):
         sts.append(fp.name[12:25])
-        dfs.append(gpd.read_parquet(fp))
+        df = gpd.read_parquet(fp)
+        # At least when concatting all of them, getting some weird types in WY2016
+        # (WY2011 is ok for some reason)
+        # TODO: alleviate need for this (in preproc)
+        df = df.assign(
+            mean_pr=df.mean_pr.astype(float),
+            max_pr=df.max_pr.astype(float),
+            min_pr=df.min_pr.astype(float),
+            count_pr=df.count_pr.astype(int),
+        ).convert_dtypes()
+        dfs.append(df)
 
     times = pd.to_datetime(sts, format=r"%Y-%m-%d_%H")
 
