@@ -120,14 +120,14 @@ def run_wrf_preproced(
     ----------
     id_
         Just used for the info messages, to differentiate when running multiple at same time.
-    rt : {'df', 'ds'}
+    rt
         Return type.
         - df -- return pandas dataframe (only stats, no contours/geometry)
         - ds -- return xarray dataset (mask to identify MCSs)
-          - `mcs_mask` variable, with dims (time, y, x)
-          - 'lat'/'lon' with dims (y, x) (even if they only vary in one dim)
-          - file name: `<last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc`
-    grid : xarray.Dataset, optional
+            - `mcs_mask` variable, with dims (time, y, x)
+            - 'lat'/'lon' with dims (y, x) (even if they only vary in one dim)
+            - file name: `<last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc`
+    grid
         If using ``rt='ds'``, need a file to get the lat/lon grid from in order to make the masks.
         This assumes that the grid is constant.
     """
