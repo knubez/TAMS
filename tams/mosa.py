@@ -107,7 +107,7 @@ def run_wrf_preproced(
     fps: list[Path],
     *,
     id_: str = None,
-    rt: Literal["df", "ds"] = "df",
+    rt: Literal["df", "ds", "gdf"] = "df",
     grid: xr.Dataset | None = None,
 ) -> xr.Dataset | pd.DataFrame:
     """On preprocessed files, do the remaining steps:
@@ -127,6 +127,7 @@ def run_wrf_preproced(
             - `mcs_mask` variable, with dims (time, y, x)
             - 'lat'/'lon' with dims (y, x) (even if they only vary in one dim)
             - file name: `<last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc`
+        - gdf -- GeoDataFrame, including the contour polygons
     grid
         If using ``rt='ds'``, need a file to get the lat/lon grid from in order to make the masks.
         This assumes that the grid is constant.
@@ -135,7 +136,7 @@ def run_wrf_preproced(
 
     import tams
 
-    allowed_rt = {"df", "ds"}
+    allowed_rt = {"df", "ds", "gdf"}
     if rt not in allowed_rt:
         raise ValueError(f"`rt` must be one of {allowed_rt}")
 
@@ -271,6 +272,9 @@ def run_wrf_preproced(
     #
     # Clean up the table
     #
+
+    if rt == "gdf":
+        return ce
 
     printt("Processing CE output")
     cen = ce.geometry.to_crs("EPSG:32663").centroid.to_crs("EPSG:4326")
