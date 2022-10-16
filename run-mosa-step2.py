@@ -86,6 +86,7 @@ def run_wy(wy: int, files: list[Path], rt="df"):
         # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
         # DATA can either be OBS or WRF
         ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file.nc")
+        # TODO: compression for 'mcs_mask'
 
     else:
         raise ValueError(f"invalid `rt` {rt!r}")

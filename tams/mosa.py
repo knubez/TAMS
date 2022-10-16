@@ -364,6 +364,9 @@ def run_wrf_preproced(
 
         ds = da.to_dataset().rename_vars(mask="mcs_mask")
 
+        # TODO: remove annoying 'coordinates' attrs from das (lat/lon)
+        # TODO: ds attrs (WY, TAMS info, date, TAMS commit using `git rev-parse --verify --short HEAD`, ...)
+
         printt("Done")
 
         return ds
