@@ -51,8 +51,8 @@ def load_wrf(files):
     return ds
 
 
-def preproc_wrf_file(fp, *, out_dir=None):
-    """Pre-process file, saving CE dataset including CE precip stats to file."""
+def preproc_wrf_file(fp, *, out_dir=None) -> None:
+    """Pre-process file, saving CE dataset, including CE precip stats, to file."""
     import tams
 
     fp = Path(fp)

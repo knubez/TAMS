@@ -1,5 +1,6 @@
 """
-Try the MOSA runner for preprocessed files
+Try the MOSA runner for pre-processed data,
+using a subset of the pre-processed files.
 """
 from pathlib import Path
 

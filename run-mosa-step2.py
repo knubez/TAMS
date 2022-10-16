@@ -1,5 +1,5 @@
 """
-Run on MOSA pre-processed data (step 2)
+Run TAMS on MOSA pre-processed data and produce output files (step 2)
 - track
 - classify CEs
 - save df
