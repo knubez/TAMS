@@ -287,6 +287,8 @@ def run_wrf_preproced(
 
     # TODO: include computed stats from above like duration somehow?
 
+    # TODO: separate into a step 3, using the saved gdf?
+
     if rt == "df":
 
         col_order = [

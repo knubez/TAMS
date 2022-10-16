@@ -14,7 +14,7 @@ from pathlib import Path
 from tams.mosa import run_wrf_preproced
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa-pre")
-OUT_DIR = Path("/glade/scratch/zmoon/mosa2")
+OUT_DIR = Path("/glade/scratch/zmoon/mosa2")  # TODO: just 'mosa' ?
 
 
 #
@@ -80,6 +80,7 @@ def run_wy(wy: int, files: list[Path], rt="df"):
 
     elif rt == "ds":
         ds = ret
+        # TODO: this includes non-MCS CEs, and currently no way to differentiate
 
         # Save ds
         # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
