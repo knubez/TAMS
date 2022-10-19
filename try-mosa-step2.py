@@ -21,3 +21,8 @@ ds_grid = (
     .squeeze()
 )
 ds = run_wrf_preproced(files, rt="ds", grid=ds_grid, id_="ds")
+
+# Save file
+encoding = {"mcs_mask": {"zlib": True, "complevel": 5}}
+ds.to_netcdf(base / "tams_mcs-mask-sample_nocomp.nc")
+ds.to_netcdf(base / "tams_mcs-mask-sample.nc", encoding=encoding)  # type: ignore[arg-type]

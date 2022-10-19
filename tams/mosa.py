@@ -3,6 +3,8 @@ MOSA - MCSs over South America
 """
 from __future__ import annotations
 
+import datetime
+import subprocess
 import warnings
 from pathlib import Path
 
@@ -36,6 +38,8 @@ WRF files are like `tb_rainrate_2010-11-30_02:00.nc`.
 """
 
 OUT_BASE_DIR = Path("/glade/scratch/knocasio/SAAG")
+
+HERE = Path(__file__).parent
 
 
 def load_wrf(files):
@@ -364,8 +368,23 @@ def run_wrf_preproced(
 
         ds = da.to_dataset().rename_vars(mask="mcs_mask")
 
-        # TODO: remove annoying 'coordinates' attrs from das (lat/lon)
-        # TODO: ds attrs (WY, TAMS info, date, TAMS commit using `git rev-parse --verify --short HEAD`, ...)
+        # Remove current irrelevant 'coordinates' attrs from das
+        # ('mcs_mask' will still get `mcs_mask:coordinates = "lon lat"` in the saved file)
+        for _, v in ds.variables.items():
+            if "coordinates" in v.attrs:
+                del v.attrs["coordinates"]
+
+        # Add some info
+        assert HERE.parent.name == "TAMS", "repo"
+        try:
+            cmd = ["git", "-C", HERE.parent.as_posix(), "rev-parse", "--verify", "--short", "HEAD"]
+            cp = subprocess.run(cmd, text=True, capture_output=True)
+        except Exception:
+            ver = ""
+        else:
+            ver = f" ({cp.stdout.strip()})"
+        now = datetime.datetime.utcnow().strftime(r"%Y-%m-%d %H:%M UTC")
+        ds.attrs.update(prov=(f"Creating using TAMS{ver} at {now}."))
 
         printt("Done")
 
