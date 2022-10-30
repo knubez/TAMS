@@ -339,6 +339,7 @@ def run_wrf_preproced(
 
         time = sorted(ce.time.unique())
 
+        dfs = []
         masks = []
         for t in time:  # TODO: joblib?
             ce_t = ce.loc[ce.time == t]
@@ -356,6 +357,15 @@ def run_wrf_preproced(
                 )
                 mask = regions.mask(grid)
             masks.append(mask)
+
+            # Agg some other info
+            gb = ce_t.groupby("mcs_id")
+            x1 = gb[["area_km2", "area_core_km2"]].sum()
+            x2 = gb[["is_mcs", "not_is_mcs_reason"]].agg(tams.util._the_unique)
+            x3 = gb[["area_km2"]].count().rename(columns={"area_km2": "ce_count"})
+            x3["time"] = t
+
+            dfs.append(pd.concat([x1, x2, x3], axis="columns"))
 
         da = xr.concat(masks, dim="time")
         da["time"] = time
@@ -385,6 +395,16 @@ def run_wrf_preproced(
             ver = f" ({cp.stdout.strip()})"
         now = datetime.datetime.utcnow().strftime(r"%Y-%m-%d %H:%M UTC")
         ds.attrs.update(prov=(f"Creating using TAMS{ver} at {now}."))
+
+        # Add the extra variables
+        df = pd.concat(dfs, axis="index")
+        df[["area_km2", "area_core_km2"]] = df[["area_km2", "area_core_km2"]].astype(np.float64)
+        df[["is_mcs"]] = df[["is_mcs"]].astype(np.bool)
+        ds2 = df.reset_index().set_index(["mcs_id", "time"]).to_xarray()
+        ds2["mcs_id"] = ds2.mcs_id + 1
+        ds = ds.merge(ds2, join="exact", compat="equals")
+
+        # TODO: mcs_id could be uint32, float ones float32, ce_count int32 or uint32 with 0 for null?
 
         printt("Done")
 
