@@ -15,7 +15,7 @@ dependencies:
   - xarray
   #
   # Extras
-  - cartopy
+  - cartopy>=0.21
   - joblib
   - netcdf4
   - ptitprince
