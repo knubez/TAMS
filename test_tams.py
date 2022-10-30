@@ -70,7 +70,7 @@ def test_ellipse_eccen(wh):
     from shapely.geometry import Polygon
 
     w, h = wh
-    ell = Ellipse((1, 1), w, h, np.rad2deg(np.pi / 4))
+    ell = Ellipse((1, 1), w, h, angle=np.rad2deg(np.pi / 4))
     p = Polygon(ell.get_verts())
 
     b, a = sorted([w, h])
