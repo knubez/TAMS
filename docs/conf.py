@@ -17,6 +17,8 @@ extensions = [
     "sphinxcontrib.bibtex",
     "myst_nb",
     "sphinxext.opengraph",
+    "sphinx-prompt",
+    "sphinx_copybutton",
 ]
 
 exclude_patterns = [

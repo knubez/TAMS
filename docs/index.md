@@ -27,24 +27,23 @@ GitHub <https://github.com/knubez/TAMS>
 
 ## Installing
 
-To install TAMS, first create a
-[conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)
-with at least the core dependencies listed
-[here](https://github.com/knubez/TAMS/blob/main/environment-dev.yml).
-You may want to include the extras as well.
+TAMS is [available on conda-forge](https://anaconda.org/conda-forge/tams).
 
-Then, you can install TAMS directly:
-
-```sh
-pip install --no-deps --force-reinstall https://github.com/knubez/TAMS/archive/main.zip
+```{prompt} bash
+conda install -c conda-forge tams
 ```
 
-Or if you want to modify the code, you can first clone the repo
-and then do an editable install:
+### Development install
 
-```sh
+If you want to modify the code, you can first clone the repo
+and then do an editable install to the dev conda environment:
+
+```{prompt} bash
 git clone https://github.com/knubez/TAMS.git
-pip install -e TAMS --no-deps
+cd TAMS
+conda env create -f environment-dev.yml
+conda activate tams-dev
+pip install -e . --no-deps
 ```
 
 ## References

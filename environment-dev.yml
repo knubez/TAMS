@@ -35,6 +35,8 @@ dependencies:
   - sphinx=4.*
   - sphinx-autobuild
   - sphinx-book-theme
+  - sphinx-copybutton
   - sphinxcontrib-bibtex
   - pip:
+      - sphinx-prompt
       - sphinxext-opengraph
