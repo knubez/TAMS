@@ -2,7 +2,7 @@
 ## Submit with `qsub -A <account>`
 #PBS -N mosa2
 #PBS -q casper
-#PBS -l walltime=02:00:00
+#PBS -l walltime=04:00:00
 #PBS -l select=1:ncpus=4:mem=16gb
 #PBS -j oe
 
