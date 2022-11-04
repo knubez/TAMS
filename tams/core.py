@@ -471,7 +471,7 @@ def track(
     else:
         # Estimate dt values
         dt = times[1:] - times[:-1]
-        assert (dt.astype(int) > 0).all()
+        assert (dt.astype(np.int64) > 0).all()
         if not dt.unique().size == 1:
             warnings.warn("unequal time spacing")
         dt = dt.insert(-1, dt[-1])

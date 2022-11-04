@@ -15,7 +15,7 @@ dependencies:
   - xarray
   #
   # Extras
-  - cartopy
+  - cartopy>=0.21
   - joblib
   - netcdf4
   - ptitprince
@@ -35,6 +35,8 @@ dependencies:
   - sphinx=4.*
   - sphinx-autobuild
   - sphinx-book-theme
+  - sphinx-copybutton
   - sphinxcontrib-bibtex
   - pip:
+      - sphinx-prompt
       - sphinxext-opengraph

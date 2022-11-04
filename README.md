@@ -6,6 +6,8 @@
 
 [![CI status](https://github.com/knubez/TAMS/actions/workflows/ci.yml/badge.svg)](https://github.com/knubez/TAMS/actions/workflows/ci.yml)
 [![Documentation status](https://readthedocs.org/projects/tams/badge/?version=latest)](https://tams.readthedocs.io/en/latest/)
+[![Conda Version](https://img.shields.io/conda/vn/conda-forge/tams.svg)](https://anaconda.org/conda-forge/tams)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 
 TAMS
 (**T**racking **A**lgorithm for [**M**esoscale Convective **S**ystems](https://en.wikipedia.org/wiki/Mesoscale_convective_system))
