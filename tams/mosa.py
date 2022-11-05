@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime
 import subprocess
 import warnings
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -55,7 +56,41 @@ def load_wrf(files):
     return ds
 
 
-def preproc_wrf_file(fp, *, out_dir=None) -> None:
+def _load_wrf_file(fp) -> xr.Dataset:
+    # fns are like 'tb_rainrate_2015-06-01_12:00.nc'
+    ds = (
+        xr.open_dataset(fp)
+        .rename({"rainrate": "pr", "tb": "ctt"})
+        .rename_dims({"rlat": "y", "rlon": "x"})
+        .squeeze()
+    )
+    ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
+
+    return ds
+
+
+def _load_gpm_file(fp) -> xr.Dataset:
+    # fns are like 'merg_2015060112_4km-pixel.nc'
+    #
+    # > The original 30 min IMERG precipitation data have been averaged to hourly
+    # > (at the first time stamp), but the original 30 min Tb data are retained
+    # > in the files.
+    # > Note that the GPM_MERGIR data occasionally have missing Tb data,
+    # > either caused by a missing satellite scan, or in lines of individual pixels
+    # > that may affect convective cloud object identification.
+    ds = (
+        xr.open_dataset(fp)
+        .drop_vars(["lat_bnds", "lon_bnds", "gw", "area"])
+        .rename({"Tb": "ctt", "precipitationCal": "pr"})
+    )
+    assert ds.isel(time=1).pr.isnull().all()
+    ds = ds.mean(dim="time", keep_attrs=True)
+    assert (ds.lon < 0).any()
+
+    return ds
+
+
+def preproc_file(fp, *, kind, out_dir=None) -> None:
     """Pre-process file, saving CE dataset, including CE precip stats, to file."""
     import tams
 
@@ -66,13 +101,12 @@ def preproc_wrf_file(fp, *, out_dir=None) -> None:
     else:
         ofp = Path(out_dir) / ofn
 
-    ds = (
-        xr.open_dataset(fp)
-        .rename({"rainrate": "pr", "tb": "ctt"})
-        .rename_dims({"rlat": "y", "rlon": "x"})
-        .squeeze()
-    )
-    ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
+    if kind.lower() == "wrf":
+        ds = _load_wrf_file(fp)
+    elif kind.lower() == "gpm":
+        ds = _load_gpm_file(fp)
+    else:
+        raise ValueError(f"invalid `which` {kind!r}")
     assert len(ds.dims) == 2
 
     # Identify CEs
@@ -105,6 +139,10 @@ def preproc_wrf_file(fp, *, out_dir=None) -> None:
         # TODO: avoid `:` in fn since Windows doesn't like?
 
     ds.close()
+
+
+preproc_wrf_file = partial(preproc_file, kind="wrf")
+preproc_gpm_file = partial(preproc_file, kind="gpm")
 
 
 def run_wrf_preproced(
