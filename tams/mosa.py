@@ -84,7 +84,10 @@ def _load_gpm_file(fp) -> xr.Dataset:
         .rename({"Tb": "ctt", "precipitationCal": "pr"})
     )
     assert set(ds.data_vars) == {"ctt", "pr"}
-    assert ds.isel(time=1).pr.isnull().all() or (ds.pr.isel(time=0) == ds.pr.isel(time=1)).all()
+    if not (ds.isel(time=1).pr.isnull().all() or (ds.pr.isel(time=0) == ds.pr.isel(time=1)).all()):
+        warnings.warn(
+            f"precip at time 1 not all NaN and not all equal to time 0: {fp.name}", stacklevel=2
+        )
     ds = ds.mean(dim="time", keep_attrs=True)
     assert (ds.lon < 0).any()
 
