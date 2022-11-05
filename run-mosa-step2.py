@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
+from typing import Any, Hashable
 
 from tams.mosa import run_wrf_preproced
 
@@ -84,7 +85,7 @@ def run_wy(wy: int, files: list[Path], rt="df"):
         # Save ds
         # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
         # DATA can either be OBS or WRF
-        encoding = {"mcs_mask": {"zlib": True, "complevel": 5}}
+        encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
         ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file_all.nc", encoding=encoding)  # type: ignore[arg-type]
 
         # Drop those not identified as MCSs using the MOSA criteria

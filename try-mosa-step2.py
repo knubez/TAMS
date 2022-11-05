@@ -2,7 +2,10 @@
 Try the MOSA runner for pre-processed data,
 using a subset of the pre-processed files.
 """
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any, Hashable
 
 import xarray as xr
 
@@ -23,9 +26,9 @@ ds_grid = (
 ds = run_wrf_preproced(files, rt="ds", grid=ds_grid, id_="ds")
 
 # Save file
-encoding = {"mcs_mask": {"zlib": True, "complevel": 5}}
+encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
 ds.to_netcdf(base / "tams_mcs-mask-sample_nocomp.nc")
-ds.to_netcdf(base / "tams_mcs-mask-sample.nc", encoding=encoding)  # type: ignore[arg-type]
+ds.to_netcdf(base / "tams_mcs-mask-sample.nc", encoding=encoding)
 
 # Drop non-MCS
 is_mcs = ds.is_mcs.to_series().groupby("mcs_id").agg(lambda x: x[~x.isnull()].unique())
@@ -35,4 +38,4 @@ ids = is_mcs[is_mcs].index
 ds2 = ds.sel(mcs_id=ids)
 assert ds2.is_mcs.all()
 ds2 = ds2.drop_vars(["is_mcs", "not_is_mcs_reason"])
-ds2.to_netcdf(base / "tams_mcs-mask-sample_reduced.nc", encoding=encoding)  # type: ignore[arg-type]
+ds2.to_netcdf(base / "tams_mcs-mask-sample_reduced.nc", encoding=encoding)
