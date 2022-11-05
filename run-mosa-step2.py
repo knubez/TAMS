@@ -85,7 +85,7 @@ def run_wy(wy: int, files: list[Path], rt="df"):
         # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
         # DATA can either be OBS or WRF
         encoding = {"mcs_mask": {"zlib": True, "complevel": 5}}
-        ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file_all.nc", encoding=encoding)
+        ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file_all.nc", encoding=encoding)  # type: ignore[arg-type]
 
         # Drop those not identified as MCSs using the MOSA criteria
         is_mcs = ds.is_mcs.to_series().groupby("mcs_id").agg(lambda x: x[~x.isnull()].unique())
@@ -95,7 +95,7 @@ def run_wy(wy: int, files: list[Path], rt="df"):
         ds2 = ds.sel(mcs_id=ids)
         assert ds2.is_mcs.all()
         ds2 = ds2.drop_vars(["is_mcs", "not_is_mcs_reason"])
-        ds2.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file.nc", encoding=encoding)
+        ds2.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file.nc", encoding=encoding)  # type: ignore[arg-type]
 
     else:
         raise ValueError(f"invalid `rt` {rt!r}")

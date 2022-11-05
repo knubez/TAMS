@@ -437,7 +437,7 @@ def run_wrf_preproced(
         # Add the extra variables
         df = pd.concat(dfs, axis="index")
         df[["area_km2", "area_core_km2"]] = df[["area_km2", "area_core_km2"]].astype(np.float64)
-        df[["is_mcs"]] = df[["is_mcs"]].astype(np.bool)
+        df[["is_mcs"]] = df[["is_mcs"]].astype(np.bool_)
         ds2 = df.reset_index().set_index(["mcs_id", "time"]).to_xarray()
         ds2["mcs_id"] = ds2.mcs_id + 1
         ds = ds.merge(ds2, join="exact", compat="equals")

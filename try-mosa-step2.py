@@ -35,4 +35,4 @@ ids = is_mcs[is_mcs].index
 ds2 = ds.sel(mcs_id=ids)
 assert ds2.is_mcs.all()
 ds2 = ds2.drop_vars(["is_mcs", "not_is_mcs_reason"])
-ds2.to_netcdf(base / "tams_mcs-mask-sample_reduced.nc", encoding=encoding)
+ds2.to_netcdf(base / "tams_mcs-mask-sample_reduced.nc", encoding=encoding)  # type: ignore[arg-type]
