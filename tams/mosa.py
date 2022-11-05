@@ -84,10 +84,16 @@ def _load_gpm_file(fp) -> xr.Dataset:
         .rename({"Tb": "ctt", "precipitationCal": "pr"})
     )
     assert set(ds.data_vars) == {"ctt", "pr"}
+    # It seems like most of the files have pr all NaN in the second time,
+    # though some have a copy of the first time values,
+    # and a few have different values
+    # e.g. merg_20110208{15,16,17}_4km-pixel.nc
+    # (in which case we don't want to time-average, assuming the above info is correct).
     if not (ds.isel(time=1).pr.isnull().all() or (ds.pr.isel(time=0) == ds.pr.isel(time=1)).all()):
         warnings.warn(
-            f"precip at time 1 not all NaN and not all equal to time 0: {fp.name}", stacklevel=2
+            f"precip at time 1 not all NaN and not all equal to time 0: {fp.name}", stacklevel=3
         )
+    ds["pr"] = ds.pr.isel(time=0)
     ds = ds.mean(dim="time", keep_attrs=True)
     assert (ds.lon < 0).any()
 
