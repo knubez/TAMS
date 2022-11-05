@@ -56,7 +56,7 @@ if do_gpm:
     fn = partial(preproc_gpm_file, out_dir=out_dir)
     for wy in wys:
         # The WRF file sets start in June of previous year
-        ts = pd.date_range(f"{wy - 1}/06/01", "{wy}/06/01", freq="H")[:-1]
+        ts = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")[:-1]
         rfns = ts.strftime(r"%Y") + "/merg_" + ts.strftime(r"%Y%m%d%H") + "_4km-pixel.nc"
         files = [BASE_DIR / "GPM" / rfn for rfn in rfns]
         print(files[0])

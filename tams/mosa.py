@@ -80,9 +80,10 @@ def _load_gpm_file(fp) -> xr.Dataset:
     # > that may affect convective cloud object identification.
     ds = (
         xr.open_dataset(fp)
-        .drop_vars(["lat_bnds", "lon_bnds", "gw", "area"])
+        .drop_vars(["lat_bnds", "lon_bnds", "gw", "area"], errors="ignore")
         .rename({"Tb": "ctt", "precipitationCal": "pr"})
     )
+    assert set(ds.data_vars) == {"ctt", "pr"}
     assert ds.isel(time=1).pr.isnull().all()
     ds = ds.mean(dim="time", keep_attrs=True)
     assert (ds.lon < 0).any()
