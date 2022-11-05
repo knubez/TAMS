@@ -61,7 +61,7 @@ def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
 
 def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
     from geopandas import GeoDataFrame
-    from shapely.geometry.polygon import LinearRing, orient
+    from shapely.geometry.polygon import LinearRing, LineString, orient
 
     polys = []
     for c in cs:
@@ -71,6 +71,8 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
             continue
         r = LinearRing(zip(x, y))
         p0 = r.convex_hull  # TODO: optional, also add buffer option
+        if type(p0) is LineString:
+            continue  # not a closed contour
         p = orient(p0)  # -> counter-clockwise
         polys.append(p)
 
