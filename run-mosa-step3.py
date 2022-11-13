@@ -12,6 +12,8 @@ OUT_DIR = IN_DIR
 
 re_gdf_fn = re.compile(r"(wrf|gpm)_wy([0-9]{4})\.parquet")
 
+gdf_fps = sorted(IN_DIR.glob("???_wy????.parquet"))
+
 
 def run_gdf(fp: Path) -> None:
     import geopandas as gpd
@@ -83,4 +85,4 @@ def run_gdf(fp: Path) -> None:
 if __name__ == "__main__":
     import joblib
 
-    joblib.parallel(n_jobs=-2, verbose=1)
+    joblib.parallel(n_jobs=-2, verbose=1)(joblib.delayed(run_gdf)(fp) for fp in gdf_fps)
