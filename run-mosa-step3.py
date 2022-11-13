@@ -65,6 +65,8 @@ def run_gdf(fp: Path) -> None:
 
     ds = gdf_to_ds(gdf, grid=grid)
 
+    # TODO: add null first time if WRF
+
     # Save ds
     # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
     # DATA can either be OBS or WRF
