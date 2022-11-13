@@ -305,6 +305,8 @@ def run_wrf_preproced(
 
     # TODO: include computed stats from above like duration somehow?
 
+    printt("Done")
+
     return ce
 
 
