@@ -22,21 +22,20 @@ OUT_DIR = Path("/glade/scratch/zmoon/mosa2")  # TODO: just 'mosa' ?
 # Get files
 #
 
+# WRF
+files = sorted(IN_DIR.glob("tb_rainrate_*.parquet"))
 
-files = sorted(IN_DIR.glob("tb_rainrate*.parquet"))
-
-print(f"{len(files)} total files")
+print(f"{len(files)} total files (WRF)")
 
 print(files[0])
 print("...")
 print(files[-1])
 
-
 # Split files into WYs
 extra = []
 wy_files = defaultdict(list)
 for p in files:
-    pre = p.name[:16]
+    pre = p.name[: len("tb_rainrate_2010")]
     if pre in {"tb_rainrate_2010", "tb_rainrate_2011"}:
         wy_files[2011].append(p)
     elif pre in {"tb_rainrate_2015", "tb_rainrate_2016"}:
@@ -47,6 +46,33 @@ for p in files:
         extra.append(p)
 
 assert not extra
+wy_files_wrf = wy_files
+
+# GPM
+files = sorted(IN_DIR.glob("merg_*.parquet"))
+
+print(f"{len(files)} total files (GPM)")
+
+print(files[0])
+print("...")
+print(files[-1])
+
+# Split files into WYs
+extra = []
+wy_files = defaultdict(list)
+for p in files:
+    pre = p.name[: len("merg_2010")]
+    if pre in {"merg_2010", "merg_2011"}:
+        wy_files[2011].append(p)
+    elif pre in {"merg_2015", "merg_2016"}:
+        wy_files[2016].append(p)
+    elif pre in {"merg_2018", "merg_2019"}:
+        wy_files[2019].append(p)
+    else:
+        extra.append(p)
+
+assert not extra
+wy_files_gpm = wy_files
 
 
 #
@@ -72,6 +98,7 @@ def run_wy(wy: int, files: list[Path]):
 
 
 if __name__ == "__main__":
+    import itertools
     from functools import partial
 
     import joblib
@@ -79,5 +106,6 @@ if __name__ == "__main__":
     fn = partial(run_wy, rt="ds")
 
     joblib.Parallel(n_jobs=-2, verbose=1)(
-        joblib.delayed(fn)(wy, files) for wy, files in wy_files.items()
+        joblib.delayed(fn)(wy, files)
+        for wy, files in itertools.chain(wy_files_wrf.items(), wy_files_gpm.items())
     )
