@@ -1,6 +1,8 @@
 """
 Try the MOSA runner for pre-processed data,
 using a subset of the pre-processed files.
+
+(Steps 2 _and_ 3.)
 """
 from __future__ import annotations
 
@@ -9,13 +11,14 @@ from typing import Any, Hashable
 
 import xarray as xr
 
-from tams.mosa import run_wrf_preproced
+from tams.mosa import gdf_to_df, gdf_to_ds, run_wrf_preproced
 
 base = Path("~/OneDrive/w/ERT-ARL/mosa").expanduser()
 files = sorted((base / "mosa-pre-sample").glob("tb_rainrate*.parquet"))
 
 # DataFrame output
-df = run_wrf_preproced(files, id_="df")
+gdf = run_wrf_preproced(files, id_="WRF")
+df = gdf_to_df(gdf)
 
 # Dataset output
 ds_grid = (
@@ -23,7 +26,7 @@ ds_grid = (
     .rename_dims({"rlat": "y", "rlon": "x"})
     .squeeze()
 )
-ds = run_wrf_preproced(files, rt="ds", grid=ds_grid, id_="ds")
+ds = gdf_to_ds(gdf, grid=ds_grid)
 
 # Save file
 encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}

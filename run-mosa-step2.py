@@ -2,15 +2,15 @@
 Run TAMS on MOSA pre-processed data and produce output files (step 2)
 - track
 - classify CEs
-- save df
+- save gdf
 
 Based on nb MOSA-2.ipynb
 """
 from __future__ import annotations
 
+import warnings
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Hashable
 
 from tams.mosa import run_wrf_preproced
 
@@ -54,52 +54,21 @@ assert not extra
 #
 
 
-def run_wy(wy: int, files: list[Path], rt="df"):
-    # Grid?
-    if rt == "ds":
-        import xarray as xr
-
-        p_grid = (
-            f"/glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking/WY{wy}/WRF/"
-            f"tb_rainrate_{wy - 1}-06-01_00:00.nc"
-        )
-        grid = xr.open_dataset(p_grid).rename_dims({"rlat": "y", "rlon": "x"}).squeeze()
-    else:
-        grid = None
-
+def run_wy(wy: int, files: list[Path]):
     # Run
-    ret = run_wrf_preproced(files, id_=f"WY{wy}", rt=rt, grid=grid)
+    gdf = run_wrf_preproced(files, id_=f"WY{wy}")
 
-    if rt == "df":
-        # Only CEs associated to MCS (as defined by MOSA)
-        ce = ret
-        mcs = ce[ce.is_mcs].reset_index(drop=True).drop(columns=["is_mcs", "not_is_mcs_reason"])
-        mcs
-
-        # Save df
-        mcs.to_csv(OUT_DIR / f"wrf_wy{wy}.csv.gz", index=False)
-
-    elif rt == "ds":
-        ds = ret
-
-        # Save ds
-        # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
-        # DATA can either be OBS or WRF
-        encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
-        ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file_all.nc", encoding=encoding)  # type: ignore[arg-type]
-
-        # Drop those not identified as MCSs using the MOSA criteria
-        is_mcs = ds.is_mcs.to_series().groupby("mcs_id").agg(lambda x: x[~x.isnull()].unique())
-        assert is_mcs.apply(len).eq(1).all()
-        is_mcs = is_mcs.explode()
-        ids = is_mcs[is_mcs].index
-        ds2 = ds.sel(mcs_id=ids)
-        assert ds2.is_mcs.all()
-        ds2 = ds2.drop_vars(["is_mcs", "not_is_mcs_reason"])
-        ds2.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_WRF_SAAG-MCS-mask-file.nc", encoding=encoding)  # type: ignore[arg-type]
-
+    # Save
+    f0n = files[0].name
+    if f0n.startswith("tb_rainrate_"):
+        which = "wrf"
+    elif f0n.startswith("merg_"):
+        which = "gpm"
     else:
-        raise ValueError(f"invalid `rt` {rt!r}")
+        raise ValueError("Unexpected file name {f0n!r}, unable to determine WRF or GPM.")
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
+        gdf.to_parquet(OUT_DIR / f"{which}_wy{wy}.parquet")
 
 
 if __name__ == "__main__":

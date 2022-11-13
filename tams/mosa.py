@@ -9,10 +9,10 @@ import warnings
 from functools import partial
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
-from typing_extensions import Literal, assert_never
 
 BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking")
 """Base location on NCAR GLADE.
@@ -158,42 +158,24 @@ preproc_gpm_file = partial(preproc_file, kind="gpm")
 def run_wrf_preproced(
     fps: list[Path],
     *,
-    id_: str = None,
-    rt: Literal["df", "ds", "gdf"] = "df",
-    grid: xr.Dataset | None = None,
-) -> xr.Dataset | pd.DataFrame:
+    id_: str | None = None,
+) -> gpd.GeoDataFrame:
     """On preprocessed files, do the remaining steps:
     track, classify.
 
     Note that this returns all tracked CEs, including those not classified as MCS
-    (output df includes reason).
+    (output gdf includes reason).
+
+    Returns GeoDataFrame including the contour polygons.
 
     Parameters
     ----------
     id_
         Just used for the info messages, to differentiate when running multiple at same time.
-    rt
-        Return type.
-        - df -- return pandas dataframe (only stats, no contours/geometry)
-        - ds -- return xarray dataset (mask to identify MCSs)
-            - `mcs_mask` variable, with dims (time, y, x)
-            - 'lat'/'lon' with dims (y, x) (even if they only vary in one dim)
-            - file name: `<last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc`
-        - gdf -- GeoDataFrame, including the contour polygons
-    grid
-        If using ``rt='ds'``, need a file to get the lat/lon grid from in order to make the masks.
-        This assumes that the grid is constant.
     """
     import geopandas as gpd
 
     import tams
-
-    allowed_rt = {"df", "ds", "gdf"}
-    if rt not in allowed_rt:
-        raise ValueError(f"`rt` must be one of {allowed_rt}")
-
-    if rt == "ds" and grid is None:
-        raise ValueError("`grid` dataset must be provided")
 
     #
     # Read
@@ -321,14 +303,15 @@ def run_wrf_preproced(
     assert (ce.query("is_mcs == True").not_is_mcs_reason == "").all()
     assert (ce.query("is_mcs == False").not_is_mcs_reason != "").all()
 
-    #
-    # Clean up the table
-    #
+    # TODO: include computed stats from above like duration somehow?
 
-    if rt == "gdf":
-        return ce
+    return ce
 
-    printt("Processing CE output")
+
+def gdf_to_df(ce) -> pd.DataFrame:
+    """Convert CE gdf to a df of only stats (no contours/geometry)."""
+    import tams
+
     cen = ce.geometry.to_crs("EPSG:32663").centroid.to_crs("EPSG:4326")
 
     with warnings.catch_warnings():
@@ -337,128 +320,131 @@ def run_wrf_preproced(
         )
         eccen = ce.geometry.apply(tams.calc_ellipse_eccen)
 
-    # TODO: include computed stats from above like duration somehow?
+    col_order = [
+        "time",
+        "lat",
+        "lon",
+        "area_km2",
+        "area_core_km2",
+        "eccen",
+        "mcs_id",
+        "mean_pr",
+        "max_pr",
+        "min_pr",
+        "count_pr",
+        "is_mcs",
+        "not_is_mcs_reason",
+    ]
 
-    # TODO: separate into a step 3, using the saved gdf?
-
-    if rt == "df":
-
-        col_order = [
-            "time",
-            "lat",
-            "lon",
-            "area_km2",
-            "area_core_km2",
-            "eccen",
-            "mcs_id",
-            "mean_pr",
-            "max_pr",
-            "min_pr",
-            "count_pr",
-            "is_mcs",
-            "not_is_mcs_reason",
-        ]
-
-        ce_ = (
-            ce.drop(
-                columns=[
-                    # "inds219", "area219_km2", "cs219",
-                    "itime",
-                    "dtime",
-                    "geometry",
-                ]
-            )
-            .assign(eccen=eccen)
-            .assign(lat=cen.y, lon=cen.x)
+    ce_ = (
+        ce.drop(
+            columns=[
+                # "inds219", "area219_km2", "cs219",
+                "itime",
+                "dtime",
+                "geometry",
+            ]
         )
+        .assign(eccen=eccen)
+        .assign(lat=cen.y, lon=cen.x)
+    )
 
-        assert set(ce_.columns) == set(col_order)
+    assert set(ce_.columns) == set(col_order)
 
-        df = pd.DataFrame(ce_)[col_order]
-        df
+    df = pd.DataFrame(ce_)[col_order]
+    df
 
-        printt("Done")
+    return df
 
-        return df
 
-    elif rt == "ds":
-        import regionmask
-        from shapely.errors import ShapelyDeprecationWarning
+def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
+    """Convert CE gdf to a MCS mask dataset.
 
-        time = sorted(ce.time.unique())
+    - `mcs_mask` variable, with dims (time, y, x)
+    - 'lat'/'lon' with dims (y, x) (even if they only vary in one dim)
+    - file name: `<last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc`
 
-        dfs = []
-        masks = []
-        for t in time:  # TODO: joblib?
-            ce_t = ce.loc[ce.time == t]
-            # NOTE: `numbers` can't have duplicates, so we use `.dissolve()` to combine
-            regions = regionmask.from_geopandas(
-                ce_t[["geometry", "mcs_id"]].dissolve(by="mcs_id").reset_index(),
-                numbers="mcs_id",
+    Parameters
+    ----------
+    grid
+        File to get the lat/lon grid from in order to make the masks.
+        (This assumes that the grid is constant.)
+    """
+    import regionmask
+    from shapely.errors import ShapelyDeprecationWarning
+
+    import tams
+
+    time = sorted(ce.time.unique())
+
+    dfs = []
+    masks = []
+    for t in time:  # TODO: joblib?
+        ce_t = ce.loc[ce.time == t]
+        # NOTE: `numbers` can't have duplicates, so we use `.dissolve()` to combine
+        regions = regionmask.from_geopandas(
+            ce_t[["geometry", "mcs_id"]].dissolve(by="mcs_id").reset_index(),
+            numbers="mcs_id",
+        )
+        with warnings.catch_warnings():
+            # ShapelyDeprecationWarning: __len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.
+            warnings.filterwarnings(
+                "ignore",
+                category=ShapelyDeprecationWarning,
+                message="__len__ for multi-part geometries is deprecated",
             )
-            with warnings.catch_warnings():
-                # ShapelyDeprecationWarning: __len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.
-                warnings.filterwarnings(
-                    "ignore",
-                    category=ShapelyDeprecationWarning,
-                    message="__len__ for multi-part geometries is deprecated",
-                )
-                mask = regions.mask(grid)
-            masks.append(mask)
+            mask = regions.mask(grid)
+        masks.append(mask)
 
-            # Agg some other info
-            gb = ce_t.groupby("mcs_id")
-            x1 = gb[["area_km2", "area_core_km2"]].sum()
-            x2 = gb[["is_mcs", "not_is_mcs_reason"]].agg(tams.util._the_unique)
-            x3 = gb[["area_km2"]].count().rename(columns={"area_km2": "ce_count"})
-            x3["time"] = t
+        # Agg some other info
+        gb = ce_t.groupby("mcs_id")
+        x1 = gb[["area_km2", "area_core_km2"]].sum()
+        x2 = gb[["is_mcs", "not_is_mcs_reason"]].agg(tams.util._the_unique)
+        x3 = gb[["area_km2"]].count().rename(columns={"area_km2": "ce_count"})
+        x3["time"] = t
 
-            dfs.append(pd.concat([x1, x2, x3], axis="columns"))
+        dfs.append(pd.concat([x1, x2, x3], axis="columns"))
 
-        da = xr.concat(masks, dim="time")
-        da["time"] = time
+    da = xr.concat(masks, dim="time")
+    da["time"] = time
 
-        # Our IDs start at 0, but we want to use 0 for missing/null value
-        # (the sample file looks to be doing this)
-        assert da.min() == 0
-        da = (da + 1).fillna(0).astype(np.int64)
-        da.attrs.update(long_name="MCS ID mask", description="Value 0 indicates null (no MCS).")
+    # Our IDs start at 0, but we want to use 0 for missing/null value
+    # (the sample file looks to be doing this)
+    assert da.min() == 0
+    da = (da + 1).fillna(0).astype(np.int64)
+    da.attrs.update(long_name="MCS ID mask", description="Value 0 indicates null (no MCS).")
 
-        ds = da.to_dataset().rename_vars(mask="mcs_mask")
+    ds = da.to_dataset().rename_vars(mask="mcs_mask")
 
-        # Remove current irrelevant 'coordinates' attrs from das
-        # ('mcs_mask' will still get `mcs_mask:coordinates = "lon lat"` in the saved file)
-        for _, v in ds.variables.items():
-            if "coordinates" in v.attrs:
-                del v.attrs["coordinates"]
+    # Remove current irrelevant 'coordinates' attrs from das
+    # ('mcs_mask' will still get `mcs_mask:coordinates = "lon lat"` in the saved file)
+    for _, v in ds.variables.items():
+        if "coordinates" in v.attrs:
+            del v.attrs["coordinates"]
 
-        # Add some info
-        assert HERE.parent.name == "TAMS", "repo"
-        try:
-            cmd = ["git", "-C", HERE.parent.as_posix(), "rev-parse", "--verify", "--short", "HEAD"]
-            cp = subprocess.run(cmd, text=True, capture_output=True)
-        except Exception:
-            ver = ""
-        else:
-            ver = f" ({cp.stdout.strip()})"
-        now = datetime.datetime.utcnow().strftime(r"%Y-%m-%d %H:%M UTC")
-        ds.attrs.update(prov=(f"Creating using TAMS{ver} at {now}."))
+    # Add some info
+    assert HERE.parent.name == "TAMS", "repo"
+    try:
+        cmd = ["git", "-C", HERE.parent.as_posix(), "rev-parse", "--verify", "--short", "HEAD"]
+        cp = subprocess.run(cmd, text=True, capture_output=True)
+    except Exception:
+        ver = ""
+    else:
+        ver = f" ({cp.stdout.strip()})"
+    now = datetime.datetime.utcnow().strftime(r"%Y-%m-%d %H:%M UTC")
+    ds.attrs.update(prov=(f"Creating using TAMS{ver} at {now}."))
 
-        # Add the extra variables
-        df = pd.concat(dfs, axis="index")
-        df[["area_km2", "area_core_km2"]] = df[["area_km2", "area_core_km2"]].astype(np.float64)
-        df[["is_mcs"]] = df[["is_mcs"]].astype(np.bool_)
-        ds2 = df.reset_index().set_index(["mcs_id", "time"]).to_xarray()
-        ds2["mcs_id"] = ds2.mcs_id + 1
-        ds = ds.merge(ds2, join="exact", compat="equals")
+    # Add the extra variables
+    df = pd.concat(dfs, axis="index")
+    df[["area_km2", "area_core_km2"]] = df[["area_km2", "area_core_km2"]].astype(np.float64)
+    df[["is_mcs"]] = df[["is_mcs"]].astype(np.bool_)
+    ds2 = df.reset_index().set_index(["mcs_id", "time"]).to_xarray()
+    ds2["mcs_id"] = ds2.mcs_id + 1
+    ds = ds.merge(ds2, join="exact", compat="equals")
 
-        # TODO: mcs_id could be uint32, float ones float32, ce_count int32 or uint32 with 0 for null?
+    # TODO: mcs_id could be uint32, float ones float32, ce_count int32 or uint32 with 0 for null?
 
-        printt("Done")
-
-        return ds
-
-    assert_never(rt)
+    return ds
 
 
 if __name__ == "__main__":
