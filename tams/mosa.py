@@ -221,13 +221,13 @@ def run_wrf_preproced(
     #
 
     printt("Classifying")
-    ce["mcs_id"] = ce.mcs_id.astype(int)  # TODO: should be already
-    n_ = ce.mcs_id.max() + 1
-    n = int(n_)
-    if n != n_:
-        warnings.warn(f"{pre}max MCS ID + 1 was {n_} but using {n}", stacklevel=2)
-    is_mcs_list: list[None | bool] = [None] * n
-    reason_list: list[None | str] = [None] * n
+    ce["mcs_id"] = ce.mcs_id.astype(int)  # TODO: should be already (unless NaNs)
+    n_mcs_ = ce.mcs_id.max() + 1
+    n_mcs = int(n_mcs_)
+    if n_mcs != n_mcs_:
+        warnings.warn(f"{pre}max MCS ID + 1 was {n_mcs_} but using {n_mcs}", stacklevel=2)
+    is_mcs_list: list[None | bool] = [None] * n_mcs
+    reason_list: list[None | str] = [None] * n_mcs
     for mcs_id, g in ce.groupby("mcs_id"):
         # Compute time
         t = g.time.unique()
