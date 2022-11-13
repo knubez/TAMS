@@ -235,8 +235,6 @@ def run_wrf_preproced(
         tmax = t.max()
         duration = pd.Timedelta(tmax - tmin)
 
-        # TODO: collect reasons
-
         # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
         # but for accumulated (during previous time step), 4 is fine(?)
         n = 4
