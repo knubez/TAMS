@@ -101,4 +101,4 @@ def run_gdf(fp: Path) -> None:
 if __name__ == "__main__":
     import joblib
 
-    joblib.parallel(n_jobs=-2, verbose=1)(joblib.delayed(run_gdf)(fp) for fp in gdf_fps)
+    joblib.Parallel(n_jobs=-2, verbose=1)(joblib.delayed(run_gdf)(fp) for fp in gdf_fps)
