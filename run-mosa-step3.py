@@ -2,8 +2,11 @@
 Convert from CE gdf output to summary formats (step 3)
 """
 import re
+from calendar import isleap
 from pathlib import Path
 from typing import Any, Hashable
+
+import pandas as pd
 
 from tams.mosa import gdf_to_df, gdf_to_ds
 
@@ -65,7 +68,18 @@ def run_gdf(fp: Path) -> None:
 
     ds = gdf_to_ds(gdf, grid=grid)
 
-    # TODO: add null first time if WRF
+    # Add null first time if WRF
+    t0 = pd.Timestamp(ds.time.values[0]).year
+    if which == "wrf":
+        assert t0.hour == 1, "first time (hour 0) should be missing (skipped since tb null)"
+        ds0 = ds.isel(time=0).copy()
+        for vn in ds0.data_vars:
+            ds0[vn] = ds0[vn].where(False)
+        ds = xr.concat(ds0, ds, dim="time")
+
+    # Check ntimes
+    nt_should_be = 8784 if isleap(t0) else 8760
+    assert ds.time.size == nt_should_be
 
     # Save ds
     # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
