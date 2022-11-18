@@ -12,7 +12,7 @@ import warnings
 from collections import defaultdict
 from pathlib import Path
 
-from tams.mosa import run_wrf_preproced
+from tams.mosa import run_preproced
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa-pre")
 OUT_DIR = Path("/glade/scratch/zmoon/mosa2")  # TODO: just 'mosa' ?
@@ -81,10 +81,7 @@ wy_files_gpm = wy_files
 
 
 def run_wy(wy: int, files: list[Path]):
-    # Run
-    gdf = run_wrf_preproced(files, id_=f"WY{wy}")
 
-    # Save
     f0n = files[0].name
     if f0n.startswith("tb_rainrate_"):
         which = "wrf"
@@ -92,6 +89,11 @@ def run_wy(wy: int, files: list[Path]):
         which = "gpm"
     else:
         raise ValueError("Unexpected file name {f0n!r}, unable to determine WRF or GPM.")
+
+    # Run
+    gdf = run_preproced(files, kind=which, id_=f"{which.upper()}-WY{wy}")
+
+    # Save
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
         gdf.to_parquet(OUT_DIR / f"{which}_wy{wy}.parquet")
@@ -99,11 +101,10 @@ def run_wy(wy: int, files: list[Path]):
 
 if __name__ == "__main__":
     import itertools
-    from functools import partial
 
     import joblib
 
-    fn = partial(run_wy, rt="ds")
+    fn = run_wy
 
     joblib.Parallel(n_jobs=-2, verbose=1)(
         joblib.delayed(fn)(wy, files)

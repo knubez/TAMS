@@ -100,7 +100,7 @@ def _load_gpm_file(fp) -> xr.Dataset:
     return ds
 
 
-def preproc_file(fp, *, kind, out_dir=None) -> None:
+def preproc_file(fp, *, kind: str, out_dir=None) -> None:
     """Pre-process file, saving CE dataset, including CE precip stats, to file."""
     import tams
 
@@ -116,7 +116,7 @@ def preproc_file(fp, *, kind, out_dir=None) -> None:
     elif kind.lower() == "gpm":
         ds = _load_gpm_file(fp)
     else:
-        raise ValueError(f"invalid `which` {kind!r}")
+        raise ValueError(f"invalid `kind` {kind!r}")
     assert len(ds.dims) == 2
 
     # Identify CEs
@@ -155,9 +155,10 @@ preproc_wrf_file = partial(preproc_file, kind="wrf")
 preproc_gpm_file = partial(preproc_file, kind="gpm")
 
 
-def run_wrf_preproced(
+def run_preproced(
     fps: list[Path],
     *,
+    kind: str,
     id_: str | None = None,
 ) -> gpd.GeoDataFrame:
     """On preprocessed files, do the remaining steps:
@@ -190,11 +191,20 @@ def run_wrf_preproced(
         st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{pre}{st}: {s}")
 
+    if kind.lower() == "wrf":
+        fn_t_fmt = r"%Y-%m-%d_%H"
+        fn_t_slice = slice(12, 25)
+    elif kind.lower() == "gpm":
+        fn_t_fmt = r"%Y%m%d%H"
+        fn_t_slice = slice(5, 15)
+    else:
+        raise ValueError(f"invalid `kind` {kind!r}")
+
     printt(f"Reading {len(fps)} pre-processed files")
     sts = []  # datetime strings
     dfs = []
     for fp in sorted(fps):
-        sts.append(fp.name[12:25])
+        sts.append(fp.name[fn_t_slice])
         df = gpd.read_parquet(fp)
         # At least when concatting all of them, getting some weird types in WY2016
         # (WY2011 is ok for some reason)
@@ -207,7 +217,7 @@ def run_wrf_preproced(
         ).convert_dtypes()
         dfs.append(df)
 
-    times = pd.to_datetime(sts, format=r"%Y-%m-%d_%H")
+    times = pd.to_datetime(sts, format=fn_t_fmt)
 
     #
     # Track
