@@ -76,6 +76,8 @@ def run_gdf(fp: Path) -> None:
     if which == "wrf":
         assert t0.hour == 1, "first time (hour 0) should be missing (skipped since tb null)"
         ds0 = ds.isel(time=0).copy()
+        ds0["time"] = t0 - pd.Timedelta(hours=1)
+        assert ds0.time.dt.hour == 0
         for vn in ds0.data_vars:
             ds0[vn] = ds0[vn].where(False, 0)  # FIXME ?
         ds = xr.concat([ds0, ds], dim="time")
