@@ -78,7 +78,7 @@ def run_gdf(fp: Path) -> None:
         ds0 = ds.isel(time=0).copy()
         for vn in ds0.data_vars:
             ds0[vn] = ds0[vn].where(False, 0)  # FIXME ?
-        ds = xr.concat(ds0, ds, dim="time")
+        ds = xr.concat([ds0, ds], dim="time")
 
     times_should_be = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")[:-1]
     nt_missing = 0
