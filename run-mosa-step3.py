@@ -18,6 +18,15 @@ re_gdf_fn = re.compile(r"(wrf|gpm)_wy([0-9]{4})\.parquet")
 
 gdf_fps = sorted(IN_DIR.glob("???_wy????.parquet"))
 
+ds_null_val = {
+    "mcs_mask": 0,
+    "area_km2": np.nan,
+    "area_core_km2": np.nan,
+    "is_mcs": np.nan,
+    "not_is_mcs_reason": "",
+    "ce_count": np.nan,
+}
+
 
 def run_gdf(fp: Path) -> None:
     import geopandas as gpd
@@ -79,7 +88,13 @@ def run_gdf(fp: Path) -> None:
         ds0["time"] = t0 - pd.Timedelta(hours=1)
         assert ds0.time.dt.hour == 0
         for vn in ds0.data_vars:
-            ds0[vn] = ds0[vn].where(False, 0)  # FIXME ?
+            if vn not in ds_null_val:
+                raise Exception(
+                    f"null value not known for data var {vn}. "
+                    f"Known for: {sorted(ds_null_val)}. "
+                    f"Data vars: {sorted(ds.data_vars)}."
+                )
+            ds0[vn] = ds0[vn].where(False, ds_null_val[vn])
         ds = xr.concat([ds0, ds], dim="time")
 
     times_should_be = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")[:-1]
@@ -90,7 +105,7 @@ def run_gdf(fp: Path) -> None:
             nt_missing += 1
 
     if nt_missing:
-        ds = ds.reindex(time=times_should_be, method=None, copy=False, fill_value=0)
+        ds = ds.reindex(time=times_should_be, method=None, copy=False, fill_value=ds_null_val)
 
     # Check ntimes
     nt_should_be = 8784 if isleap(wy) else 8760
