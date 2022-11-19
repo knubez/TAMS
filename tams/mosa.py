@@ -444,7 +444,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
     else:
         ver = f" ({cp.stdout.strip()})"
     now = datetime.datetime.utcnow().strftime(r"%Y-%m-%d %H:%M UTC")
-    ds.attrs.update(prov=(f"Creating using TAMS{ver} at {now}."))
+    ds.attrs.update(prov=(f"Created using TAMS{ver} at {now}."))
 
     # Add the extra variables
     df = pd.concat(dfs, axis="index")
