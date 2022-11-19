@@ -26,6 +26,7 @@ OUT_DIR = Path("/glade/scratch/zmoon/mosa2")  # TODO: just 'mosa' ?
 files = sorted(IN_DIR.glob("tb_rainrate_*.parquet"))
 
 print(f"{len(files)} total files (WRF)")
+assert len(files) == 8760 + 8760 + 8784 - 3
 
 print(files[0])
 print("...")
@@ -52,6 +53,7 @@ wy_files_wrf = wy_files
 files = sorted(IN_DIR.glob("merg_*.parquet"))
 
 print(f"{len(files)} total files (GPM)")
+assert len(files) == 8760 + 8760 + 8784
 
 print(files[0])
 print("...")
