@@ -58,6 +58,7 @@ def load_wrf(files):
 
 def _load_wrf_file(fp) -> xr.Dataset:
     # fns are like 'tb_rainrate_2015-06-01_12:00.nc'
+    # /glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking/WY2016/WRF/tb_rainrate_2015-06-01_12:00.nc
     ds = (
         xr.open_dataset(fp)
         .rename({"rainrate": "pr", "tb": "ctt"})
@@ -71,6 +72,7 @@ def _load_wrf_file(fp) -> xr.Dataset:
 
 def _load_gpm_file(fp) -> xr.Dataset:
     # fns are like 'merg_2015060112_4km-pixel.nc'
+    # /glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking/GPM/2015/merg_2015060112_4km-pixel.nc
     #
     # > The original 30 min IMERG precipitation data have been averaged to hourly
     # > (at the first time stamp), but the original 30 min Tb data are retained

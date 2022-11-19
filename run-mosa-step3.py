@@ -64,7 +64,9 @@ def run_gdf(fp: Path) -> None:
     # ds
     #
 
-    grid = xr.open_dataset(p_grid).rename_dims({"rlat": "y", "rlon": "x"}).squeeze()
+    grid = xr.open_dataset(p_grid).squeeze()
+    if which == "wrf":
+        grid = grid.rename_dims({"rlat": "y", "rlon": "x"})
 
     ds = gdf_to_ds(gdf, grid=grid)
 
