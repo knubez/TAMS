@@ -3,7 +3,7 @@
 #PBS -N mosa3
 #PBS -q casper
 #PBS -l walltime=04:00:00
-#PBS -l select=1:ncpus=7:mem=28gb
+#PBS -l select=1:ncpus=7:mem=56gb
 #PBS -j oe
 
 cd /glade/u/home/zmoon/git/TAMS
