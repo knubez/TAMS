@@ -91,7 +91,7 @@ def run_gdf(fp: Path) -> None:
         ds = ds.reindex(time=times_should_be, method=None, copy=False, fill_value=0)
 
     # Check ntimes
-    nt_should_be = 8784 if (isleap(t0.year) or isleap(t0.year + 1)) else 8760
+    nt_should_be = 8784 if isleap(wy) else 8760
     assert ds.time.size == nt_should_be, f"expected {nt_should_be} times, found {ds.time.size}"
     assert (ds.time.diff("time") == np.timedelta64(1, "h")).all()
 
