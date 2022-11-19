@@ -81,11 +81,14 @@ def run_gdf(fp: Path) -> None:
         ds = xr.concat(ds0, ds, dim="time")
 
     times_should_be = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")
+    nt_missing = 0
     for t_ in times_should_be:
         if t_ not in ds.time.values:
             print(f"warning: {t_} not found in {which_mosa}-WY{wy}")
+            nt_missing += 1
 
-    ds = ds.reindex(time=times_should_be, method=None, copy=False, fill_value=0)
+    if nt_missing:
+        ds = ds.reindex(time=times_should_be, method=None, copy=False, fill_value=0)
 
     # Check ntimes
     nt_should_be = 8784 if (isleap(t0.year) or isleap(t0.year + 1)) else 8760
