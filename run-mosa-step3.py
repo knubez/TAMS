@@ -6,6 +6,7 @@ from calendar import isleap
 from pathlib import Path
 from typing import Any, Hashable
 
+import numpy as np
 import pandas as pd
 
 from tams.mosa import gdf_to_df, gdf_to_ds
@@ -71,17 +72,25 @@ def run_gdf(fp: Path) -> None:
     ds = gdf_to_ds(gdf, grid=grid)
 
     # Add null first time if WRF
-    t0 = pd.Timestamp(ds.time.values[0]).year
+    t0 = pd.Timestamp(ds.time.values[0])
     if which == "wrf":
         assert t0.hour == 1, "first time (hour 0) should be missing (skipped since tb null)"
         ds0 = ds.isel(time=0).copy()
         for vn in ds0.data_vars:
-            ds0[vn] = ds0[vn].where(False)
+            ds0[vn] = ds0[vn].where(False, 0)  # FIXME ?
         ds = xr.concat(ds0, ds, dim="time")
 
+    times_should_be = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")
+    for t_ in times_should_be:
+        if t_ not in ds.time.values:
+            print(f"warning: {t_} not found in {which_mosa}-WY{wy}")
+
+    ds = ds.reindex(time=times_should_be, method=None, copy=False, fill_value=0)
+
     # Check ntimes
-    nt_should_be = 8784 if isleap(t0) else 8760
-    assert ds.time.size == nt_should_be
+    nt_should_be = 8784 if (isleap(t0.year) or isleap(t0.year + 1)) else 8760
+    assert ds.time.size == nt_should_be, f"expected {nt_should_be} times, found {ds.time.size}"
+    assert (ds.time.diff("time") == np.timedelta64(1, "h")).all()
 
     # Save ds
     # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
