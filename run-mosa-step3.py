@@ -83,9 +83,9 @@ def run_gdf(fp: Path) -> None:
     # Add null first time if WRF
     t0 = pd.Timestamp(ds.time.values[0])
     if which == "wrf":
-        assert t0.hour == 1, "first time (hour 0) should be missing (skipped since tb null)"
+        assert t0.hour != 0, "first time (hour 0) should be missing (skipped since tb null)"
         ds0 = ds.isel(time=0).copy()
-        ds0["time"] = t0 - pd.Timedelta(hours=1)
+        ds0["time"] = t0 - pd.Timedelta(hours=t0.hour)
         assert ds0.time.dt.hour == 0
         for vn in ds0.data_vars:
             if vn not in ds_null_val:
