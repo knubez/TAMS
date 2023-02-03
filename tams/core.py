@@ -718,7 +718,6 @@ def run(
     dfs_t = []
     ds_nt = []
     for mcs_id, mcs_ in ce.groupby("mcs_id"):
-
         # Time-varying
         time_group = mcs_.groupby("time")
         d = {}
