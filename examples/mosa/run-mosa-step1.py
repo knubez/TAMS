@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from tams.mosa import BASE_DIR, preproc_gpm_file, preproc_wrf_file
+from lib import BASE_DIR, preproc_gpm_file, preproc_wrf_file
 
 # Constants
 out_dir = Path("/glade/scratch/zmoon/mosa-pre")

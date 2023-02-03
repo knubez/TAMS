@@ -1,5 +1,9 @@
 """
 MOSA - MCSs over South America
+
+This library defines load and run functions
+for the MOSA data
+for the different steps of the TAMS workflow.
 """
 from __future__ import annotations
 
@@ -41,6 +45,9 @@ WRF files are like `tb_rainrate_2010-11-30_02:00.nc`.
 OUT_BASE_DIR = Path("/glade/scratch/knocasio/SAAG")
 
 HERE = Path(__file__).parent
+
+REPO = HERE.parent.parent
+assert REPO.is_dir() and REPO.name == "TAMS", "repo"
 
 
 def load_wrf(files):
@@ -320,6 +327,10 @@ def run_preproced(
     return ce
 
 
+run_wrf_preproced = partial(run_preproced, kind="wrf")
+run_gpm_preproced = partial(run_preproced, kind="gpm")
+
+
 def gdf_to_df(ce) -> pd.DataFrame:
     """Convert CE gdf to a df of only stats (no contours/geometry)."""
     import tams
@@ -435,9 +446,8 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
             del v.attrs["coordinates"]
 
     # Add some info
-    assert HERE.parent.name == "TAMS", "repo"
     try:
-        cmd = ["git", "-C", HERE.parent.as_posix(), "rev-parse", "--verify", "--short", "HEAD"]
+        cmd = ["git", "-C", REPO.as_posix(), "rev-parse", "--verify", "--short", "HEAD"]
         cp = subprocess.run(cmd, text=True, capture_output=True)
     except Exception:
         ver = ""

@@ -9,7 +9,7 @@ from typing import Any, Hashable
 import numpy as np
 import pandas as pd
 
-from tams.mosa import gdf_to_df, gdf_to_ds
+from lib import gdf_to_df, gdf_to_ds
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa2")
 OUT_DIR = IN_DIR

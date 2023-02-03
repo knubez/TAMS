@@ -11,7 +11,7 @@ from typing import Any, Hashable
 
 import xarray as xr
 
-from tams.mosa import gdf_to_df, gdf_to_ds, run_wrf_preproced
+from lib import gdf_to_df, gdf_to_ds, run_wrf_preproced
 
 base = Path("~/OneDrive/w/ERT-ARL/mosa").expanduser()
 files = sorted((base / "mosa-pre-sample").glob("tb_rainrate*.parquet"))

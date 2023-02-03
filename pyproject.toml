@@ -30,6 +30,7 @@ Home = "https://github.com/knubez/TAMS"
 [tool.isort]
 line_length = 100
 profile = "black"
+known_first_party = "lib"
 
 [tool.black]
 line-length = 100

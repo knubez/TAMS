@@ -6,7 +6,7 @@
 #PBS -l select=1:ncpus=7:mem=28gb
 #PBS -j oe
 
-cd /glade/u/home/zmoon/git/TAMS
+cd /glade/u/home/zmoon/git/TAMS/examples/mosa
 
 # Load conda env using NCAR conda installation
 module load conda/latest

@@ -12,7 +12,7 @@ import warnings
 from collections import defaultdict
 from pathlib import Path
 
-from tams.mosa import run_preproced
+from lib import run_preproced
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa-pre")
 OUT_DIR = Path("/glade/scratch/zmoon/mosa2")  # TODO: just 'mosa' ?
@@ -83,7 +83,6 @@ wy_files_gpm = wy_files
 
 
 def run_wy(wy: int, files: list[Path]):
-
     f0n = files[0].name
     if f0n.startswith("tb_rainrate_"):
         which = "wrf"
