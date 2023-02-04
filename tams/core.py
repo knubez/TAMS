@@ -440,6 +440,8 @@ def track(
     overlap_threshold: float = 0.5,
     u_projection: float = 0,
     durations=None,
+    look: str = "back",
+    largest: bool = False,
 ) -> geopandas.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
@@ -463,6 +465,10 @@ def track(
     durations
         Durations associated with the times in `times` (akin to the time resolution).
         If not provided, they will be estimated using ``times[1:] - times[:-1]``.
+    look
+        (time) direction in which we "look" and compute overlaps.
+    largest
+        Only the largest CE continues a track.
     """
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
@@ -496,19 +502,71 @@ def track(
             cs_im1 = css[i - 1]
             dt_im1_s = dt[i - 1].total_seconds()
 
-            # TODO: option to overlap in other direction, match with all that meet the condition
-            ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s))
-            ids = []
-            for j, d in ovs.items():
-                # TODO: option to pick bigger one to "continue the trajectory", as in jevans paper
-                k, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
-                if k is None or frac < overlap_threshold:
-                    # No parent or not enough overlap => new ID
-                    ids.append(next_id)
-                    next_id += 1
-                else:
-                    # Has parent; use their family ID
-                    ids.append(cs_im1.loc[k].mcs_id)
+            if look in {"b", "back"}:
+                ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s))
+                ids = []
+                for j, d in ovs.items():
+                    # For each CE at current time, find previous CE of maximum overlap
+                    k, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
+                    if k is None or frac < overlap_threshold:
+                        # No parent or not enough overlap => new ID
+                        ids.append(next_id)
+                        next_id += 1
+                    else:
+                        # Has parent; use their family ID
+                        ids.append(cs_im1.loc[k].mcs_id)
+
+                assert len(ids) == len(cs_i)
+
+                if largest:
+                    # For current CEs, make sure no MCS ID is shared (give to largest)
+                    sz = cs_i["area_km2"].values
+                    for mcs_id in set(ids):
+                        inds_with_id = [j for j, id_ in enumerate(ids) if id_ == mcs_id]
+                        if len(inds_with_id) == 1:
+                            continue
+                        print(f"multiple CEs with same MCS ID: {inds_with_id}")
+                        ind_largest, _ = max(
+                            zip(inds_with_id, sz[inds_with_id]), key=lambda tup: tup[1]
+                        )
+                        print(f"largest: {sz[ind_largest]} out of {sz[inds_with_id]}")
+                        for j in inds_with_id:
+                            if j == ind_largest:
+                                continue
+                            ids[j] = next_id
+                            next_id += 1
+                        assert ids[ind_largest] == mcs_id
+
+            elif look in {"f", "forward"}:
+                ovs = overlap(project(cs_im1, u=u_projection, dt=dt_im1_s), cs_i)
+                ids = [None for _ in range(len(cs_i))]
+                for k, d in ovs.items():
+                    mcs_id = cs_im1.loc[k].mcs_id
+                    if not d:
+                        continue
+
+                    if largest and len(d) > 1:
+                        # TODO: 1-1 track not guaranteed since multiple parents could have same ID
+                        j, frac = max(d.items(), key=lambda tup: tup[1])
+                        print(f"{len(d)} -> 1")
+                        d = {j: frac}
+                        # TODO: largest child instead of largest overlap?
+
+                    for j, frac in d.items():
+                        if frac >= overlap_threshold:
+                            if ids[j] is not None:
+                                print(f"warning: {j} already set to ID {ids[j]}, now {mcs_id}")
+                            # Assign child parent's MCS ID
+                            ids[j] = mcs_id
+
+                # For current CEs with no assigned parent, give new IDs
+                for j, mcs_id in enumerate(ids):
+                    if mcs_id is None:
+                        ids[j] = next_id
+                        next_id += 1
+
+            else:
+                raise ValueError("invalid `look`")
 
             cs_i["mcs_id"] = ids
 

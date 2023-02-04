@@ -12,6 +12,7 @@ import subprocess
 import warnings
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import geopandas as gpd
 import numpy as np
@@ -169,6 +170,7 @@ def run_preproced(
     *,
     kind: str,
     id_: str | None = None,
+    track_kws: dict[str, Any] | None = None,
 ) -> gpd.GeoDataFrame:
     """On preprocessed files, do the remaining steps:
     track, classify.
@@ -232,8 +234,11 @@ def run_preproced(
     # Track
     #
 
+    if track_kws is None:
+        track_kws = {}
+
     printt("Tracking")
-    ce = tams.track(dfs, times)
+    ce = tams.track(dfs, times, **track_kws)
 
     #
     # Classify (CEs)
