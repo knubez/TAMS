@@ -418,25 +418,10 @@ def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame, *, norm: str =
     norm : {'a', 'b', 'max', 'min', 'mean'}
         Area to use to normalize the overlap to a fraction.
     """
+    # TODO: test(s) for the different `norm` options
     s_crs_area = "EPSG:32663"
-    if norm == "a":
-        area_norm = a.to_crs(s_crs_area).area
-    elif norm == "b":
-        area_norm = b.to_crs(s_crs_area).area
-    elif norm in {"max", "min", "mean"}:
-        op = norm
-        area_norm = getattr(
-            pd.concat(
-                [
-                    a.to_crs(s_crs_area).area,
-                    b.to_crs(s_crs_area).area,
-                ],
-                axis="columns",
-            ),
-            op,
-        )(axis="columns")
-    else:
-        raise ValueError(f"invalid `norm` {norm!r}")
+    area_a = a.to_crs(s_crs_area).area
+    area_b = b.to_crs(s_crs_area).area
 
     res = {}
     for i in range(len(a)):
@@ -449,10 +434,37 @@ def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame, *, norm: str =
                 category=RuntimeWarning,
                 message="invalid value encountered in intersection",
             )
-            inter = b.intersection(a_i_poly)  # .dropna()
+            inter = b.intersection(a_i_poly)
         inter = inter[~inter.is_empty]
-        ov = inter.to_crs(s_crs_area).area / area_norm.iloc[i]
-        res[i] = ov.to_dict()
+
+        ov = inter.to_crs(s_crs_area).area
+
+        if norm == "a":
+            area_norm = area_a.iloc[i]
+        elif norm == "b":
+            area_norm = area_b.loc[ov.index]
+        elif norm in {"max", "min", "mean"}:
+            op = norm
+            b_area_i = area_b.loc[ov.index]
+            area_norm = getattr(
+                pd.concat(
+                    [
+                        pd.Series(
+                            data=np.full(len(b_area_i), area_a.iloc[i]),
+                            index=b_area_i.index,
+                        ),
+                        b_area_i,
+                    ],
+                    axis="columns",
+                ),
+                op,
+            )(axis="columns")
+        else:
+            raise ValueError(f"invalid `norm` {norm!r}")
+
+        ov_frac = ov / area_norm
+
+        res[i] = ov_frac.to_dict()
 
     return res
 
