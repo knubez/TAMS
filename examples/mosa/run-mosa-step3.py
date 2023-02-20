@@ -89,6 +89,7 @@ def run_gdf(fp: Path) -> None:
         ds0["time"] = t0_should_be
         assert ds0.time.dt.hour == 0
         for vn in ds0.data_vars:
+            assert isinstance(vn, str)
             if vn not in ds_null_val:
                 raise Exception(
                     f"null value not known for data var {vn}. "

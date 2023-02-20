@@ -566,7 +566,7 @@ def track(
 
             elif look in {"f", "forward"}:
                 ovs = overlap(project(cs_im1, u=u_projection, dt=dt_im1_s), cs_i, norm=overlap_norm)
-                ids = [None for _ in range(len(cs_i))]
+                ids: list[int | None] = [None for _ in range(len(cs_i))]  # type: ignore[no-redef]
                 for k, d in ovs.items():
                     mcs_id = cs_im1.loc[k].mcs_id
                     if not d:
