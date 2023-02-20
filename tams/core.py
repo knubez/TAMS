@@ -467,6 +467,7 @@ def track(
     look: str = "back",
     largest: bool = False,
     overlap_norm: str = "a",
+    verbose: bool = False,
 ) -> geopandas.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
@@ -496,6 +497,8 @@ def track(
         Only the largest CE continues a track.
     overlap_norm
         Passed to :func:`overlap`.
+    verbose
+        Print tracking info messages.
     """
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
@@ -547,16 +550,19 @@ def track(
 
                 if largest:
                     # For current CEs, make sure no MCS ID is shared (give to largest)
-                    sz = cs_i["area_km2"].values
+                    sz = cs_i["area_km2"].to_numpy(dtype=np.float64)
                     for mcs_id in set(ids):
                         inds_with_id = [j for j, id_ in enumerate(ids) if id_ == mcs_id]
                         if len(inds_with_id) == 1:
                             continue
-                        print(f"multiple CEs with same MCS ID: {inds_with_id}")
+                        if verbose:
+                            print(f"multiple CEs with same MCS ID: {inds_with_id}")
                         ind_largest, _ = max(
-                            zip(inds_with_id, sz[inds_with_id]), key=lambda tup: tup[1]
+                            zip(inds_with_id, sz[inds_with_id]),
+                            key=lambda tup: tup[1],
                         )
-                        print(f"largest: {sz[ind_largest]} out of {sz[inds_with_id]}")
+                        if verbose:
+                            print(f"largest: {sz[ind_largest]} out of {sz[inds_with_id]}")
                         for j in inds_with_id:
                             if j == ind_largest:
                                 continue
@@ -565,25 +571,41 @@ def track(
                         assert ids[ind_largest] == mcs_id
 
             elif look in {"f", "forward"}:
+                # Following `look='b'`,
+                # `j`: iloc of CE at current time (i, `cs_i`)
+                # `k`: iloc of CE at previous time (i-1, `cs_im1`)
                 ovs = overlap(project(cs_im1, u=u_projection, dt=dt_im1_s), cs_i, norm=overlap_norm)
                 ids: list[int | None] = [None for _ in range(len(cs_i))]  # type: ignore[no-redef]
+                sz_i = cs_i["area_km2"].to_numpy(dtype=np.float64)
                 for k, d in ovs.items():
+                    # For each CE at previous time ("parent"),
+                    # look at CEs of current time that overlap ("kid"/"child")
                     mcs_id = cs_im1.loc[k].mcs_id
                     if not d:
                         continue
 
                     if largest and len(d) > 1:
-                        # TODO: 1-1 track not guaranteed since multiple parents could have same ID
-                        j, frac = max(d.items(), key=lambda tup: tup[1])
-                        print(f"{len(d)} -> 1")
+                        # NOTE: 1-1 track not guaranteed since multiple parents could have same ID
+                        # j, frac = max(d.items(), key=lambda tup: tup[1])  # max overlap
+                        js = list(d.keys())
+                        if verbose:
+                            print(f"{len(d)} possible children: {js}")
+                        sz_ji = sz_i[js]
+                        j, frac, _ = max(
+                            zip(d.keys(), d.values(), sz_ji),
+                            key=lambda tup: tup[2],
+                        )  # max child area
+                        assert sz_i[j] == sz_ji.max()
+                        if verbose:
+                            print(f"keeping largest: {sz_i[j]} out of {sz_ji}")
                         d = {j: frac}
-                        # TODO: largest child instead of largest overlap?
 
                     for j, frac in d.items():
                         if frac >= overlap_threshold:
-                            if ids[j] is not None:
+                            if ids[j] is not None and verbose:
                                 print(f"warning: {j} already set to ID {ids[j]}, now {mcs_id}")
-                            # Assign child parent's MCS ID
+                                # TODO: support multiple parent
+                            # Assign child the MCS ID of parent
                             ids[j] = mcs_id
 
                 # For current CEs with no assigned parent, give new IDs
