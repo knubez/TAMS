@@ -410,7 +410,8 @@ def project(df: geopandas.GeoDataFrame, *, u: float = 0, dt: float = 3600):
 def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame, *, norm: str = "a"):
     """For each contour in `a`, determine those in `b` that overlap and by how much.
 
-    Currently the mapping is based on indices of the frames.
+    Currently the mapping is based on indices of the frames:
+    iloc position in `a` : loc position in `b` : overlap fraction.
 
     Parameters
     ----------
@@ -419,12 +420,12 @@ def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame, *, norm: str =
     """
     s_crs_area = "EPSG:32663"
     if norm == "a":
-        norm_ = a.to_crs(s_crs_area).area
+        area_norm = a.to_crs(s_crs_area).area
     elif norm == "b":
-        norm_ = b.to_crs(s_crs_area).area
+        area_norm = b.to_crs(s_crs_area).area
     elif norm in {"max", "min", "mean"}:
         op = norm
-        norm_ = getattr(
+        area_norm = getattr(
             pd.concat(
                 [
                     a.to_crs(s_crs_area).area,
@@ -450,7 +451,7 @@ def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame, *, norm: str =
             )
             inter = b.intersection(a_i_poly)  # .dropna()
         inter = inter[~inter.is_empty]
-        ov = inter.to_crs(s_crs_area).area / norm_.iloc[i]
+        ov = inter.to_crs(s_crs_area).area / area_norm.iloc[i]
         res[i] = ov.to_dict()
 
     return res
