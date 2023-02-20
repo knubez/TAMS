@@ -20,12 +20,6 @@ files = sorted((base / "mosa-pre-sample").glob("tb_rainrate*.parquet"))
 gdf = run_wrf_preproced(files, id_="WRF")
 df = gdf_to_df(gdf)
 
-# Tracking options
-gdf_b = gdf
-gdf_bl = run_wrf_preproced(files, id_="WRF", track_kws=dict(largest=True))
-gdf_f = run_wrf_preproced(files, id_="WRF", track_kws=dict(look="f", largest=False))
-gdf_fl = run_wrf_preproced(files, id_="WRF", track_kws=dict(look="f", largest=True))
-
 # Dataset output
 ds_grid = (
     xr.open_dataset(base / "mosa-pre-sample/tb_rainrate_2010-06-01_01%3A00.nc")
