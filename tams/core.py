@@ -466,7 +466,7 @@ def track(
     durations=None,
     look: str = "back",
     largest: bool = False,
-    overlap_norm: str = "a",
+    overlap_norm: str | None = None,
     verbose: bool = False,
 ) -> geopandas.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
@@ -497,6 +497,10 @@ def track(
         Only the largest CE continues a track.
     overlap_norm
         Passed to :func:`overlap`.
+        Default is to use child area (
+        `'a'` for `look='back'`,
+        `'b'` for `look='forward'`
+        ), i.e. CE at the later of the two times.
     verbose
         Print tracking info messages.
     """
@@ -533,6 +537,8 @@ def track(
             dt_im1_s = dt[i - 1].total_seconds()
 
             if look in {"b", "back"}:
+                if overlap_norm is None:
+                    overlap_norm = "a"
                 ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s), norm=overlap_norm)
                 ids = []
                 for j, d in ovs.items():
@@ -574,6 +580,8 @@ def track(
                 # Following `look='b'`,
                 # `j`: iloc of CE at current time (i, `cs_i`)
                 # `k`: iloc of CE at previous time (i-1, `cs_im1`)
+                if overlap_norm is None:
+                    overlap_norm = "b"
                 ovs = overlap(project(cs_im1, u=u_projection, dt=dt_im1_s), cs_i, norm=overlap_norm)
                 ids: list[int | None] = [None for _ in range(len(cs_i))]  # type: ignore[no-redef]
                 sz_i = cs_i["area_km2"].to_numpy(dtype=np.float64)
