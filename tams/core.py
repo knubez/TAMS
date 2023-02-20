@@ -407,12 +407,36 @@ def project(df: geopandas.GeoDataFrame, *, u: float = 0, dt: float = 3600):
     return df.assign(geometry=new_geometry)
 
 
-def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame):
+def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame, *, norm: str = "a"):
     """For each contour in `a`, determine those in `b` that overlap and by how much.
 
     Currently the mapping is based on indices of the frames.
+
+    Parameters
+    ----------
+    norm : {'a', 'b', 'max', 'min', 'mean'}
+        Area to use to normalize the overlap to a fraction.
     """
-    a_area = a.to_crs("EPSG:32663").area
+    s_crs_area = "EPSG:32663"
+    if norm == "a":
+        norm_ = a.to_crs(s_crs_area).area
+    elif norm == "b":
+        norm_ = b.to_crs(s_crs_area).area
+    elif norm in {"max", "min", "mean"}:
+        op = norm
+        norm_ = getattr(
+            pd.concat(
+                [
+                    a.to_crs(s_crs_area).area,
+                    b.to_crs(s_crs_area).area,
+                ],
+                axis="columns",
+            ),
+            op,
+        )(axis="columns")
+    else:
+        raise ValueError(f"invalid `norm` {norm!r}")
+
     res = {}
     for i in range(len(a)):
         a_i = a.iloc[i : i + 1]  # slicing preserves GeoDataFrame type
@@ -426,8 +450,7 @@ def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame):
             )
             inter = b.intersection(a_i_poly)  # .dropna()
         inter = inter[~inter.is_empty]
-        ov = inter.to_crs("EPSG:32663").area / a_area.iloc[i]
-        # TODO: original TAMS normalized by the *min* area between a and b, could offer option
+        ov = inter.to_crs(s_crs_area).area / norm_.iloc[i]
         res[i] = ov.to_dict()
 
     return res
@@ -442,6 +465,7 @@ def track(
     durations=None,
     look: str = "back",
     largest: bool = False,
+    overlap_norm: str = "a",
 ) -> geopandas.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
@@ -469,6 +493,8 @@ def track(
         (time) direction in which we "look" and compute overlaps.
     largest
         Only the largest CE continues a track.
+    overlap_norm
+        Passed to :func:`overlap`.
     """
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
@@ -503,7 +529,7 @@ def track(
             dt_im1_s = dt[i - 1].total_seconds()
 
             if look in {"b", "back"}:
-                ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s))
+                ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s), norm=overlap_norm)
                 ids = []
                 for j, d in ovs.items():
                     # For each CE at current time, find previous CE of maximum overlap
@@ -538,7 +564,7 @@ def track(
                         assert ids[ind_largest] == mcs_id
 
             elif look in {"f", "forward"}:
-                ovs = overlap(project(cs_im1, u=u_projection, dt=dt_im1_s), cs_i)
+                ovs = overlap(project(cs_im1, u=u_projection, dt=dt_im1_s), cs_i, norm=overlap_norm)
                 ids = [None for _ in range(len(cs_i))]
                 for k, d in ovs.items():
                     mcs_id = cs_im1.loc[k].mcs_id
