@@ -11,7 +11,7 @@ import pandas as pd
 
 from lib import gdf_to_df, gdf_to_ds
 
-IN_DIR = Path("/glade/scratch/zmoon/mosa2")
+IN_DIR = Path("/glade/scratch/zmoon/mosa")
 OUT_DIR = IN_DIR
 
 re_gdf_fn = re.compile(r"(wrf|gpm)_wy([0-9]{4})\.parquet")

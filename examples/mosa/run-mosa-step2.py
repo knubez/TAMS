@@ -15,7 +15,7 @@ from pathlib import Path
 from lib import run_preproced
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa-pre")
-OUT_DIR = Path("/glade/scratch/zmoon/mosa2")  # TODO: just 'mosa' ?
+OUT_DIR = Path("/glade/scratch/zmoon/mosa")
 
 
 #
