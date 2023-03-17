@@ -41,6 +41,7 @@ def plot_tracked(
     """Plot CEs at a range of times (colors) with CE group ID (MCS ID) identified."""
 
     import matplotlib.pyplot as plt
+    from matplotlib import patheffects
 
     valid_backgrounds = {"map", "countries", "none"}
     if background not in valid_backgrounds:
@@ -52,7 +53,11 @@ def plot_tracked(
     # https://xarray.pydata.org/en/stable/user-guide/plotting.html#controlling-the-figure-size
 
     blob_kwargs = dict(alpha=alpha, lw=1.5)
-    text_kwargs = dict(fontsize=14, zorder=10)
+    text_kwargs = dict(
+        fontsize=14,
+        zorder=10,
+        path_effects=[patheffects.withStroke(linewidth=2, foreground="0.2")],
+    )
     if ax is None:
         if background in {"map", "countries"}:
             try:
