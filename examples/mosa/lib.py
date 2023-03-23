@@ -165,87 +165,21 @@ preproc_wrf_file = partial(preproc_file, kind="wrf")
 preproc_gpm_file = partial(preproc_file, kind="gpm")
 
 
-def run_preproced(
-    fps: list[Path],
-    *,
-    kind: str,
-    id_: str | None = None,
-    track_kws: dict[str, Any] | None = None,
-) -> gpd.GeoDataFrame:
-    """On preprocessed files, do the remaining steps:
-    track, classify.
+def classify(ce: gpd.GeoDataFrame, *, pre: str = ""):
+    """Determine if CE group (MCS ID) is indeed MCS or not under the MOSA criteria.
 
-    Note that this returns all tracked CEs, including those not classified as MCS
-    (output gdf includes reason).
-
-    Returns GeoDataFrame including the contour polygons.
+    Modifies `ce` in-place.
 
     Parameters
     ----------
-    id_
-        Just used for the info messages, to differentiate when running multiple at same time.
+    ce
+        CE dataset (output from TAMS tracking step).
+    pre
+        Prefix added to warning/info messages to identify a specific run.
     """
-    import geopandas as gpd
-
-    import tams
-
-    #
-    # Read
-    #
-
-    pre = f"[{id_}] " if id_ is not None else ""
-
-    def printt(s):
-        """Print message and current time"""
-        import datetime
-
-        st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"{pre}{st}: {s}")
-
-    if kind.lower() == "wrf":
-        fn_t_fmt = r"%Y-%m-%d_%H"
-        fn_t_slice = slice(12, 25)
-    elif kind.lower() == "gpm":
-        fn_t_fmt = r"%Y%m%d%H"
-        fn_t_slice = slice(5, 15)
-    else:
-        raise ValueError(f"invalid `kind` {kind!r}")
-
-    printt(f"Reading {len(fps)} pre-processed files")
-    sts = []  # datetime strings
-    dfs = []
-    for fp in sorted(fps):
-        sts.append(fp.name[fn_t_slice])
-        df = gpd.read_parquet(fp)
-        # At least when concatting all of them, getting some weird types in WY2016
-        # (WY2011 is ok for some reason)
-        # TODO: alleviate need for this (in preproc)
-        df = df.assign(
-            mean_pr=df.mean_pr.astype(float),
-            max_pr=df.max_pr.astype(float),
-            min_pr=df.min_pr.astype(float),
-            count_pr=df.count_pr.astype(int),
-        ).convert_dtypes()
-        dfs.append(df)
-
-    times = pd.to_datetime(sts, format=fn_t_fmt)
-
-    #
-    # Track
-    #
-
-    if track_kws is None:
-        track_kws = {}
-
-    printt("Tracking")
-    ce = tams.track(dfs, times, **track_kws)
-
-    #
-    # Classify (CEs)
-    #
-
-    printt("Classifying")
-    ce["mcs_id"] = ce.mcs_id.astype(int)  # TODO: should be already (unless NaNs)
+    ce["mcs_id"] = ce.mcs_id.astype(
+        int
+    )  # TODO: should be already (unless NaNs due to days with no CEs identified)
     n_mcs_ = ce.mcs_id.max() + 1
     n_mcs = int(n_mcs_)
     if n_mcs != n_mcs_:
@@ -326,6 +260,91 @@ def run_preproced(
     assert (ce.query("is_mcs == False").not_is_mcs_reason != "").all()
 
     # TODO: include computed stats from above like duration somehow?
+
+    return ce
+
+
+def run_preproced(
+    fps: list[Path],
+    *,
+    kind: str,
+    id_: str | None = None,
+    track_kws: dict[str, Any] | None = None,
+) -> gpd.GeoDataFrame:
+    """On preprocessed files, do the remaining steps:
+    track, classify.
+
+    Note that this returns all tracked CEs, including those not classified as MCS
+    (output gdf includes reason).
+
+    Returns GeoDataFrame including the contour polygons.
+
+    Parameters
+    ----------
+    id_
+        Just used for the info messages, to differentiate when running multiple at same time.
+    """
+    import geopandas as gpd
+
+    import tams
+
+    #
+    # Read
+    #
+
+    pre = f"[{id_}] " if id_ is not None else ""
+
+    def printt(s):
+        """Print message and current time"""
+        import datetime
+
+        st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"{pre}{st}: {s}")
+
+    if kind.lower() == "wrf":
+        fn_t_fmt = r"%Y-%m-%d_%H"
+        fn_t_slice = slice(12, 25)
+    elif kind.lower() == "gpm":
+        fn_t_fmt = r"%Y%m%d%H"
+        fn_t_slice = slice(5, 15)
+    else:
+        raise ValueError(f"invalid `kind` {kind!r}")
+
+    printt(f"Reading {len(fps)} pre-processed files")
+    sts = []  # datetime strings
+    dfs = []
+    for fp in sorted(fps):
+        sts.append(fp.name[fn_t_slice])
+        df = gpd.read_parquet(fp)
+        # At least when concatting all of them, getting some weird types in WY2016
+        # (WY2011 is ok for some reason)
+        # TODO: alleviate need for this (in preproc)
+        df = df.assign(
+            mean_pr=df.mean_pr.astype(float),
+            max_pr=df.max_pr.astype(float),
+            min_pr=df.min_pr.astype(float),
+            count_pr=df.count_pr.astype(int),
+        ).convert_dtypes()
+        dfs.append(df)
+
+    times = pd.to_datetime(sts, format=fn_t_fmt)
+
+    #
+    # Track
+    #
+
+    if track_kws is None:
+        track_kws = {}
+
+    printt("Tracking")
+    ce = tams.track(dfs, times, **track_kws)
+
+    #
+    # Classify (CEs)
+    #
+
+    printt("Classifying")
+    ce = classify(ce, pre=pre)
 
     printt("Done")
 
