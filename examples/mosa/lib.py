@@ -203,22 +203,26 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
 
         # 1. Assess area criterion
         # NOTE: rolling usage assuming data is hourly
-        yes = (area >= 40_000).rolling(n, min_periods=0).count().eq(n).any()
+        yes = (area >= 40_000).rolling(n, min_periods=0).sum().eq(n).any()
         if not yes:
             is_mcs = False
             not_is_mcs_reason = "area"
 
         else:
+            assert area.max() >= 40_000
+
             # Agg max precip over cloud elements
             maxpr = g.groupby("itime")["max_pr"].max()
 
             # 2. Assess minimum pixel-peak precip criterion
-            yes = (maxpr >= 10).rolling(n, min_periods=0).count().eq(n).any()
+            yes = (maxpr >= 10).rolling(n, min_periods=0).sum().eq(n).any()
             if not yes:
                 is_mcs = False
                 not_is_mcs_reason = "peak precip"
 
             else:
+                assert maxpr.max() >= 10
+
                 # Compute rainfall volume
                 ce_prvol = g.area_km2 * g.mean_pr  # per CE
                 prvol = g.assign(prvol=ce_prvol).groupby("itime")["prvol"].sum()
@@ -230,6 +234,8 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
                     not_is_mcs_reason = "rainfall volume"
 
                 else:
+                    assert prvol.max() >= 20_000
+
                     # 4. Overshoot threshold currently met for all due to TAMS approach
                     # TODO: check anyway
                     ...
