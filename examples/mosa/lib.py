@@ -220,8 +220,8 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
 
             else:
                 # Compute rainfall volume
-                g["prvol"] = g.area_km2 * g.mean_pr  # per CE
-                prvol = g.groupby("itime")["prvol"].sum()
+                ce_prvol = g.area_km2 * g.mean_pr  # per CE
+                prvol = g.assign(prvol=ce_prvol).groupby("itime")["prvol"].sum()
 
                 # 3. Assess minimum rainfall volume criterion
                 yes = (prvol >= 20_000).sum() >= 1
