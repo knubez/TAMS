@@ -165,7 +165,7 @@ preproc_wrf_file = partial(preproc_file, kind="wrf")
 preproc_gpm_file = partial(preproc_file, kind="gpm")
 
 
-def classify(ce: gpd.GeoDataFrame, *, pre: str = ""):
+def classify(ce: gpd.GeoDataFrame, *, pre: str = "") -> gpd.GeoDataFrame:
     """Determine if CE group (MCS ID) is indeed MCS or not under the MOSA criteria.
 
     Modifies `ce` in-place.
@@ -177,9 +177,8 @@ def classify(ce: gpd.GeoDataFrame, *, pre: str = ""):
     pre
         Prefix added to warning/info messages to identify a specific run.
     """
-    ce["mcs_id"] = ce.mcs_id.astype(
-        int
-    )  # TODO: should be already (unless NaNs due to days with no CEs identified)
+    ce["mcs_id"] = ce.mcs_id.astype(int)
+    # TODO: ^ should be already (unless NaNs due to days with no CEs identified)
     n_mcs_ = ce.mcs_id.max() + 1
     n_mcs = int(n_mcs_)
     if n_mcs != n_mcs_:
@@ -212,7 +211,7 @@ def classify(ce: gpd.GeoDataFrame, *, pre: str = ""):
             reason_list[mcs_id] = "area"
             continue
 
-        # Agg min precip over cloud elements
+        # Agg max precip over cloud elements
         maxpr = g.groupby("itime")["max_pr"].max()
 
         # 2. Assess minimum pixel-peak precip criterion
