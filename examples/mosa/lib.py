@@ -165,8 +165,97 @@ preproc_wrf_file = partial(preproc_file, kind="wrf")
 preproc_gpm_file = partial(preproc_file, kind="gpm")
 
 
-def classify(ce: gpd.GeoDataFrame, *, pre: str = "") -> gpd.GeoDataFrame:
+def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = False) -> pd.Series:
     """Determine if CE group (MCS ID) is indeed MCS or not under the MOSA criteria.
+
+    Returns Series of stats for the CE group (MCS ID).
+
+    Parameters
+    ----------
+    g
+        CE dataset (output from TAMS tracking step, single MCS ID).
+    pre
+        Prefix added to warning/info messages to identify a specific run.
+    """
+    if "mcs_id" in g:
+        assert g.mcs_id.nunique() == 1
+
+    # Until proven guilty
+    is_mcs = True
+    not_is_mcs_reason = ""
+
+    # Compute time
+    t = g.time.unique()
+    tmin = t.min()
+    tmax = t.max()
+    duration = pd.Timedelta(tmax - tmin)
+
+    # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
+    # but for accumulated (during previous time step), 4 is fine(?)
+    n = 4
+    if duration < pd.Timedelta(f"{n}H"):
+        is_mcs = False
+        not_is_mcs_reason = "duration"
+
+    else:
+        # Sum area over cloud elements
+        area = g.groupby("itime")["area_km2"].sum()
+
+        # 1. Assess area criterion
+        # NOTE: rolling usage assuming data is hourly
+        yes = (area >= 40_000).rolling(n, min_periods=0).count().eq(n).any()
+        if not yes:
+            is_mcs = False
+            not_is_mcs_reason = "area"
+
+        else:
+            # Agg max precip over cloud elements
+            maxpr = g.groupby("itime")["max_pr"].max()
+
+            # 2. Assess minimum pixel-peak precip criterion
+            yes = (maxpr >= 10).rolling(n, min_periods=0).count().eq(n).any()
+            if not yes:
+                is_mcs = False
+                not_is_mcs_reason = "peak precip"
+
+            else:
+                # Compute rainfall volume
+                g["prvol"] = g.area_km2 * g.mean_pr  # per CE
+                prvol = g.groupby("itime")["prvol"].sum()
+
+                # 3. Assess minimum rainfall volume criterion
+                yes = (prvol >= 20_000).sum() >= 1
+                if not yes:
+                    is_mcs = False
+                    not_is_mcs_reason = "rainfall volume"
+
+                else:
+                    # 4. Overshoot threshold currently met for all due to TAMS approach
+                    # TODO: check anyway
+                    ...
+
+    # TODO: include/check all reasons?
+
+    res = {
+        "is_mcs": is_mcs,
+        "not_is_mcs_reason": not_is_mcs_reason,
+    }
+
+    if include_stats:
+        res.update(
+            {
+                "duration": duration,
+                "max_area": area.max(),
+                "max_maxpr": maxpr.max(),
+                "max_prvol": prvol.max(),
+            }
+        )
+
+    return pd.Series(res)
+
+
+def classify(ce: gpd.GeoDataFrame, *, pre: str = "") -> gpd.GeoDataFrame:
+    """Determine if CE groups (MCS IDs) is indeed MCS or not under the MOSA criteria.
 
     Modifies `ce` in-place.
 
@@ -183,80 +272,13 @@ def classify(ce: gpd.GeoDataFrame, *, pre: str = "") -> gpd.GeoDataFrame:
     n_mcs = int(n_mcs_)
     if n_mcs != n_mcs_:
         warnings.warn(f"{pre}max MCS ID + 1 was {n_mcs_} but using {n_mcs}", stacklevel=2)
-    is_mcs_list: list[None | bool] = [None] * n_mcs
-    reason_list: list[None | str] = [None] * n_mcs
-    for mcs_id, g in ce.groupby("mcs_id"):
-        # Compute time
-        t = g.time.unique()
-        tmin = t.min()
-        tmax = t.max()
-        duration = pd.Timedelta(tmax - tmin)
 
-        # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
-        # but for accumulated (during previous time step), 4 is fine(?)
-        n = 4
-        if duration < pd.Timedelta(f"{n}H"):
-            is_mcs_list[mcs_id] = False
-            reason_list[mcs_id] = "duration"
-            continue
+    mcs_info = ce.groupby("mcs_id").apply(classify_one, include_stats=False, pre=pre)
+    assert mcs_info.index.name == "mcs_id"
 
-        # Sum area over cloud elements
-        area = g.groupby("itime")["area_km2"].sum()
-
-        # 1. Assess area criterion
-        # NOTE: rolling usage assuming data is hourly
-        yes = (area >= 40_000).rolling(n, min_periods=0).count().eq(n).any()
-        if not yes:
-            is_mcs_list[mcs_id] = False
-            reason_list[mcs_id] = "area"
-            continue
-
-        # Agg max precip over cloud elements
-        maxpr = g.groupby("itime")["max_pr"].max()
-
-        # 2. Assess minimum pixel-peak precip criterion
-        yes = (maxpr >= 10).rolling(n, min_periods=0).count().eq(n).any()
-        if not yes:
-            is_mcs_list[mcs_id] = False
-            reason_list[mcs_id] = "peak precip"
-            continue
-
-        # Compute rainfall volume
-        g["prvol"] = g.area_km2 * g.mean_pr  # per CE
-        prvol = g.groupby("itime")["prvol"].sum()
-
-        # 3. Assess minimum rainfall volume criterion
-        yes = (prvol >= 20_000).sum() >= 1
-        if not yes:
-            is_mcs_list[mcs_id] = False
-            reason_list[mcs_id] = "rainfall volume"
-            continue
-
-        # 4. Overshoot threshold currently met for all due to TAMS approach
-
-        # If make it to here, is MCS
-        is_mcs_list[mcs_id] = True
-        reason_list[mcs_id] = ""
-
-    assert len(is_mcs_list) == len(reason_list) == ce.mcs_id.max() + 1
-    assert not any(x is None for x in is_mcs_list)
-    assert not any(x is None for x in reason_list)
-
-    ce = ce.drop(columns=["is_mcs"], errors="ignore").merge(
-        pd.Series(is_mcs_list, index=range(len(is_mcs_list)), name="is_mcs"),
-        how="left",
-        left_on="mcs_id",
-        right_index=True,
+    ce = ce.drop(columns=["is_mcs", "not_is_mcs_reason"], errors="ignore").merge(
+        mcs_info, how="left", left_on="mcs_id", right_index=True
     )
-    ce = ce.drop(columns=["not_is_mcs_reason"], errors="ignore").merge(
-        pd.Series(reason_list, index=range(len(is_mcs_list)), name="not_is_mcs_reason"),
-        how="left",
-        left_on="mcs_id",
-        right_index=True,
-    )
-
-    assert (ce.query("is_mcs == True").not_is_mcs_reason == "").all()
-    assert (ce.query("is_mcs == False").not_is_mcs_reason != "").all()
 
     # TODO: include computed stats from above like duration somehow?
 
