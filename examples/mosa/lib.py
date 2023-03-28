@@ -237,7 +237,7 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
                     assert prvol.max() >= 20_000
 
                     # 4. Overshoot threshold currently met for all due to TAMS approach
-                    # TODO: check anyway
+                    # TODO: check anyway?
                     ...
 
     # TODO: include/check all reasons?
@@ -251,9 +251,9 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
         res.update(
             {
                 "duration": duration,
-                "max_area": area.max(),
-                "max_maxpr": maxpr.max(),
-                "max_prvol": prvol.max(),
+                # "max_area": area.max(),
+                # "max_maxpr": maxpr.max(),
+                # "max_prvol": prvol.max(),
             }
         )
 
