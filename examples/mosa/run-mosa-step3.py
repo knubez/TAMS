@@ -9,7 +9,7 @@ from typing import Any, Hashable
 import numpy as np
 import pandas as pd
 
-from lib import gdf_to_df, gdf_to_ds
+from lib import _classify_cols, gdf_to_df, gdf_to_ds
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa")
 OUT_DIR = IN_DIR
@@ -22,10 +22,10 @@ ds_null_val = {
     "mcs_mask": 0,
     "area_km2": np.nan,
     "area_core_km2": np.nan,
-    "is_mcs": np.nan,
-    "not_is_mcs_reason": "",
     "ce_count": np.nan,
 }
+for col in _classify_cols:
+    ds_null_val[col] = np.nan
 
 
 def run_gdf(fp: Path) -> None:
@@ -64,7 +64,7 @@ def run_gdf(fp: Path) -> None:
 
     # Only CEs associated to MCS (as defined by MOSA)
     df = gdf
-    mcs = df[df.is_mcs].reset_index(drop=True).drop(columns=["is_mcs", "not_is_mcs_reason"])
+    mcs = df[df.is_mcs].reset_index(drop=True).drop(columns=_classify_cols)
     mcs
 
     # Save df
@@ -127,7 +127,7 @@ def run_gdf(fp: Path) -> None:
     ids = is_mcs[is_mcs].index
     ds2 = ds.sel(mcs_id=ids)
     assert ds2.is_mcs.all()
-    ds2 = ds2.drop_vars(["is_mcs", "not_is_mcs_reason"])
+    ds2 = ds2.drop_vars(_classify_cols)
     ds2.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file.nc", encoding=encoding)  # type: ignore[arg-type]
 
 

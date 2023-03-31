@@ -212,6 +212,21 @@ preproc_wrf_file = partial(preproc_file, kind="wrf")
 preproc_gpm_file = partial(preproc_file, kind="gpm")
 
 
+_classify_cols = [
+    "is_mcs",
+    "meets_crit_duration",
+    "meets_crit_area",
+    "meets_crit_prpeak",
+    "meets_crit_prvol",
+]
+_classify_stats_cols = [
+    "duration",
+    "max_area",
+    "max_maxpr",
+    "max_prvol",
+]
+
+
 def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = False) -> pd.Series:
     """Determine if CE group (MCS ID) is indeed MCS or not under the MOSA criteria.
 
@@ -229,7 +244,10 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
 
     # Until proven guilty
     is_mcs = True
-    not_is_mcs_reason = ""
+    meets_crit_duration = True
+    meets_crit_area = True
+    meets_crit_prpeak = True
+    meets_crit_prvol = True
 
     # Compute time
     t = g.time.unique()
@@ -238,69 +256,67 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     duration = pd.Timedelta(tmax - tmin)
 
     # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
-    # but for accumulated (during previous time step), 4 is fine(?)
+    # but for accumulated (during previous time step), 4 is fine(?) (according to Andy)
     n = 4
     if duration < pd.Timedelta(f"{n}H"):
         is_mcs = False
-        not_is_mcs_reason = "duration"
+        meets_crit_duration = False
 
+    # TODO: faster (e.g. just one groupby agg)
+
+    # Sum area over cloud elements
+    area = g.groupby("itime")["area_km2"].sum()
+
+    # 1. Assess area criterion
+    # NOTE: rolling usage assuming data is hourly
+    yes = (area >= 40_000).rolling(n, min_periods=0).sum().eq(n).any()
+    if not yes:
+        is_mcs = False
+        meets_crit_area = False
     else:
-        # Sum area over cloud elements
-        area = g.groupby("itime")["area_km2"].sum()
+        assert area.max() >= 40_000
 
-        # 1. Assess area criterion
-        # NOTE: rolling usage assuming data is hourly
-        yes = (area >= 40_000).rolling(n, min_periods=0).sum().eq(n).any()
-        if not yes:
-            is_mcs = False
-            not_is_mcs_reason = "area"
+    # Agg max precip over cloud elements
+    maxpr = g.groupby("itime")["max_pr"].max()
 
-        else:
-            assert area.max() >= 40_000
+    # 2. Assess minimum pixel-peak precip criterion
+    yes = (maxpr >= 10).rolling(n, min_periods=0).sum().eq(n).any()
+    if not yes:
+        is_mcs = False
+        meets_crit_prpeak = False
+    else:
+        assert maxpr.max() >= 10
 
-            # Agg max precip over cloud elements
-            maxpr = g.groupby("itime")["max_pr"].max()
+    # Compute rainfall volume
+    ce_prvol = g.area_km2 * g.mean_pr  # per CE
+    prvol = g.assign(prvol=ce_prvol).groupby("itime")["prvol"].sum()
 
-            # 2. Assess minimum pixel-peak precip criterion
-            yes = (maxpr >= 10).rolling(n, min_periods=0).sum().eq(n).any()
-            if not yes:
-                is_mcs = False
-                not_is_mcs_reason = "peak precip"
+    # 3. Assess minimum rainfall volume criterion
+    yes = (prvol >= 20_000).sum() >= 1
+    if not yes:
+        is_mcs = False
+        meets_crit_prvol = False
+    else:
+        assert prvol.max() >= 20_000
 
-            else:
-                assert maxpr.max() >= 10
-
-                # Compute rainfall volume
-                ce_prvol = g.area_km2 * g.mean_pr  # per CE
-                prvol = g.assign(prvol=ce_prvol).groupby("itime")["prvol"].sum()
-
-                # 3. Assess minimum rainfall volume criterion
-                yes = (prvol >= 20_000).sum() >= 1
-                if not yes:
-                    is_mcs = False
-                    not_is_mcs_reason = "rainfall volume"
-
-                else:
-                    assert prvol.max() >= 20_000
-
-                    # 4. Overshoot threshold currently met for all due to TAMS approach
-                    # TODO: check anyway?
-                    ...
-
-    # TODO: include/check all reasons?
+    # 4. Overshoot threshold currently met for all due to TAMS approach
+    # TODO: check anyway?
 
     res = {
         "is_mcs": is_mcs,
-        "not_is_mcs_reason": not_is_mcs_reason,
+        "meets_crit_duration": meets_crit_duration,
+        "meets_crit_area": meets_crit_area,
+        "meets_crit_prpeak": meets_crit_prpeak,
+        "meets_crit_prvol": meets_crit_prvol,
     }
 
     if include_stats:
         res.update(
             {
                 "duration": duration,
-                # "max_area": area.max(),
-                # "max_maxpr": maxpr.max(),
-                # "max_prvol": prvol.max(),
+                "max_area": area.max(),
+                "max_maxpr": maxpr.max(),
+                "max_prvol": prvol.max(),
             }
         )
 
@@ -329,7 +345,7 @@ def classify(ce: gpd.GeoDataFrame, *, pre: str = "") -> gpd.GeoDataFrame:
     mcs_info = ce.groupby("mcs_id").apply(classify_one, include_stats=False, pre=pre)
     assert mcs_info.index.name == "mcs_id"
 
-    ce = ce.drop(columns=["is_mcs", "not_is_mcs_reason"], errors="ignore").merge(
+    ce = ce.drop(columns=_classify_cols + _classify_stats_cols, errors="ignore").merge(
         mcs_info, how="left", left_on="mcs_id", right_index=True
     )
 
@@ -454,9 +470,7 @@ def gdf_to_df(ce) -> pd.DataFrame:
         "max_pr",
         "min_pr",
         "count_pr",
-        "is_mcs",
-        "not_is_mcs_reason",
-    ]
+    ] + _classify_cols
 
     ce_ = (
         ce.drop(
@@ -521,7 +535,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
         # Agg some other info
         gb = ce_t.groupby("mcs_id")
         x1 = gb[["area_km2", "area_core_km2"]].sum()
-        x2 = gb[["is_mcs", "not_is_mcs_reason"]].agg(tams.util._the_unique)
+        x2 = gb[_classify_cols].agg(tams.util._the_unique)
         x3 = gb[["area_km2"]].count().rename(columns={"area_km2": "ce_count"})
         x3["time"] = t
 

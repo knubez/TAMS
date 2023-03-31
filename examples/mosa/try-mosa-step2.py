@@ -11,7 +11,7 @@ from typing import Any, Hashable
 
 import xarray as xr
 
-from lib import gdf_to_df, gdf_to_ds, run_wrf_preproced
+from lib import _classify_cols, gdf_to_df, gdf_to_ds, run_wrf_preproced
 
 base = Path("~/OneDrive/w/ERT-ARL/mosa").expanduser()
 files = sorted((base / "mosa-pre-sample").glob("tb_rainrate*.parquet"))
@@ -40,5 +40,5 @@ is_mcs = is_mcs.explode()
 ids = is_mcs[is_mcs].index
 ds2 = ds.sel(mcs_id=ids)
 assert ds2.is_mcs.all()
-ds2 = ds2.drop_vars(["is_mcs", "not_is_mcs_reason"])
+ds2 = ds2.drop_vars(_classify_cols)
 ds2.to_netcdf(base / "tams_mcs-mask-sample_reduced.nc", encoding=encoding)
