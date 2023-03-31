@@ -254,24 +254,27 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     meets_crit_duration = duration >= pd.Timedelta(f"{n}H")
     # TODO: ^ not really one of the 4 criteria (though needed for 1 and 2)
 
-    # TODO: faster (e.g. just one groupby agg)
+    # Compute rainfall volume
+    ce_prvol = g.area_km2 * g.mean_pr  # per CE
+
+    # Group by time
+    gb = g.assign(prvol=ce_prvol).groupby("itime")
 
     # Sum area over cloud elements
-    area = g.groupby("itime")["area_km2"].sum()
+    area = gb["area_km2"].sum()
+
+    # Agg max precip over cloud elements
+    maxpr = gb["max_pr"].max()
+
+    # Sum rainfall volume over cloud elements
+    prvol = gb["prvol"].sum()
 
     # 1. Assess area criterion
     # NOTE: rolling usage assuming data is hourly
     meets_crit_area = (area >= 40_000).rolling(n, min_periods=0).sum().eq(n).any()
 
-    # Agg max precip over cloud elements
-    maxpr = g.groupby("itime")["max_pr"].max()
-
     # 2. Assess minimum pixel-peak precip criterion
     meets_crit_prpeak = (maxpr >= 10).rolling(n, min_periods=0).sum().eq(n).any()
-
-    # Compute rainfall volume
-    ce_prvol = g.area_km2 * g.mean_pr  # per CE
-    prvol = g.assign(prvol=ce_prvol).groupby("itime")["prvol"].sum()
 
     # 3. Assess minimum rainfall volume criterion
     meets_crit_prvol = (prvol >= 20_000).sum() >= 1
@@ -299,19 +302,22 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
 
     # Sanity checks
     if meets_crit_area:
-        assert area.max() >= 40_000
+        max_area = area.max()
+        assert max_area >= 40_000
     if meets_crit_prpeak:
-        assert maxpr.max() >= 10
+        max_maxpr = maxpr.max()
+        assert max_maxpr >= 10
     if meets_crit_prvol:
-        assert prvol.max() >= 20_000
+        max_prvol = prvol.max()
+        assert max_prvol >= 20_000
 
     if include_stats:
         res.update(
             {
                 "duration": duration,
-                "max_area": area.max(),
-                "max_maxpr": maxpr.max(),
-                "max_prvol": prvol.max(),
+                "max_area": max_area,
+                "max_maxpr": max_maxpr,
+                "max_prvol": max_prvol,
             }
         )
 
