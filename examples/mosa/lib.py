@@ -110,6 +110,53 @@ def _load_gpm_file(fp) -> xr.Dataset:
     return ds
 
 
+def load_preproc_one(fp, *, kind: str) -> gpd.GeoDataFrame:
+    """Load a preprocessed file (one time) saved in Parquet format."""
+    if kind.lower() == "wrf":
+        fn_t_fmt = r"%Y-%m-%d_%H"
+        fn_t_slice = slice(12, 25)
+    elif kind.lower() == "gpm":
+        fn_t_fmt = r"%Y%m%d%H"
+        fn_t_slice = slice(5, 15)
+    else:
+        raise ValueError(f"invalid `kind` {kind!r}")
+
+    st = fp.name[fn_t_slice]
+    df = gpd.read_parquet(fp)
+    # At least when concatting all of them, getting some weird types in WY2016
+    # (WY2011 is ok for some reason)
+    # TODO: alleviate need for this (in preproc)
+    df = df.assign(
+        mean_pr=df.mean_pr.astype(float),
+        max_pr=df.max_pr.astype(float),
+        min_pr=df.min_pr.astype(float),
+        count_pr=df.count_pr.astype(int),
+    ).convert_dtypes()
+
+    time = pd.to_datetime(st, format=fn_t_fmt)
+    df.attrs.update(time=time)
+
+    return df
+
+
+def load_preproc_zip(fp, *, kind: str) -> gpd.GeoDataFrame:
+    """Load zip of preprocessed identify files in Parquet format."""
+    import zipfile
+
+    with zipfile.ZipFile(fp) as zf:
+        files = zf.namelist()
+        dfs = []
+        for fn in files:
+            with zf.open(fn) as f:
+                dfs.append(load_preproc_one(f, kind=kind))
+
+    dfs.sort(key=lambda df: df.attrs["time"])
+
+    times = [df.attrs["time"] for df in dfs]
+
+    return times, dfs
+
+
 def preproc_file(fp, *, kind: str, out_dir=None) -> None:
     """Pre-process file, saving CE dataset, including CE precip stats, to file."""
     import tams
@@ -328,6 +375,7 @@ def run_preproced(
         st = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{pre}{st}: {s}")
 
+    # TODO: replace with zip load?
     if kind.lower() == "wrf":
         fn_t_fmt = r"%Y-%m-%d_%H"
         fn_t_slice = slice(12, 25)
