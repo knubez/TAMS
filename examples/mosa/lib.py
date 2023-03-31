@@ -219,6 +219,7 @@ _classify_cols = [
     "meets_crit_prpeak",
     "meets_crit_prvol",
 ]
+_classify_cols_set = set(_classify_cols)
 _classify_stats_cols = [
     "duration",
     "max_area",
@@ -299,6 +300,7 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
         "meets_crit_prpeak": meets_crit_prpeak,
         "meets_crit_prvol": meets_crit_prvol,
     }
+    assert res.keys() == _classify_cols_set
 
     # Sanity checks
     if meets_crit_area:
