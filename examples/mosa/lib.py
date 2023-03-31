@@ -242,14 +242,7 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     if "mcs_id" in g:
         assert g.mcs_id.nunique() == 1
 
-    # Until proven guilty
-    is_mcs = True
-    meets_crit_duration = True
-    meets_crit_area = True
-    meets_crit_prpeak = True
-    meets_crit_prvol = True
-
-    # Compute time
+    # Compute duration
     t = g.time.unique()
     tmin = t.min()
     tmax = t.max()
@@ -258,9 +251,8 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
     # but for accumulated (during previous time step), 4 is fine(?) (according to Andy)
     n = 4
-    if duration < pd.Timedelta(f"{n}H"):
-        is_mcs = False
-        meets_crit_duration = False
+    meets_crit_duration = duration >= pd.Timedelta(f"{n}H")
+    # TODO: ^ not really one of the 4 criteria (though needed for 1 and 2)
 
     # TODO: faster (e.g. just one groupby agg)
 
@@ -269,38 +261,33 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
 
     # 1. Assess area criterion
     # NOTE: rolling usage assuming data is hourly
-    yes = (area >= 40_000).rolling(n, min_periods=0).sum().eq(n).any()
-    if not yes:
-        is_mcs = False
-        meets_crit_area = False
-    else:
-        assert area.max() >= 40_000
+    meets_crit_area = (area >= 40_000).rolling(n, min_periods=0).sum().eq(n).any()
 
     # Agg max precip over cloud elements
     maxpr = g.groupby("itime")["max_pr"].max()
 
     # 2. Assess minimum pixel-peak precip criterion
-    yes = (maxpr >= 10).rolling(n, min_periods=0).sum().eq(n).any()
-    if not yes:
-        is_mcs = False
-        meets_crit_prpeak = False
-    else:
-        assert maxpr.max() >= 10
+    meets_crit_prpeak = (maxpr >= 10).rolling(n, min_periods=0).sum().eq(n).any()
 
     # Compute rainfall volume
     ce_prvol = g.area_km2 * g.mean_pr  # per CE
     prvol = g.assign(prvol=ce_prvol).groupby("itime")["prvol"].sum()
 
     # 3. Assess minimum rainfall volume criterion
-    yes = (prvol >= 20_000).sum() >= 1
-    if not yes:
-        is_mcs = False
-        meets_crit_prvol = False
-    else:
-        assert prvol.max() >= 20_000
+    meets_crit_prvol = (prvol >= 20_000).sum() >= 1
 
     # 4. Overshoot threshold currently met for all due to TAMS approach
     # TODO: check anyway?
+
+    # An MCS meets all of the criteria
+    is_mcs = all(
+        [
+            meets_crit_duration,
+            meets_crit_area,
+            meets_crit_prpeak,
+            meets_crit_prvol,
+        ]
+    )
 
     res = {
         "is_mcs": is_mcs,
@@ -309,6 +296,14 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
         "meets_crit_prpeak": meets_crit_prpeak,
         "meets_crit_prvol": meets_crit_prvol,
     }
+
+    # Sanity checks
+    if meets_crit_area:
+        assert area.max() >= 40_000
+    if meets_crit_prpeak:
+        assert maxpr.max() >= 10
+    if meets_crit_prvol:
+        assert prvol.max() >= 20_000
 
     if include_stats:
         res.update(
