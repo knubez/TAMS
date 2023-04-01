@@ -303,14 +303,14 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     assert res.keys() == _classify_cols_set
 
     # Sanity checks
+    max_area = area.max()
     if meets_crit_area:
-        max_area = area.max()
         assert max_area >= 40_000
+    max_maxpr = maxpr.max()
     if meets_crit_prpeak:
-        max_maxpr = maxpr.max()
         assert max_maxpr >= 10
+    max_prvol = prvol.max()
     if meets_crit_prvol:
-        max_prvol = prvol.max()
         assert max_prvol >= 20_000
 
     if include_stats:
@@ -326,7 +326,12 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     return pd.Series(res)
 
 
-def classify(ce: gpd.GeoDataFrame, *, pre: str = "") -> gpd.GeoDataFrame:
+def classify(
+    ce: gpd.GeoDataFrame,
+    *,
+    pre: str = "",
+    include_stats: bool = False,
+) -> gpd.GeoDataFrame:
     """Determine if CE groups (MCS IDs) is indeed MCS or not under the MOSA criteria.
 
     Modifies `ce` in-place.
@@ -345,14 +350,12 @@ def classify(ce: gpd.GeoDataFrame, *, pre: str = "") -> gpd.GeoDataFrame:
     if n_mcs != n_mcs_:
         warnings.warn(f"{pre}max MCS ID + 1 was {n_mcs_} but using {n_mcs}", stacklevel=2)
 
-    mcs_info = ce.groupby("mcs_id").apply(classify_one, include_stats=False, pre=pre)
+    mcs_info = ce.groupby("mcs_id").apply(classify_one, include_stats=include_stats, pre=pre)
     assert mcs_info.index.name == "mcs_id"
 
     ce = ce.drop(columns=_classify_cols + _classify_stats_cols, errors="ignore").merge(
         mcs_info, how="left", left_on="mcs_id", right_index=True
     )
-
-    # TODO: include computed stats from above like duration somehow?
 
     return ce
 
