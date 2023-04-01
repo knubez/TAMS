@@ -519,6 +519,10 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
 
     time = sorted(ce.time.unique())
 
+    unique_cols = _classify_cols
+    if "mcs_id_orig" in ce.columns:
+        unique_cols += ["mcs_id_orig"]
+
     dfs = []
     masks = []
     for t in time:  # TODO: joblib?
@@ -541,7 +545,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
         # Agg some other info
         gb = ce_t.groupby("mcs_id")
         x1 = gb[["area_km2", "area_core_km2"]].sum()
-        x2 = gb[_classify_cols].agg(tams.util._the_unique)
+        x2 = gb[unique_cols].agg(tams.util._the_unique)
         x3 = gb[["area_km2"]].count().rename(columns={"area_km2": "ce_count"})
         x3["time"] = t
 

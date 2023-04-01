@@ -62,7 +62,8 @@ assert (np.unique(ds2.mcs_mask) == np.r_[0, gdf.mcs_id.unique() + 1]).all()
 gdf_mcs = gdf[gdf.is_mcs]
 assert gdf_mcs.mcs_id.nunique() < gdf.mcs_id.nunique()
 
-gdf_mcs_reid = gdf_mcs.assign(mcs_id=re_id(gdf_mcs))
+gdf_mcs_reid = gdf_mcs.assign(mcs_id=re_id(gdf_mcs), mcs_id_orig=gdf_mcs.mcs_id)
+assert gdf_mcs_reid.groupby("mcs_id").nunique()["mcs_id_orig"].eq(1).all()
 ds3 = gdf_to_ds(gdf_mcs_reid, grid=ds_grid)
 
 assert gdf_mcs.mcs_id.nunique() == ds3.dims["mcs_id"]
