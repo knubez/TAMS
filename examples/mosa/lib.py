@@ -519,7 +519,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
 
     time = sorted(ce.time.unique())
 
-    unique_cols = _classify_cols
+    unique_cols = _classify_cols[:]  # unique for a given MCS ID
     if "mcs_id_orig" in ce.columns:
         unique_cols += ["mcs_id_orig"]
 
@@ -558,7 +558,13 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
     # (the sample file looks to be doing this)
     assert da.min() == 0
     da = (da + 1).fillna(0).astype(np.int64)
-    da.attrs.update(long_name="MCS ID mask", description="Value 0 indicates null (no MCS).")
+    da.attrs.update(
+        long_name="MCS ID mask",
+        description=(
+            "Value 0 indicates null (no MCS), "
+            "so these are +1 compared to TAMS's standard output."
+        ),
+    )
 
     ds = da.to_dataset().rename_vars(mask="mcs_mask")
 
@@ -577,15 +583,46 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
     else:
         ver = f" ({cp.stdout.strip()})"
     now = datetime.datetime.utcnow().strftime(r"%Y-%m-%d %H:%M UTC")
-    ds.attrs.update(prov=(f"Created using TAMS{ver} at {now}."))
+    ds.attrs.update(history=f"Created using TAMS{ver} at {now}.")
 
     # Add the extra variables
     df = pd.concat(dfs, axis="index")
     df[["area_km2", "area_core_km2"]] = df[["area_km2", "area_core_km2"]].astype(np.float64)
-    df[["is_mcs"]] = df[["is_mcs"]].astype(np.bool_)
-    ds2 = df.reset_index().set_index(["mcs_id", "time"]).to_xarray()
+    df[_classify_cols] = df[_classify_cols].astype(np.bool_)
+    if "mcs_id_orig" in df.columns:
+        df["mcs_id_orig"] = df["mcs_id_orig"].astype(np.int64)
+
+    # (mcs_id, time) varying
+    ds2 = (
+        df.drop(columns=unique_cols)
+        .reset_index()  # mcs_id
+        .set_index(["mcs_id", "time"])
+        .to_xarray()
+    )
     ds2["mcs_id"] = ds2.mcs_id + 1
+
+    # mcs_id-varying only
+    ds3 = (
+        df.reset_index()
+        .groupby("mcs_id")[unique_cols]
+        .apply(lambda g: g.apply(tams.util._the_unique, axis="index"))
+        .to_xarray()
+    )
+    ds3["mcs_id"] = ds3.mcs_id + 1
+
+    if "mcs_id_orig" in ds3:
+        ds3["mcs_id_orig"] = ds3.mcs_id_orig + 1
+        ds3["mcs_id_orig"].attrs.update(description="ID in mask if not dropping non-MOSA-MCSs")
+
     ds = ds.merge(ds2, join="exact", compat="equals")
+    ds = ds.merge(ds3, join="exact", compat="equals")
+
+    ds["mcs_id"].attrs.update(
+        long_name="MCS ID",
+        description=(
+            "To accommodate null=0 in the mask, " "these are +1 compared to TAMS's standard output."
+        ),
+    )
 
     # TODO: mcs_id could be uint32, float ones float32, ce_count int32 or uint32 with 0 for null?
 

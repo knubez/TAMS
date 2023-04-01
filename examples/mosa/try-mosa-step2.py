@@ -6,6 +6,8 @@ using a subset of the pre-processed files.
 """
 from __future__ import annotations
 
+import operator
+from functools import reduce
 from pathlib import Path
 from typing import Any, Hashable
 
@@ -16,6 +18,7 @@ from lib import _classify_cols, gdf_to_df, gdf_to_ds, run_wrf_preproced
 
 
 def re_id(ce):
+    """Return Series of re-assigned MCS IDs, 0 .. n_unique - 1."""
     current_ids = sorted(ce.mcs_id.unique())
     to_new_id = {old_id: new_id for new_id, old_id in enumerate(current_ids)}
     return ce.mcs_id.map(to_new_id)
@@ -35,7 +38,19 @@ ds_grid = (
     .rename_dims({"rlat": "y", "rlon": "x"})
     .squeeze()
 )
+ds_grid.lon.attrs.update(units="degree_east")
 ds = gdf_to_ds(gdf, grid=ds_grid)
+
+# Check `is_mcs` and crit consistency
+crit_cols = [vn for vn in _classify_cols if vn != "is_mcs"]
+assert (
+    reduce(operator.add, [ds.isel(mcs_id=ds.is_mcs)[vn].astype(int) for vn in crit_cols])
+    == len(crit_cols)
+).all()
+ds_non_mcs = ds.isel(mcs_id=~ds.is_mcs)
+assert (
+    reduce(operator.add, [ds_non_mcs[vn].astype(int) for vn in crit_cols]) < len(crit_cols)
+).all()
 
 # Save file
 encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
@@ -43,14 +58,11 @@ ds.to_netcdf(base / "tams_mcs-mask-sample_nocomp.nc")
 ds.to_netcdf(base / "tams_mcs-mask-sample.nc", encoding=encoding)
 
 # Drop non-MCS
-is_mcs = ds.is_mcs.to_series().groupby("mcs_id").agg(lambda x: x[~x.isnull()].unique())
-assert is_mcs.apply(len).eq(1).all()
-is_mcs = is_mcs.explode()
-ids = is_mcs[is_mcs].index
-ds2 = ds.sel(mcs_id=ids)
-assert ds2.is_mcs.all()
+ds2 = ds.isel(mcs_id=ds.is_mcs)
+assert ds2[_classify_cols].all().all()
+assert set(gdf[gdf.is_mcs].mcs_id.unique() + 1) == set(ds2.mcs_id.values)
 ds2 = ds2.drop_vars(_classify_cols)
-ds2.to_netcdf(base / "tams_mcs-mask-sample_reduced.nc", encoding=encoding)
+ds2.to_netcdf(base / "tams_mcs-mask-sample_reduced_bad.nc", encoding=encoding)
 
 # non-MCS are still in the mask! :(
 assert (np.unique(ds2.mcs_mask) == np.r_[0, gdf.mcs_id.unique() + 1]).all()
@@ -64,7 +76,13 @@ assert gdf_mcs.mcs_id.nunique() < gdf.mcs_id.nunique()
 
 gdf_mcs_reid = gdf_mcs.assign(mcs_id=re_id(gdf_mcs), mcs_id_orig=gdf_mcs.mcs_id)
 assert gdf_mcs_reid.groupby("mcs_id").nunique()["mcs_id_orig"].eq(1).all()
+
 ds3 = gdf_to_ds(gdf_mcs_reid, grid=ds_grid)
+assert ds3[_classify_cols].all().all()
+ds3 = ds3.drop_vars(_classify_cols)
 
 assert gdf_mcs.mcs_id.nunique() == ds3.dims["mcs_id"]
 assert (np.unique(ds3.mcs_mask) == np.r_[0, gdf_mcs_reid.mcs_id.unique() + 1]).all()
+assert (gdf_mcs.mcs_id.unique() == ds3.mcs_id_orig - 1).all()
+
+ds3.to_netcdf(base / "tams_mcs-mask-sample_reduced.nc", encoding=encoding)
