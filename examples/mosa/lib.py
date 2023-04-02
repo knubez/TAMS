@@ -625,6 +625,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
         ),
     )
 
+    # TODO: mcs_mask could be uint16 in most cases, or go up to uint32 if needed
     # TODO: mcs_id could be uint32, float ones float32, ce_count int32 or uint32 with 0 for null?
 
     return ds
