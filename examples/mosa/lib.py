@@ -519,7 +519,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
 
     time = sorted(ce.time.unique())
 
-    unique_cols = _classify_cols[:]  # unique for a given MCS ID
+    unique_cols = [col for col in _classify_cols if col in ce.columns]  # unique for a given MCS ID
     if "mcs_id_orig" in ce.columns:
         unique_cols += ["mcs_id_orig"]
 
