@@ -621,7 +621,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
     ds["mcs_id"].attrs.update(
         long_name="MCS ID",
         description=(
-            "To accommodate null=0 in the mask, " "these are +1 compared to TAMS's standard output."
+            "To accommodate null=0 in the mask, these are +1 compared to TAMS's standard output."
         ),
     )
 
