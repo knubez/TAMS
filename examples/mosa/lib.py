@@ -629,6 +629,13 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def re_id(ce):
+    """Return Series of re-assigned MCS IDs, 0 .. n_unique - 1."""
+    current_ids = sorted(ce.mcs_id.unique())
+    to_new_id = {old_id: new_id for new_id, old_id in enumerate(current_ids)}
+    return ce.mcs_id.map(to_new_id)
+
+
 if __name__ == "__main__":
     # import geopandas as gpd
 

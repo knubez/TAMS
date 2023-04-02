@@ -9,7 +9,7 @@ from typing import Any, Hashable
 import numpy as np
 import pandas as pd
 
-from lib import _classify_cols, gdf_to_df, gdf_to_ds
+from lib import _classify_cols, gdf_to_df, gdf_to_ds, re_id
 
 IN_DIR = Path("/glade/scratch/zmoon/mosa")
 OUT_DIR = IN_DIR
@@ -54,6 +54,7 @@ def run_gdf(fp: Path) -> None:
     else:
         raise ValueError(f"Unexpected `which` {which!r}")
 
+    # Load CE gdf, which has non-MCS CEs, but classified to indicate so
     gdf = gpd.read_parquet(fp)
 
     #
@@ -63,12 +64,11 @@ def run_gdf(fp: Path) -> None:
     df = gdf_to_df(gdf)
 
     # Only CEs associated to MCS (as defined by MOSA)
-    df = gdf
-    mcs = df[df.is_mcs].reset_index(drop=True).drop(columns=_classify_cols)
-    mcs
+    df_mcs = df[df.is_mcs].reset_index(drop=True).drop(columns=_classify_cols)
+    df_mcs
 
     # Save df
-    mcs.to_csv(OUT_DIR / f"{which}_wy{wy}.csv.gz", index=False)
+    df_mcs.to_csv(OUT_DIR / f"{which}_wy{wy}.csv.gz", index=False)
 
     #
     # ds
@@ -77,8 +77,15 @@ def run_gdf(fp: Path) -> None:
     grid = xr.open_dataset(p_grid).squeeze()
     if which == "wrf":
         grid = grid.rename_dims({"rlat": "y", "rlon": "x"})
+    grid.lon.attrs.update(units="degree_east")
 
-    ds = gdf_to_ds(gdf, grid=grid)
+    # Drop non-MCSs
+    gdf_mcs = gdf[gdf.is_mcs].drop(columns=_classify_cols)
+    assert gdf_mcs.mcs_id.nunique() < gdf.mcs_id.nunique()
+    gdf_mcs_reid = gdf_mcs.assign(mcs_id=re_id(gdf_mcs), mcs_id_orig=gdf_mcs.mcs_id)
+
+    # Create ds, featuring (time, y, x) mask array
+    ds = gdf_to_ds(gdf_mcs_reid, grid=grid)
 
     # Add null first time if WRF
     t0 = pd.Timestamp(ds.time.values[0])
@@ -114,21 +121,19 @@ def run_gdf(fp: Path) -> None:
     assert ds.time.size == nt_should_be, f"expected {nt_should_be} times, found {ds.time.size}"
     assert (ds.time.diff("time") == np.timedelta64(1, "h")).all()
 
+    # Check for consistency with non-MCS gdfs
+    assert gdf_mcs.mcs_id.nunique() == ds.dims["mcs_id"], "same number of MCS"
+    assert (
+        np.unique(ds.mcs_mask) == np.r_[0, gdf_mcs_reid.mcs_id.unique() + 1]
+    ).all(), "mask only contains re-IDed MCSs"
+    assert (gdf_mcs.mcs_id.unique() == ds.mcs_id_orig - 1).all(), "MCS ID orig correct in ds"
+    assert (gdf_mcs_reid.mcs_id.unique() == ds.mcs_id - 1).all(), "MCS ID correct in ds"
+
     # Save ds
     # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
     # DATA can either be OBS or WRF
     encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
-    ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file_all.nc", encoding=encoding)  # type: ignore[arg-type]
-
-    # Drop those not identified as MCSs using the MOSA criteria
-    is_mcs = ds.is_mcs.to_series().groupby("mcs_id").agg(lambda x: x[~x.isnull()].unique())
-    assert is_mcs.apply(len).eq(1).all()
-    is_mcs = is_mcs.explode()
-    ids = is_mcs[is_mcs].index
-    ds2 = ds.sel(mcs_id=ids)
-    assert ds2.is_mcs.all()
-    ds2 = ds2.drop_vars(_classify_cols)
-    ds2.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file.nc", encoding=encoding)  # type: ignore[arg-type]
+    ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file.nc", encoding=encoding)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

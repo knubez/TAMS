@@ -14,15 +14,7 @@ from typing import Any, Hashable
 import numpy as np
 import xarray as xr
 
-from lib import _classify_cols, gdf_to_df, gdf_to_ds, run_wrf_preproced
-
-
-def re_id(ce):
-    """Return Series of re-assigned MCS IDs, 0 .. n_unique - 1."""
-    current_ids = sorted(ce.mcs_id.unique())
-    to_new_id = {old_id: new_id for new_id, old_id in enumerate(current_ids)}
-    return ce.mcs_id.map(to_new_id)
-
+from lib import _classify_cols, gdf_to_df, gdf_to_ds, re_id, run_wrf_preproced
 
 base = Path("~/OneDrive/w/ERT-ARL/mosa").expanduser()
 files = sorted((base / "mosa-pre-sample").glob("tb_rainrate*.parquet"))
