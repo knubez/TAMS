@@ -121,10 +121,14 @@ def run_gdf(fp: Path) -> None:
     assert ds.time.size == nt_should_be, f"expected {nt_should_be} times, found {ds.time.size}"
     assert (ds.time.diff("time") == np.timedelta64(1, "h")).all()
 
+    # Check mask IDs consistent with dim coord
+    mcs_mask_unique = np.unique(ds.mcs_mask)
+    assert set(mcs_mask_unique) - set(ds.mcs_id.values) == {0}
+
     # Check for consistency with non-MCS gdfs
     assert gdf_mcs.mcs_id.nunique() == ds.dims["mcs_id"], "same number of MCS"
     assert (
-        np.unique(ds.mcs_mask) == np.r_[0, gdf_mcs_reid.mcs_id.unique() + 1]
+        mcs_mask_unique == np.r_[0, gdf_mcs_reid.mcs_id.unique() + 1]
     ).all(), "mask only contains re-IDed MCSs"
     assert (gdf_mcs.mcs_id.unique() == ds.mcs_id_orig - 1).all(), "MCS ID orig correct in ds"
     assert (gdf_mcs_reid.mcs_id.unique() == ds.mcs_id - 1).all(), "MCS ID correct in ds"
