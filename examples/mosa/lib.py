@@ -520,6 +520,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
     time = sorted(ce.time.unique())
 
     unique_cols = [col for col in _classify_cols if col in ce.columns]  # unique for a given MCS ID
+    bool_cols = unique_cols[:]
     if "mcs_id_orig" in ce.columns:
         unique_cols += ["mcs_id_orig"]
 
@@ -588,7 +589,7 @@ def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
     # Add the extra variables
     df = pd.concat(dfs, axis="index")
     df[["area_km2", "area_core_km2"]] = df[["area_km2", "area_core_km2"]].astype(np.float64)
-    df[_classify_cols] = df[_classify_cols].astype(np.bool_)
+    df[bool_cols] = df[bool_cols].astype(np.bool_)
     if "mcs_id_orig" in df.columns:
         df["mcs_id_orig"] = df["mcs_id_orig"].astype(np.int64)
 
