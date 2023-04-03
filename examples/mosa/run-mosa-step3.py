@@ -98,6 +98,8 @@ def run_gdf(fp: Path) -> None:
         vns_non_time = [vn for vn in ds.data_vars if "time" not in ds[vn].dims]
         for vn in ds0.data_vars:
             assert isinstance(vn, str)
+            if vn in vns_non_time:
+                continue
             if vn not in ds_null_val:
                 raise Exception(
                     f"null value not known for data var {vn}. "
