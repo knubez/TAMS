@@ -95,6 +95,7 @@ def run_gdf(fp: Path) -> None:
         ds0 = ds.isel(time=0).copy()
         ds0["time"] = t0_should_be
         assert ds0.time.dt.hour == 0
+        vns_non_time = [vn for vn in ds.data_vars if "time" not in ds[vn].dims]
         for vn in ds0.data_vars:
             assert isinstance(vn, str)
             if vn not in ds_null_val:
@@ -104,7 +105,9 @@ def run_gdf(fp: Path) -> None:
                     f"Data vars: {sorted(ds.data_vars)}."
                 )
             ds0[vn] = ds0[vn].where(False, ds_null_val[vn])
-        ds = xr.concat([ds0, ds], dim="time")
+        ds = xr.concat([ds0.drop_vars(vns_non_time), ds.drop_vars(vns_non_time)], dim="time")
+        for vn in vns_non_time:
+            ds[vn] = ds0[vn]
 
     times_should_be = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")[:-1]
     nt_missing = 0
