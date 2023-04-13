@@ -9,7 +9,7 @@
 
 ### Tracking
 
-1. Unlike TAMS v1.0 which tracks MCSs (and thus, matches “parent” and “kid” clouds) both backwards and forward in time using a recursive function, TAMS v2.0 tracks back in time such that for example: clouds at time i are matched with clouds at time i-1.
+1. Unlike TAMS v1.0 which matches MCSs (and thus, matches “parent” and “kid” clouds) forward in time using a recursive function, TAMS v2.0 matches back in time such that for example: clouds at time i are matched with clouds at time i-1.
 
 ### Classification
 
