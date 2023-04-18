@@ -75,6 +75,12 @@ napoleon_type_aliases = {
 nb_execution_mode = "cache"
 nb_execution_excludepatterns = exclude_patterns
 
+myst_enable_extensions = [
+    "dollarmath",
+    "smartquotes",
+    "replacements",
+]
+
 autodoc_typehints = "description"
 autosummary_generate = True
 
