@@ -20,7 +20,7 @@ dependencies:
   - netcdf4
   - ptitprince
   - pygeos
-  - regionmask
+  - regionmask>=0.9
   - scipy
   #
   # Development and tests
