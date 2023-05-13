@@ -98,10 +98,11 @@ def _size_filter_contours(
     cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
     # ^ This crs is equidistant cylindrical
     big_enough = cs235.area_km2 >= threshold
-    logger.info(
-        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-        f" of 235s are big enough ({threshold} km2)"
-    )
+    if not big_enough.empty:
+        logger.info(
+            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
+            f" of 235s are big enough ({threshold} km2)"
+        )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
     # Drop very small 219s (insignificant)
@@ -110,10 +111,11 @@ def _size_filter_contours(
     individual_219_threshold = 10  # km2
     cs219["area_km2"] = cs219.to_crs("EPSG:32663").area / 10**6
     big_enough = cs219.area_km2 >= individual_219_threshold
-    logger.info(
-        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-        f" of 235s are big enough ({individual_219_threshold} km2)"
-    )
+    if not big_enough.empty:
+        logger.info(
+            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
+            f" of 219s are big enough ({individual_219_threshold} km2)"
+        )
     cs219 = cs219[big_enough].reset_index(drop=True)
 
     # Identify indices of 219s inside 235s
@@ -139,10 +141,11 @@ def _size_filter_contours(
     }
     cs235["area219_km2"] = pd.Series(sum219s)
     big_enough = cs235.area219_km2 >= threshold
-    logger.info(
-        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-        f"of big-enough 235s have enough 219 area ({threshold} km2)"
-    )
+    if not big_enough.empty:
+        logger.info(
+            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
+            f"of big-enough 235s have enough 219 area ({threshold} km2)"
+        )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
     # Store 219s inside the 235 frame as `MultiPolygon`s
