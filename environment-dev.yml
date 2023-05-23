@@ -38,5 +38,5 @@ dependencies:
   - sphinx-copybutton
   - sphinxcontrib-bibtex
   - pip:
-      - sphinx-prompt
+      - sphinx-prompt<1.7
       - sphinxext-opengraph
