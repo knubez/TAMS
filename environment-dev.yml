@@ -32,7 +32,7 @@ dependencies:
   # Docs
   - myst-nb
   - myst-parser
-  - sphinx=4.*
+  - sphinx=6.*
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinx-copybutton
