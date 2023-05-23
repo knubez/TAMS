@@ -32,11 +32,11 @@ dependencies:
   # Docs
   - myst-nb
   - myst-parser
-  - sphinx=6.*
+  - sphinx=5.*
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinx-copybutton
   - sphinxcontrib-bibtex
   - pip:
-      - sphinx-prompt<1.7
+      - sphinx-prompt<1.6
       - sphinxext-opengraph
