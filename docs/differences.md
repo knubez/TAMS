@@ -36,5 +36,6 @@
   - Trackpy [includes](https://soft-matter.github.io/trackpy/v0.6.1/tutorial/prediction.html) options for predicting the next position of a point based on its trajectory history, which tobac uses. That is, tobac (with Trackpy) tracks points, while TAMS tracks geo areas.
 - tobac v1.5 can identify and track 3-D features, while TAMS supports 2-D only
 - tobac v1.4 added merge/split combination of cells (cell: "is a series of features linked together over multiple timesteps") as a post-processing step, while TAMS accounts for merge/splits in the tracking step based on overlaps
+- tobac v1.5 has an option to identify/track across a periodic boundary (e.g. for global data or certain types of idealized limited-area simulations). In TAMS, support for global data across the date line is in development, but support for limited-area periodic boundaries is not planned at this time.
 
 [^tob]: tobac refers to both the project and the Python package with lowercase.
