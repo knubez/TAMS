@@ -9,7 +9,7 @@ dependencies:
   - geopandas>=0.10
   - matplotlib>=3.4
   - numpy
-  - pandas
+  - pandas<2
   - scikit-image
   - shapely
   - xarray
