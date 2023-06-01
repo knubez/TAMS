@@ -9,7 +9,7 @@ dependencies:
   - geopandas>=0.10
   - matplotlib>=3.4
   - numpy
-  - pandas
+  - pandas<2
   - scikit-image
   - shapely
   - xarray
@@ -30,13 +30,14 @@ dependencies:
   - pytest>=6.0
   #
   # Docs
+  - docutils<0.18
   - myst-nb
   - myst-parser
-  - sphinx=4.*
+  - sphinx=5.*
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinx-copybutton
   - sphinxcontrib-bibtex
   - pip:
-      - sphinx-prompt
+      - sphinx-prompt<1.6
       - sphinxext-opengraph
