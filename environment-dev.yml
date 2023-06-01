@@ -30,6 +30,7 @@ dependencies:
   - pytest>=6.0
   #
   # Docs
+  - docutils<0.18
   - myst-nb
   - myst-parser
   - sphinx=5.*
