@@ -8,7 +8,7 @@ TAMS is run on observational ([GPM_MERGIR](https://disc.gsfc.nasa.gov/datasets/G
 
 This directory includes Python and PBS job scripts (for NCAR Casper) for three steps in the run process:
 
-1. CE identification, creating Parquet files of CEs identified at each time, including precip stats within CEs
+1. Cloud element (CE) identification, creating Parquet files of CEs identified at each time, including precip stats within CEs
 
 2. Track and classify, adding MCS IDs and assessing whether the MCSs meet the MOSA criteria, saving results as a single Parquet file (6 total)
 
