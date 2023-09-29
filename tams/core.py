@@ -507,7 +507,8 @@ def track(
         Durations associated with the times in `times` (akin to the time resolution).
         If not provided, they will be estimated using ``times[1:] - times[:-1]``.
     look
-        (time) direction in which we "look" and compute overlaps.
+        (time) direction in which we "look" and compute overlaps,
+        linking CEs in time.
     largest
         Only the largest CE continues a track.
     overlap_norm
@@ -533,6 +534,9 @@ def track(
 
     # IDEA: even at initial time, could put CEs together in groups based on edge-to-edge distance
 
+    if look in {"f", "forward"}:
+        warnings.warn("forward `look` considered experimental")
+
     css: list[geopandas.GeoDataFrame] = []
     for i in itimes:
         cs_i = contours_sets[i]
@@ -555,7 +559,8 @@ def track(
                 ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s), norm=overlap_norm)
                 ids = []
                 for j, d in ovs.items():
-                    # For each CE at current time, find previous CE of maximum overlap
+                    # For each CE at current time ("kid"/"child"),
+                    # find previous CE of maximum overlap (single "parent")
                     k, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
                     if k is None or frac < overlap_threshold:
                         # No parent or not enough overlap => new ID
