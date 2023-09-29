@@ -61,7 +61,7 @@ def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
 
 def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
     from geopandas import GeoDataFrame
-    from shapely.geometry.polygon import LinearRing, orient
+    from shapely.geometry.polygon import LinearRing, LineString, Point, orient
 
     polys = []
     for c in cs:
@@ -71,6 +71,8 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
             continue
         r = LinearRing(zip(x, y))
         p0 = r.convex_hull  # TODO: optional, also add buffer option
+        if type(p0) is LineString or type(p0) is Point:
+            continue  # not a closed contour
         p = orient(p0)  # -> counter-clockwise
         polys.append(p)
 
@@ -96,10 +98,11 @@ def _size_filter_contours(
     cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
     # ^ This crs is equidistant cylindrical
     big_enough = cs235.area_km2 >= threshold
-    logger.info(
-        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-        f" of 235s are big enough ({threshold} km2)"
-    )
+    if not big_enough.empty:
+        logger.info(
+            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
+            f" of 235s are big enough ({threshold} km2)"
+        )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
     # Drop very small 219s (insignificant)
@@ -108,10 +111,11 @@ def _size_filter_contours(
     individual_219_threshold = 10  # km2
     cs219["area_km2"] = cs219.to_crs("EPSG:32663").area / 10**6
     big_enough = cs219.area_km2 >= individual_219_threshold
-    logger.info(
-        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-        f" of 235s are big enough ({individual_219_threshold} km2)"
-    )
+    if not big_enough.empty:
+        logger.info(
+            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
+            f" of 219s are big enough ({individual_219_threshold} km2)"
+        )
     cs219 = cs219[big_enough].reset_index(drop=True)
 
     # Identify indices of 219s inside 235s
@@ -137,10 +141,11 @@ def _size_filter_contours(
     }
     cs235["area219_km2"] = pd.Series(sum219s)
     big_enough = cs235.area219_km2 >= threshold
-    logger.info(
-        f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-        f"of big-enough 235s have enough 219 area ({threshold} km2)"
-    )
+    if not big_enough.empty:
+        logger.info(
+            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
+            f"of big-enough 235s have enough 219 area ({threshold} km2)"
+        )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
     # Store 219s inside the 235 frame as `MultiPolygon`s
@@ -405,12 +410,22 @@ def project(df: geopandas.GeoDataFrame, *, u: float = 0, dt: float = 3600):
     return df.assign(geometry=new_geometry)
 
 
-def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame):
+def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame, *, norm: str = "a"):
     """For each contour in `a`, determine those in `b` that overlap and by how much.
 
-    Currently the mapping is based on indices of the frames.
+    Currently the mapping is based on indices of the frames:
+    iloc position in `a` : loc position in `b` : overlap fraction.
+
+    Parameters
+    ----------
+    norm : {'a', 'b', 'max', 'min', 'mean'}
+        Area to use to normalize the overlap to a fraction.
     """
-    a_area = a.to_crs("EPSG:32663").area
+    # TODO: test(s) for the different `norm` options
+    s_crs_area = "EPSG:32663"
+    area_a = a.to_crs(s_crs_area).area
+    area_b = b.to_crs(s_crs_area).area
+
     res = {}
     for i in range(len(a)):
         a_i = a.iloc[i : i + 1]  # slicing preserves GeoDataFrame type
@@ -422,11 +437,37 @@ def overlap(a: geopandas.GeoDataFrame, b: geopandas.GeoDataFrame):
                 category=RuntimeWarning,
                 message="invalid value encountered in intersection",
             )
-            inter = b.intersection(a_i_poly)  # .dropna()
+            inter = b.intersection(a_i_poly)
         inter = inter[~inter.is_empty]
-        ov = inter.to_crs("EPSG:32663").area / a_area.iloc[i]
-        # TODO: original TAMS normalized by the *min* area between a and b, could offer option
-        res[i] = ov.to_dict()
+
+        ov = inter.to_crs(s_crs_area).area
+
+        if norm == "a":
+            area_norm = area_a.iloc[i]
+        elif norm == "b":
+            area_norm = area_b.loc[ov.index]
+        elif norm in {"max", "min", "mean"}:
+            op = norm
+            b_area_i = area_b.loc[ov.index]
+            area_norm = getattr(
+                pd.concat(
+                    [
+                        pd.Series(
+                            data=np.full(len(b_area_i), area_a.iloc[i]),
+                            index=b_area_i.index,
+                        ),
+                        b_area_i,
+                    ],
+                    axis="columns",
+                ),
+                op,
+            )(axis="columns")
+        else:
+            raise ValueError(f"invalid `norm` {norm!r}")
+
+        ov_frac = ov / area_norm
+
+        res[i] = ov_frac.to_dict()
 
     return res
 
@@ -438,6 +479,9 @@ def track(
     overlap_threshold: float = 0.5,
     u_projection: float = 0,
     durations=None,
+    look: str = "back",
+    largest: bool = False,
+    overlap_norm: str | None = None,
 ) -> geopandas.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
@@ -461,6 +505,17 @@ def track(
     durations
         Durations associated with the times in `times` (akin to the time resolution).
         If not provided, they will be estimated using ``times[1:] - times[:-1]``.
+    look
+        (time) direction in which we "look" and compute overlaps,
+        linking CEs in time.
+    largest
+        Only the largest CE continues a track.
+    overlap_norm
+        Passed to :func:`overlap`.
+        Default is to use child area (
+        ``'a'`` for ``look='back'``,
+        ``'b'`` for ``look='forward'``
+        ), i.e. the CE at the later of the two times.
     """
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
@@ -478,6 +533,9 @@ def track(
 
     # IDEA: even at initial time, could put CEs together in groups based on edge-to-edge distance
 
+    if look in {"f", "forward"}:
+        warnings.warn("forward `look` considered experimental")
+
     css: list[geopandas.GeoDataFrame] = []
     for i in itimes:
         cs_i = contours_sets[i]
@@ -494,19 +552,93 @@ def track(
             cs_im1 = css[i - 1]
             dt_im1_s = dt[i - 1].total_seconds()
 
-            # TODO: option to overlap in other direction, match with all that meet the condition
-            ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s))
-            ids = []
-            for j, d in ovs.items():
-                # TODO: option to pick bigger one to "continue the trajectory", as in jevans paper
-                k, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
-                if k is None or frac < overlap_threshold:
-                    # No parent or not enough overlap => new ID
-                    ids.append(next_id)
-                    next_id += 1
-                else:
-                    # Has parent; use their family ID
-                    ids.append(cs_im1.loc[k].mcs_id)
+            if look in {"b", "back"}:
+                if overlap_norm is None:
+                    overlap_norm = "a"
+                ovs = overlap(cs_i, project(cs_im1, u=u_projection, dt=dt_im1_s), norm=overlap_norm)
+                ids = []
+                for j, d in ovs.items():
+                    # For each CE at current time ("kid"/"child"),
+                    # find previous CE of maximum overlap (single "parent")
+                    k, frac = max(d.items(), key=lambda tup: tup[1], default=(None, 0))
+                    if k is None or frac < overlap_threshold:
+                        # No parent or not enough overlap => new ID
+                        ids.append(next_id)
+                        next_id += 1
+                    else:
+                        # Has parent; use their family ID
+                        ids.append(cs_im1.loc[k].mcs_id)
+
+                assert len(ids) == len(cs_i)
+
+                if largest:
+                    # For current CEs, make sure no MCS ID is shared (give to largest)
+                    sz = cs_i["area_km2"].to_numpy(dtype=np.float64)
+                    for mcs_id in set(ids):
+                        inds_with_id = [j for j, id_ in enumerate(ids) if id_ == mcs_id]
+                        if len(inds_with_id) == 1:
+                            continue
+                        logger.info(f"multiple CEs with same MCS ID: {inds_with_id}")
+                        ind_largest, _ = max(
+                            zip(inds_with_id, sz[inds_with_id]),
+                            key=lambda tup: tup[1],
+                        )
+                        logger.info(f"largest: {sz[ind_largest]} out of {sz[inds_with_id]}")
+                        for j in inds_with_id:
+                            if j == ind_largest:
+                                continue
+                            ids[j] = next_id
+                            next_id += 1
+                        assert ids[ind_largest] == mcs_id
+
+            elif look in {"f", "forward"}:
+                # Following `look='b'`,
+                # `j`: iloc of CE at current time (i, `cs_i`)
+                # `k`: iloc of CE at previous time (i-1, `cs_im1`)
+                if overlap_norm is None:
+                    overlap_norm = "b"
+                ovs = overlap(project(cs_im1, u=u_projection, dt=dt_im1_s), cs_i, norm=overlap_norm)
+                ids: list[int | None] = [None for _ in range(len(cs_i))]  # type: ignore[no-redef]
+                sz_i = cs_i["area_km2"].to_numpy(dtype=np.float64)
+                for k, d in ovs.items():
+                    # For each CE at previous time ("parent"),
+                    # look at CEs of current time that overlap ("kid"/"child")
+                    mcs_id = cs_im1.loc[k].mcs_id
+                    if not d:
+                        continue
+
+                    if largest and len(d) > 1:
+                        # NOTE: 1-1 track not guaranteed since multiple parents could have same ID
+                        # j, frac = max(d.items(), key=lambda tup: tup[1])  # max overlap
+                        js = list(d.keys())
+                        logger.info(f"{len(d)} possible children: {js}")
+                        sz_ji = sz_i[js]
+                        j, frac, _ = max(
+                            zip(d.keys(), d.values(), sz_ji),
+                            key=lambda tup: tup[2],
+                        )  # max child area
+                        assert sz_i[j] == sz_ji.max()
+                        logger.info(f"keeping largest: {sz_i[j]} out of {sz_ji}")
+                        d = {j: frac}
+
+                    for j, frac in d.items():
+                        if frac >= overlap_threshold:
+                            if ids[j] is not None:
+                                logger.info(
+                                    f"warning: {j} already set to ID {ids[j]}, now {mcs_id}"
+                                )
+                                # TODO: support multiple parent
+                            # Assign child the MCS ID of parent
+                            ids[j] = mcs_id
+
+                # For current CEs with no assigned parent, give new IDs
+                for j, mcs_id in enumerate(ids):
+                    if mcs_id is None:
+                        ids[j] = next_id
+                        next_id += 1
+
+            else:
+                raise ValueError("invalid `look`")
 
             cs_i["mcs_id"] = ids
 
@@ -668,7 +800,7 @@ def run(
 
     # TODO: timing and progress indicators, possibly with Rich
 
-    def printt(s):
+    def msg(s):
         """Print message and current time"""
         import datetime
 
@@ -679,7 +811,7 @@ def run(
     # 1. Identify
     #
 
-    printt("Starting `identify`")
+    msg("Starting `identify`")
     cs235, cs219 = identify(
         ds.ctt,
         parallel=parallel,
@@ -691,7 +823,7 @@ def run(
     # 2. Track
     #
 
-    printt("Starting `track`")
+    msg("Starting `track`")
     times = ds.time.values
     dt = pd.Timedelta(times[1] - times[0])  # TODO: equal spacing check here?
     ce = track(cs235, times, u_projection=u_projection)
@@ -700,21 +832,21 @@ def run(
     # 3. Classify
     #
 
-    printt("Starting `classify`")
+    msg("Starting `classify`")
     ce = classify(ce)
 
     #
     # 4. Stats (including precip)
     #
 
-    printt("Starting statistics calculations")
+    msg("Starting statistics calculations")
 
     # Cleanup
     ce = ce.drop(columns=["inds219", "itime", "dtime"]).convert_dtypes()
     ce = ce.rename(columns={"geometry": "cs235"}).set_geometry("cs235")
     ce.cs219 = ce.cs219.set_crs("EPSG:4326")  # TODO: ensure set in `identify`
 
-    printt("Starting CE aggregation (into MCS time series)")
+    msg("Starting CE aggregation (into MCS time series)")
     dfs_t = []
     ds_nt = []
     for mcs_id, mcs_ in ce.groupby("mcs_id"):
@@ -770,7 +902,7 @@ def run(
     mcs.mcs_class = mcs.mcs_class.astype("category")
 
     # Add CTT and PR data stats (time-resolved)
-    printt("Starting gridded data aggregation")
+    msg("Starting gridded data aggregation")
 
     def _agg_one(ds_t, g):
         df1 = data_in_contours(ds_t.pr, g, merge=True)
@@ -818,7 +950,7 @@ def run(
     mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
 
     # Add some CTT and PR stats to summary dataset
-    printt("Computing stats for MCS summary dataset")
+    msg("Computing stats for MCS summary dataset")
     vns = [
         "mean_pr",
         "mean_pr219",
@@ -865,7 +997,7 @@ def run(
     mcs = mcs.reset_index(drop=True)
     mcs_summary = mcs_summary.reset_index(drop=True)
 
-    printt("Done")
+    msg("Done")
 
     return ce, mcs, mcs_summary
 
