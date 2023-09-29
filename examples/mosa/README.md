@@ -1,6 +1,6 @@
 ## MOSA
 
-MOSA: MCSs Over South America
+MOSA: MCSs Over South America [^mosa]
 
 An MCS tracker intercomparison project of the NCAR SAAG Convective Working Group, focusing on the South American region.
 
@@ -13,3 +13,5 @@ This directory includes Python and PBS job scripts (for NCAR Casper) for three s
 2. Track and classify, adding MCS IDs and assessing whether the MCSs meet the MOSA criteria, saving results as a single Parquet file (6 total)
 
 3. Convert to mask representation (requires dissolving constituent CEs into single shape per time per track) and drop tracks that are not MCS under the MOSA criteria, saving to netCDF
+
+[^mosa]: Original working title for the project, but not used in the journal article.
