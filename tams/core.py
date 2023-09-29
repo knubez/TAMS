@@ -516,8 +516,6 @@ def track(
         `'a'` for `look='back'`,
         `'b'` for `look='forward'`
         ), i.e. CE at the later of the two times.
-    verbose
-        Print tracking info messages.
     """
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
@@ -576,14 +574,12 @@ def track(
                         inds_with_id = [j for j, id_ in enumerate(ids) if id_ == mcs_id]
                         if len(inds_with_id) == 1:
                             continue
-                        if verbose:
-                            print(f"multiple CEs with same MCS ID: {inds_with_id}")
+                        logger.info(f"multiple CEs with same MCS ID: {inds_with_id}")
                         ind_largest, _ = max(
                             zip(inds_with_id, sz[inds_with_id]),
                             key=lambda tup: tup[1],
                         )
-                        if verbose:
-                            print(f"largest: {sz[ind_largest]} out of {sz[inds_with_id]}")
+                        logger.info(f"largest: {sz[ind_largest]} out of {sz[inds_with_id]}")
                         for j in inds_with_id:
                             if j == ind_largest:
                                 continue
@@ -611,22 +607,22 @@ def track(
                         # NOTE: 1-1 track not guaranteed since multiple parents could have same ID
                         # j, frac = max(d.items(), key=lambda tup: tup[1])  # max overlap
                         js = list(d.keys())
-                        if verbose:
-                            print(f"{len(d)} possible children: {js}")
+                        logger.info(f"{len(d)} possible children: {js}")
                         sz_ji = sz_i[js]
                         j, frac, _ = max(
                             zip(d.keys(), d.values(), sz_ji),
                             key=lambda tup: tup[2],
                         )  # max child area
                         assert sz_i[j] == sz_ji.max()
-                        if verbose:
-                            print(f"keeping largest: {sz_i[j]} out of {sz_ji}")
+                        logger.info(f"keeping largest: {sz_i[j]} out of {sz_ji}")
                         d = {j: frac}
 
                     for j, frac in d.items():
                         if frac >= overlap_threshold:
-                            if ids[j] is not None and verbose:
-                                print(f"warning: {j} already set to ID {ids[j]}, now {mcs_id}")
+                            if ids[j] is not None:
+                                logger.info(
+                                    f"warning: {j} already set to ID {ids[j]}, now {mcs_id}"
+                                )
                                 # TODO: support multiple parent
                             # Assign child the MCS ID of parent
                             ids[j] = mcs_id
