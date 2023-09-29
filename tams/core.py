@@ -514,9 +514,9 @@ def track(
     overlap_norm
         Passed to :func:`overlap`.
         Default is to use child area (
-        `'a'` for `look='back'`,
-        `'b'` for `look='forward'`
-        ), i.e. CE at the later of the two times.
+        ``'a'`` for ``look='back'``,
+        ``'b'`` for ``look='forward'``
+        ), i.e. the CE at the later of the two times.
     """
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
