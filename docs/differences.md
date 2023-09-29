@@ -37,5 +37,6 @@
 - tobac v1.5 can identify and track 3-D features, while TAMS supports 2-D only
 - tobac v1.4 added merge/split combination of cells (cell: "is a series of features linked together over multiple timesteps") as a post-processing step, while TAMS accounts for merge/splits in the tracking step based on overlaps
 - tobac v1.5 has an option to identify/track across a periodic boundary (e.g. for global data or certain types of idealized limited-area simulations). In TAMS, support for global data across the date line is in development, but support for limited-area periodic boundaries is not planned at this time.
+- tobac [mentions](https://tobac.readthedocs.io/en/v1.5.1/big_datasets.html#split-feature-detection) that it is possible to do feature detection in parallel. TAMS provides optional joblib-based parallelization for (1) CE identification and (2) calculation of statistics of gridded data within MCS and cold-core areas.
 
 [^tob]: tobac refers to both the project and the Python package with lowercase.
