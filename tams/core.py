@@ -796,7 +796,7 @@ def run(
 
     # TODO: timing and progress indicators, possibly with Rich
 
-    def printt(s):
+    def msg(s):
         """Print message and current time"""
         import datetime
 
@@ -807,7 +807,7 @@ def run(
     # 1. Identify
     #
 
-    printt("Starting `identify`")
+    msg("Starting `identify`")
     cs235, cs219 = identify(
         ds.ctt,
         parallel=parallel,
@@ -819,7 +819,7 @@ def run(
     # 2. Track
     #
 
-    printt("Starting `track`")
+    msg("Starting `track`")
     times = ds.time.values
     dt = pd.Timedelta(times[1] - times[0])  # TODO: equal spacing check here?
     ce = track(cs235, times, u_projection=u_projection)
@@ -828,21 +828,21 @@ def run(
     # 3. Classify
     #
 
-    printt("Starting `classify`")
+    msg("Starting `classify`")
     ce = classify(ce)
 
     #
     # 4. Stats (including precip)
     #
 
-    printt("Starting statistics calculations")
+    msg("Starting statistics calculations")
 
     # Cleanup
     ce = ce.drop(columns=["inds219", "itime", "dtime"]).convert_dtypes()
     ce = ce.rename(columns={"geometry": "cs235"}).set_geometry("cs235")
     ce.cs219 = ce.cs219.set_crs("EPSG:4326")  # TODO: ensure set in `identify`
 
-    printt("Starting CE aggregation (into MCS time series)")
+    msg("Starting CE aggregation (into MCS time series)")
     dfs_t = []
     ds_nt = []
     for mcs_id, mcs_ in ce.groupby("mcs_id"):
@@ -898,7 +898,7 @@ def run(
     mcs.mcs_class = mcs.mcs_class.astype("category")
 
     # Add CTT and PR data stats (time-resolved)
-    printt("Starting gridded data aggregation")
+    msg("Starting gridded data aggregation")
 
     def _agg_one(ds_t, g):
         df1 = data_in_contours(ds_t.pr, g, merge=True)
@@ -946,7 +946,7 @@ def run(
     mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
 
     # Add some CTT and PR stats to summary dataset
-    printt("Computing stats for MCS summary dataset")
+    msg("Computing stats for MCS summary dataset")
     vns = [
         "mean_pr",
         "mean_pr219",
@@ -993,7 +993,7 @@ def run(
     mcs = mcs.reset_index(drop=True)
     mcs_summary = mcs_summary.reset_index(drop=True)
 
-    printt("Done")
+    msg("Done")
 
     return ce, mcs, mcs_summary
 
