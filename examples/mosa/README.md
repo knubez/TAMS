@@ -1,6 +1,6 @@
 ## MOSA
 
-MOSA: MCSs Over South Ameria
+MOSA: MCSs Over South America
 
 An MCS tracker intercomparison project of the NCAR SAAG Convective Working Group, focusing on the South American region.
 
