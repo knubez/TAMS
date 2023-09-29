@@ -7,7 +7,7 @@ dependencies:
   #
   # Core dependencies
   - geopandas>=0.10
-  - matplotlib>=3.4
+  - matplotlib>=3.4,<3.8
   - numpy
   - pandas<2
   - scikit-image
