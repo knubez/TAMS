@@ -482,7 +482,6 @@ def track(
     look: str = "back",
     largest: bool = False,
     overlap_norm: str | None = None,
-    verbose: bool = False,
 ) -> geopandas.GeoDataFrame:
     """Assign group IDs to the CEs identified at each time, returning a single CE frame.
 
