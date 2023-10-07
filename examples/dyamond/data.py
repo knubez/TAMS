@@ -137,9 +137,9 @@ for season in ["Summer", "Winter"]:
         assert ds.dims["time"] == 1
         print(pad, "t data:", ds.time.values[0])
 
-        ymdh = re.search(r"[0-9]{10}", files[0].stem).group()
+        ymdh = re.search(r"[0-9]{10}", fp.stem).group()
         t_file = datetime.datetime.strptime(ymdh, r"%Y%m%d%H")
-        print(pad, "t file:", t_file)
+        print(pad, "t path:", t_file)
 
         assert ds.dims["lon"] == 3600, "0.1 deg"
         lona, lonb = -179.95, 179.95
