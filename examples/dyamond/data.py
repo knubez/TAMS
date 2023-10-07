@@ -2,6 +2,7 @@ import datetime
 import re
 from pathlib import Path
 
+import numpy as np
 import xarray as xr
 
 base = Path("/glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP")
@@ -140,8 +141,26 @@ for season in ["Summer", "Winter"]:
         t_file = datetime.datetime.strptime(ymdh, r"%Y%m%d%H")
         print(pad, "t file:", t_file)
 
+        assert ds.dims["lon"] == 3600, "0.1 deg"
+        lona, lonb = -179.95, 179.95
+        if model == "OBS" and season.lower() == "summer":
+            lata, latb = -89.95, 89.95
+            nlat = 1800
+        else:
+            lata, latb = -59.95, 59.95
+            nlat = 1200
+        assert ds.dims["lat"] == nlat
+        lon, lat = ds["lon"], ds["lat"]
+        assert lat.dims == ("lat",)
+        try:
+            assert lat.values[0] == lata and lat.values[-1] == latb
+        except AssertionError:
+            print(pad, "unexpected lat range:", lat.values[0], "...", lat.values[-1])
+        assert lon.dims == ("lon",)
+        assert lon.values[0] == lona and np.isclose(lon.values[-1], lonb)
+
         dvs = sorted(ds.data_vars)
-        print(pad, dvs)
+        print(pad, "dvs:", dvs)
 
         rn = vn_map[season.lower()][model]
         assert rn.keys() <= set(dvs), "remap"
