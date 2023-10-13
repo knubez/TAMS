@@ -111,6 +111,12 @@ for season in ["Summer", "Winter"]:
     d = base / season
     assert d.is_dir()
 
+    start = datetime.datetime(2016, 8, 1) if season == "Summer" else datetime.datetime(2020, 1, 20)
+    time_should_be = [start]
+    for _ in range(40 * 24 - 1):
+        time_should_be.append(time_should_be[-1] + datetime.timedelta(hours=1))
+    assert time_should_be[-1] - time_should_be[0] == datetime.timedelta(days=39, hours=23)
+
     model_dirs = sorted(d.glob("*"))
     for model_dir in model_dirs:
         model = model_dir.name
@@ -164,5 +170,15 @@ for season in ["Summer", "Winter"]:
 
         rn = vn_map[season.lower()][model]
         assert rn.keys() <= set(dvs), "remap"
+
+        # Check which times we have
+        t_files = []
+        for fp in files:
+            ymdh = re.search(r"[0-9]{10}", fp.stem).group()
+            t_file = datetime.datetime.strptime(ymdh, r"%Y%m%d%H")
+            t_files.append(t_file)
+        for t in time_should_be:
+            if t not in t_files:
+                print(pad, "missing file for", t)
 
 # TODO: idealized cases data ('idealized_cases')
