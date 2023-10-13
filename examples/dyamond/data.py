@@ -177,8 +177,10 @@ for season in ["Summer", "Winter"]:
             ymdh = re.search(r"[0-9]{10}", fp.stem).group()
             t_file = datetime.datetime.strptime(ymdh, r"%Y%m%d%H")
             t_files.append(t_file)
-        for t in time_should_be:
-            if t not in t_files:
-                print(pad, "missing file for", t)
+        t_miss = [t for t in time_should_be if t not in t_files]
+        if t_miss:
+            print(pad, f"missing files for these {len(t_miss)} times:")
+            for t in t_miss:
+                print(pad, "-", t.strftime(r"%Y-%m-%d %H"))
 
 # TODO: idealized cases data ('idealized_cases')
