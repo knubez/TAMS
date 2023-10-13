@@ -170,6 +170,7 @@ for season in ["Summer", "Winter"]:
 
         rn = vn_map[season.lower()][model]
         assert rn.keys() <= set(dvs), "remap"
+        print(pad, "rename:", ", ".join(f"{k!r}=>{v!r}" for k, v in rn.items()))
 
         # Check which times we have
         t_files = []
