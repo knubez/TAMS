@@ -129,7 +129,9 @@ assert set(SEASONS) == set(VN_MAP)
 
 
 def inspect_input_data():
-    """Print info about the input datasets."""
+    """Print info about the input datasets,
+    checking what files are available and checking the contents of the first one.
+    """
 
     for season in ["Summer", "Winter"]:
         print(season)
