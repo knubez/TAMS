@@ -9,12 +9,13 @@ import re
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP")
 """Base input data directory (Andy's).
 
-Under here we have 'Summer' and 'Winter' dirs
+Under here we have 'Summer' and 'Winter' dirs (title case)
 and then model dirs with 'olr_pcp_instantaneous' subdirs
 that have the nc files, one for each hour
 e.g. ::
@@ -39,6 +40,7 @@ def _make_vn_map():
     d = {}
 
     # NOTE: these text blocks were copied and pasted from the Google Doc
+    # NOTE: summer and winter renamings aren't necessarily the same
 
     # Summer
     s = """\
@@ -122,7 +124,7 @@ For example::
     d["Summer"]["OBS"] = {"precipitationCal": "pr", "Tb": "tb"}
 """
 
-SEASONS = ["Summer", "Winter"]
+SEASONS = ["summer", "winter"]
 assert set(SEASONS) == set(VN_MAP)
 
 
@@ -208,6 +210,64 @@ def inspect_input_data():
                 print(pad, f"missing files for these {len(t_miss)} times:")
                 for t in t_miss:
                     print(pad, "-", t.strftime(r"%Y-%m-%d %H"))
+
+
+def iter_input_data():
+    """Yield `xarray.Dataset`s for pre-processing.
+
+    Each file has one time step and 'pr' and 'tb' variables.
+    """
+
+    for season in SEASONS:
+        season_dir = BASE_DIR / season
+        assert season_dir.is_dir()
+
+        start = pd.Timestamp("2016-08-01") if season == "Summer" else pd.Timestamp("2020-01-20")
+
+        # Some models don't have first hour or first day
+        # Zhe said skipping first day is ok
+        time_range = pd.date_range(
+            start=start + pd.Timedelta("1D"),
+            periods=(40 - 1) * 24,
+        )
+
+        for model, rn in VN_MAP[season.lower()].items():
+            model_dir = season_dir / model
+            assert model_dir.is_dir()
+
+            files = sorted(model_dir.glob("*"))
+            for fp in files:
+                ymdh = re.search(r"[0-9]{10}", fp.stem).group()
+                t_file = pd.to_datetime(ymdh, format=r"%Y%m%d%H")
+                if t_file not in time_range:
+                    continue
+
+                ds = xr.open_dataset(fp)
+
+                # Specific adjustments
+                if model == "MPAS":
+                    ds = ds.rename(xtime="time")
+                if model == "OBS" and season == "Summer":
+                    assert ds.dims["time"] == 2
+                    ds = ds.isel(time=0).expand_dims("time", axis=0)
+
+                # Zhe said to ignore time difference from the hour,
+                # just assume it is on the hour like the obs
+                ds["time"] = [t_file]
+
+                # Normalize variable names
+                ds = ds.rename_vars(rn)
+
+                # Meta
+                ds.attrs.update(
+                    _season=season.lower(),
+                    _model=model,
+                )
+
+                # Select variables
+                ds = ds[list(rn.values())]
+
+                yield ds
 
 
 # TODO: idealized cases data ('idealized_cases')
