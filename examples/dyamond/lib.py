@@ -333,7 +333,7 @@ def open_input(p: Path) -> xr.Dataset:
         _time=t_file.strftime(r"%Y-%m-%d %H"),
     )
 
-    return ds
+    return ds.squeeze()
 
 
 def preproc_file(p: Path) -> None:
