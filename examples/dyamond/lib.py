@@ -311,7 +311,7 @@ def open_input(p: Path) -> xr.Dataset:
     if model != "OBS":
         from scipy.constants import Stefan_Boltzmann as sigma
 
-        assert ds.data_vars == {"pr", "olr"}
+        assert ds.data_vars.keys() == {"pr", "olr"}
 
         # Yang and Sligo (2001)
         # Given by Zhe
@@ -324,7 +324,7 @@ def open_input(p: Path) -> xr.Dataset:
             units="K",
         )
         ds = ds.drop_vars("olr")
-    assert ds.data_vars == {"pr", "tb"}
+    assert ds.data_vars.keys() == {"pr", "tb"}
 
     # Meta
     ds.attrs.update(
