@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP")
+BASE_DIR_IN = Path("/glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP")
 """Base input data directory (Andy's).
 
 Under here we have 'Summer' and 'Winter' dirs (title case)
@@ -22,6 +22,9 @@ e.g. ::
 
 /glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP/Winter/UM/olr_pcp_instantaneous/pr_rlut_um_winter_2020012007.nc
 """
+
+BASE_DIR_OUT = Path("/glade/scratch/zmoon/dyamond")
+BASE_DIR_OUT_PRE = BASE_DIR_OUT / "pre"
 
 
 def _make_vn_map():
@@ -124,8 +127,23 @@ For example::
     d["Summer"]["OBS"] = {"precipitationCal": "pr", "Tb": "tb"}
 """
 
+START = {
+    "summer": pd.Timestamp("2016-08-01"),
+    "winter": pd.Timestamp("2020-01-20"),
+}
+
 SEASONS = ["summer", "winter"]
-assert set(SEASONS) == set(VN_MAP)
+"""The seasons in lowercase, like they should be."""
+
+assert set(SEASONS) == set(VN_MAP) == set(START)
+
+
+def get_t_file(fn: str) -> pd.Timestamp:
+    """Get time stamp from file name."""
+    ymdh = re.search(r"[0-9]{10}", fn).group()
+    if ymdh is None:
+        raise ValueError(f"YYYYMMDDHH time not found in '{fn}'")
+    return pd.to_datetime(ymdh, format=r"%Y%m%d%H")
 
 
 def inspect_input_data():
@@ -135,7 +153,7 @@ def inspect_input_data():
 
     for season in ["Summer", "Winter"]:
         print(season)
-        d = BASE_DIR / season
+        d = BASE_DIR_IN / season
         assert d.is_dir()
 
         start = (
@@ -172,8 +190,7 @@ def inspect_input_data():
             assert ds.dims["time"] == 1
             print(pad, "t data:", ds.time.values[0])
 
-            ymdh = re.search(r"[0-9]{10}", fp.stem).group()
-            t_file = datetime.datetime.strptime(ymdh, r"%Y%m%d%H")
+            t_file = get_t_file(fp.stem)
             print(pad, "t path:", t_file)
 
             assert ds.dims["lon"] == 3600, "0.1 deg"
@@ -214,62 +231,81 @@ def inspect_input_data():
                     print(pad, "-", t.strftime(r"%Y-%m-%d %H"))
 
 
-def iter_input_data():
-    """Yield `xarray.Dataset`s for pre-processing.
+# TODO: idealized cases data ('idealized_cases')
 
-    Each file has one time step and 'pr' and 'tb' variables.
-    """
+
+def iter_input_paths():
+    """Yield paths to input files."""
 
     for season in SEASONS:
-        season_dir = BASE_DIR / season
+        season_dir = BASE_DIR_IN / season
         assert season_dir.is_dir()
 
-        start = pd.Timestamp("2016-08-01") if season == "Summer" else pd.Timestamp("2020-01-20")
+        start = START[season]
 
         # Some models don't have first hour or first day
         # Zhe said skipping first day is ok
         time_range = pd.date_range(
             start=start + pd.Timedelta("1D"),
             periods=(40 - 1) * 24,
+            freq="1H",
         )
 
-        for model, rn in VN_MAP[season.lower()].items():
+        for model in VN_MAP[season.lower()].items():
             model_dir = season_dir / model
             assert model_dir.is_dir()
 
             files = sorted(model_dir.glob("*"))
-            for fp in files:
-                ymdh = re.search(r"[0-9]{10}", fp.stem).group()
-                t_file = pd.to_datetime(ymdh, format=r"%Y%m%d%H")
-                if t_file not in time_range:
+            t_to_file = {get_t_file(fp): fp for fp in files}
+
+            for t in time_range:
+                fp = t_to_file.get(t)
+                if fp is None:
+                    print(f"missing file for {season} | {model} | {t:%Y-%m-%d %H}")
                     continue
-
-                ds = xr.open_dataset(fp)
-
-                # Specific adjustments
-                if model == "MPAS":
-                    ds = ds.rename(xtime="time")
-                if model == "OBS" and season == "Summer":
-                    assert ds.dims["time"] == 2
-                    ds = ds.isel(time=0).expand_dims("time", axis=0)
-
-                # Zhe said to ignore time difference from the hour,
-                # just assume it is on the hour like the obs
-                ds["time"] = [t_file]
-
-                # Normalize variable names
-                ds = ds.rename_vars(rn)
-
-                # Meta
-                ds.attrs.update(
-                    _season=season.lower(),
-                    _model=model,
-                )
-
-                # Select variables
-                ds = ds[list(rn.values())]
-
-                yield ds
+                yield fp
 
 
-# TODO: idealized cases data ('idealized_cases')
+def open_input(p: Path) -> xr.Dataset:
+    """Open a single input file as an `xarray.Dataset`.
+
+    The dataset is prepared for pre-processing.
+    It has one time step and 'pr' and 'tb' variables.
+    """
+    p = p.absolute()
+
+    # Guess season and model from path
+    model = p.parent.parent.name
+    season = p.parent.parent.parent.name.lower()
+    assert season in SEASONS
+    assert model in VN_MAP[season]
+
+    t_file = get_t_file(p.stem)
+
+    ds = xr.open_dataset(p)
+
+    # Specific adjustments
+    if model == "MPAS":
+        ds = ds.rename(xtime="time")
+    if model == "OBS" and season == "Summer":
+        assert ds.dims["time"] == 2
+        ds = ds.isel(time=0).expand_dims("time", axis=0)
+
+    # Zhe said to ignore time difference from the hour,
+    # just assume it is on the hour like the obs
+    ds["time"] = [t_file]
+
+    # Normalize variable names
+    rn = VN_MAP[season][model]
+    ds = ds.rename_vars(rn)
+
+    # Meta
+    ds.attrs.update(
+        _season=season.lower(),
+        _model=model,
+    )
+
+    # Select variables
+    ds = ds[list(rn.values())]
+
+    return ds
