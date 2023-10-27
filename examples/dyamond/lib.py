@@ -343,4 +343,4 @@ def preproc_file(p: Path) -> None:
 
     # Save to Parquet
     p_out = BASE_DIR_OUT_PRE / f"{id_}.parquet"
-    df.to_parquet(p_out)
+    df.to_parquet(p_out, schema_version="0.4.0")
