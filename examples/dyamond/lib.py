@@ -267,7 +267,7 @@ def iter_input_paths():
 
 
 def open_input(p: Path) -> xr.Dataset:
-    """Open a single input file as an `xarray.Dataset`.
+    """Open a single input nc file as an `xarray.Dataset`.
 
     The dataset is prepared for pre-processing.
     It has one time step and 'pr' and 'tb' variables.
@@ -301,11 +301,46 @@ def open_input(p: Path) -> xr.Dataset:
 
     # Meta
     ds.attrs.update(
-        _season=season.lower(),
+        _season=season,
         _model=model,
+        _time=t_file.strftime(r"%Y-%m-%d %H"),
     )
 
     # Select variables
     ds = ds[list(rn.values())]
 
     return ds
+
+
+def preproc_file(p: Path) -> None:
+    """Preprocess a single input data nc file and save it to Parquet.
+
+    Note: GeoPandas currently only supports saving to disk, not bytes.
+    """
+    import tams
+
+    ds = open_input(p)
+    id_ = f"{ds._season}__{ds._model.lower()}__{ds._time.replace(' ', '_')}"
+
+    # Identify CEs
+    ce, _ = tams.core._identify_one(ds.ctt, ctt_threshold=241, ctt_core_threshold=225)
+    ce = ce[["geometry", "area_km2", "area219_km2"]].rename(
+        columns={"area219_km2": "area_core_km2"}
+    )
+
+    # Get precip stats
+    agg = ("mean", "max", "min", "count")
+    try:
+        df = tams.data_in_contours(ds["pr"], ce, agg=agg, merge=True)
+    except ValueError as e:
+        if str(e) == "no data found in contours":
+            print(f"warning: no pr data in contours for {id_} ({p.as_posix()})")
+            df = ce
+            for a in agg:
+                df[f"{a}_pr"] = np.nan
+        else:
+            raise
+
+    # Save to Parquet
+    p_out = BASE_DIR_OUT_PRE / f"{id_}.parquet"
+    df.to_parquet(p_out)
