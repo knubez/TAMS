@@ -304,15 +304,34 @@ def open_input(p: Path) -> xr.Dataset:
     rn = VN_MAP[season][model]
     ds = ds.rename_vars(rn)
 
+    # Select variables
+    ds = ds[list(rn.values())]
+
+    # For models, compute Tb from OLR
+    if model != "OBS":
+        from scipy.constants import Stefan_Boltzmann as sigma
+
+        assert ds.data_vars == {"pr", "olr"}
+
+        # Yang and Sligo (2001)
+        # Given by Zhe
+        a = 1.228
+        b = -1.106e-3
+        tf = (ds["olr"] / sigma) ** 0.25
+        ds["tb"] = (-a + np.sqrt(a**2 + 4 * b * tf)) / (2 * b)
+        ds["tb"].attrs.update(
+            long_name="brightness temperature",
+            units="K",
+        )
+        ds = ds.drop_vars("olr")
+    assert ds.data_vars == {"pr", "tb"}
+
     # Meta
     ds.attrs.update(
         _season=season,
         _model=model,
         _time=t_file.strftime(r"%Y-%m-%d %H"),
     )
-
-    # Select variables
-    ds = ds[list(rn.values())]
 
     return ds
 
@@ -328,7 +347,7 @@ def preproc_file(p: Path) -> None:
     id_ = f"{ds._season}__{ds._model.lower()}__{ds._time.replace(' ', '_')}"
 
     # Identify CEs
-    ce, _ = tams.core._identify_one(ds.tb, ctt_threshold=241, ctt_core_threshold=225)
+    ce, _ = tams.core._identify_one(ds["tb"], ctt_threshold=241, ctt_core_threshold=225)
     ce = ce[["geometry", "area_km2", "area219_km2"]].rename(
         columns={"area219_km2": "area_core_km2"}
     )
