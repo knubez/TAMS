@@ -3,6 +3,7 @@ DYAMOND -- DYnamics of the Atmospheric general circulation Modeled On Non-hydros
 
 https://www.esiwace.eu/the-project/past-phases/dyamond-initiative
 """
+from __future__ import annotations
 
 import datetime
 import re
@@ -138,12 +139,14 @@ SEASONS = ["summer", "winter"]
 assert set(SEASONS) == set(VN_MAP) == set(START)
 
 
-def get_t_file(fn: str) -> pd.Timestamp:
+def get_t_file(fn: str | Path) -> pd.Timestamp:
     """Get time stamp from file name."""
-    ymdh = re.search(r"[0-9]{10}", fn).group()
-    if ymdh is None:
+    if isinstance(fn, Path):
+        fn = fn.stem
+    m = re.search(r"[0-9]{10}", fn)
+    if m is None:
         raise ValueError(f"YYYYMMDDHH time not found in '{fn}'")
-    return pd.to_datetime(ymdh, format=r"%Y%m%d%H")
+    return pd.to_datetime(m.group(), format=r"%Y%m%d%H")
 
 
 def inspect_input_data():
@@ -238,7 +241,7 @@ def iter_input_paths():
     """Yield paths to input files."""
 
     for season in SEASONS:
-        season_dir = BASE_DIR_IN / season
+        season_dir = BASE_DIR_IN / season.title()
         assert season_dir.is_dir()
 
         start = START[season]
@@ -251,11 +254,13 @@ def iter_input_paths():
             freq="1H",
         )
 
-        for model in VN_MAP[season.lower()].items():
+        for model in VN_MAP[season]:
             model_dir = season_dir / model
-            assert model_dir.is_dir()
+            if not model_dir.is_dir():
+                print(f"missing directory {season} | {model}")
+                continue
 
-            files = sorted(model_dir.glob("*"))
+            files = sorted(model_dir.glob("**/*.nc"))
             t_to_file = {get_t_file(fp): fp for fp in files}
 
             for t in time_range:
@@ -323,7 +328,7 @@ def preproc_file(p: Path) -> None:
     id_ = f"{ds._season}__{ds._model.lower()}__{ds._time.replace(' ', '_')}"
 
     # Identify CEs
-    ce, _ = tams.core._identify_one(ds.ctt, ctt_threshold=241, ctt_core_threshold=225)
+    ce, _ = tams.core._identify_one(ds.tb, ctt_threshold=241, ctt_core_threshold=225)
     ce = ce[["geometry", "area_km2", "area219_km2"]].rename(
         columns={"area219_km2": "area_core_km2"}
     )
