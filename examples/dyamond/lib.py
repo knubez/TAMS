@@ -125,7 +125,7 @@ VN_MAP = _make_vn_map()
 
 For example::
 
-    d["Summer"]["OBS"] = {"precipitationCal": "pr", "Tb": "tb"}
+    d["summer"]["OBS"] = {"precipitationCal": "pr", "Tb": "tb"}
 """
 
 START = {
@@ -292,7 +292,7 @@ def open_input(p: Path) -> xr.Dataset:
     # Specific adjustments
     if model == "MPAS":
         ds = ds.rename(xtime="time")
-    if model == "OBS" and season == "Summer":
+    if model == "OBS" and season == "summer":
         assert ds.dims["time"] == 2
         ds = ds.isel(time=slice(0, 1))
 
