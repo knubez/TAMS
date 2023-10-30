@@ -294,7 +294,7 @@ def open_input(p: Path) -> xr.Dataset:
         ds = ds.rename(xtime="time")
     if model == "OBS" and season == "Summer":
         assert ds.dims["time"] == 2
-        ds = ds.isel(time=0).expand_dims("time", axis=0)
+        ds = ds.isel(time=slice(0, 1))
 
     # Zhe said to ignore time difference from the hour,
     # just assume it is on the hour like the obs
