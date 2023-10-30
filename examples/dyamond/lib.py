@@ -336,15 +336,24 @@ def open_input(p: Path) -> xr.Dataset:
     return ds.squeeze()
 
 
-def preproc_file(p: Path) -> None:
+def preproc_file(p: Path, *, overwrite: bool = True) -> None:
     """Preprocess a single input data nc file and save it to Parquet.
 
-    Note: GeoPandas currently only supports saving to disk, not bytes.
+    If `overwrite` is false and the output file already exists,
+    pre-processing is skipped.
+
+    NOTE: `pyarrow` is required in order to save the GeoDataFrames to Parquet.
+    NOTE: GeoPandas currently only supports saving to disk, not bytes.
     """
     import tams
 
     ds = open_input(p)
     id_ = f"{ds._season}__{ds._model.lower()}__{ds._time.replace(' ', '_')}"
+
+    p_out = BASE_DIR_OUT_PRE / f"{id_}.parquet"
+    if not overwrite and p_out.is_file():
+        print(f"skipping {id_} ({p.as_posix()}) (exists)")
+        return
 
     # Identify CEs
     ce, _ = tams.core._identify_one(ds["tb"], ctt_threshold=241, ctt_core_threshold=225)
@@ -366,5 +375,4 @@ def preproc_file(p: Path) -> None:
             raise
 
     # Save to Parquet
-    p_out = BASE_DIR_OUT_PRE / f"{id_}.parquet"
     df.to_parquet(p_out, schema_version="0.4.0")
