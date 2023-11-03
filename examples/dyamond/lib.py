@@ -372,7 +372,7 @@ def preproc_file(p: Path, *, overwrite: bool = True) -> None:
     df.to_parquet(p_out, schema_version="0.4.0")
 
 
-def get_preproced_paths():
+def get_preproced_paths() -> dict[tuple[str, str], list[Path]]:
     """Return dict of `(season, model)` to list of file paths."""
     from collections import defaultdict
 
