@@ -370,3 +370,18 @@ def preproc_file(p: Path, *, overwrite: bool = True) -> None:
 
     # Save to Parquet
     df.to_parquet(p_out, schema_version="0.4.0")
+
+
+def get_preproced_paths():
+    """Return dict of `(season, model)` to list of file paths."""
+    from collections import defaultdict
+
+    paths = defaultdict(list)
+    for p in BASE_DIR_OUT_PRE.glob("*.parquet"):
+        season, model, _ = p.stem.split("__")
+        paths[(season, model)].append(p)
+
+    for key in paths:
+        paths[key].sort()
+
+    return paths
