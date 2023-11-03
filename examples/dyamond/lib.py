@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import datetime
 import re
+import warnings
 from pathlib import Path
+from typing import Any
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -385,3 +388,231 @@ def get_preproced_paths() -> dict[tuple[str, str], list[Path]]:
         paths[key].sort()
 
     return paths
+
+
+_CLASSIFY_COLS = [
+    "is_mcs",
+    "meets_crit_duration",
+    "meets_crit_area",
+    "meets_crit_prpeak",
+    "meets_crit_prvol",
+]
+_CLASSIFY_COLS_SET = set(_CLASSIFY_COLS)
+_CLASSIFY_STATS_COLS = [
+    "duration",
+    "max_area",
+    "max_maxpr",
+    "max_prvol",
+]
+
+
+def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = False) -> pd.Series:
+    """Determine if CE group (MCS ID) is indeed MCS or not under the MOSA criteria.
+
+    Returns Series of stats for the CE group (MCS ID).
+
+    Parameters
+    ----------
+    g
+        CE dataset (output from TAMS tracking step, single MCS ID).
+    pre
+        Prefix added to warning/info messages to identify a specific run.
+    """
+    if "mcs_id" in g:
+        assert g.mcs_id.nunique() == 1
+
+    # Compute duration
+    t = g.time.unique()
+    tmin = t.min()
+    tmax = t.max()
+    duration = pd.Timedelta(tmax - tmin)
+
+    # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
+    # but for accumulated (during previous time step), 4 is fine(?) (according to Andy)
+    n = 4
+    meets_crit_duration = duration >= pd.Timedelta(f"{n}H")
+    # TODO: ^ not really one of the 4 criteria (though needed for 1 and 2)
+
+    # Compute rainfall volume
+    ce_prvol = g.area_km2 * g.mean_pr  # per CE
+
+    # Group by time
+    gb = g.assign(prvol=ce_prvol).groupby("itime")
+
+    # Sum area over cloud elements
+    area = gb["area_km2"].sum()
+
+    # Agg max precip over cloud elements
+    maxpr = gb["max_pr"].max()
+
+    # Sum rainfall volume over cloud elements
+    prvol = gb["prvol"].sum()
+
+    # 1. Assess area criterion
+    # NOTE: rolling usage assuming data is hourly
+    meets_crit_area = (area >= 40_000).rolling(n, min_periods=0).sum().eq(n).any()
+
+    # 2. Assess minimum pixel-peak precip criterion
+    meets_crit_prpeak = (maxpr >= 10).rolling(n, min_periods=0).sum().eq(n).any()
+
+    # 3. Assess minimum rainfall volume criterion
+    meets_crit_prvol = (prvol >= 20_000).sum() >= 1
+
+    # 4. Overshoot threshold currently met for all due to TAMS approach
+    # TODO: check anyway?
+
+    # An MCS meets all of the criteria
+    is_mcs = all(
+        [
+            meets_crit_duration,
+            meets_crit_area,
+            meets_crit_prpeak,
+            meets_crit_prvol,
+        ]
+    )
+
+    res = {
+        "is_mcs": is_mcs,
+        "meets_crit_duration": meets_crit_duration,
+        "meets_crit_area": meets_crit_area,
+        "meets_crit_prpeak": meets_crit_prpeak,
+        "meets_crit_prvol": meets_crit_prvol,
+    }
+    assert res.keys() == _CLASSIFY_COLS_SET
+
+    # Sanity checks
+    max_area = area.max()
+    if meets_crit_area:
+        assert max_area >= 40_000
+    max_maxpr = maxpr.max()
+    if meets_crit_prpeak:
+        assert max_maxpr >= 10
+    max_prvol = prvol.max()
+    if meets_crit_prvol:
+        assert max_prvol >= 20_000
+
+    if include_stats:
+        res.update(
+            {
+                "duration": duration,
+                "max_area": max_area,
+                "max_maxpr": max_maxpr,
+                "max_prvol": max_prvol,
+            }
+        )
+        assert res.keys() > set(_CLASSIFY_STATS_COLS)
+
+    return pd.Series(res)
+
+
+def classify(
+    ce: gpd.GeoDataFrame,
+    *,
+    pre: str = "",
+    include_stats: bool = False,
+) -> gpd.GeoDataFrame:
+    """Determine if CE groups (MCS IDs) are indeed MCS or not under the MOSA criteria.
+
+    Parameters
+    ----------
+    ce
+        CE dataset (output from TAMS tracking step).
+    pre
+        Prefix added to warning/info messages to identify a specific run.
+    """
+    ce["mcs_id"] = ce.mcs_id.astype(int)
+    # TODO: ^ should be already (unless NaNs due to days with no CEs identified)
+    n_mcs_ = ce.mcs_id.max() + 1
+    n_mcs = int(n_mcs_)
+    if n_mcs != n_mcs_:
+        warnings.warn(f"{pre}max MCS ID + 1 was {n_mcs_} but using {n_mcs}", stacklevel=2)
+
+    # TODO: parallel option?
+    mcs_info = ce.groupby("mcs_id").apply(classify_one, include_stats=include_stats, pre=pre)
+    assert mcs_info.index.name == "mcs_id"
+
+    ce = ce.drop(columns=_CLASSIFY_COLS + _CLASSIFY_STATS_COLS, errors="ignore").merge(
+        mcs_info,
+        how="left",
+        left_on="mcs_id",
+        right_index=True,
+    )
+
+    return ce
+
+
+def run(
+    fps: list[Path],
+    *,
+    id_: str | None = None,
+    track_kws: dict[str, Any] | None = None,
+) -> gpd.GeoDataFrame:
+    """On preprocessed files, do the remaining steps:
+    track, classify.
+
+    Note that this returns all tracked CEs, including those not classified as MCS
+    (the output gdf includes reason).
+
+    Returns GeoDataFrame including the contour polygons.
+
+    Parameters
+    ----------
+    fps
+        GeoDataFrames saved in Parquet format,
+        each corresponding to the CEs identified at a single time step.
+    id_
+        Just used for the info messages, to differentiate when running multiple at same time.
+    track_kws
+        Passed to :func:`tams.track`.
+
+    See Also
+    --------
+    classify
+    classify_one
+    tams.track
+    """
+    import tams
+
+    #
+    # Read
+    #
+
+    pre = f"[{id_}] " if id_ is not None else ""
+
+    def printt(s):
+        """Print message and current time"""
+        import datetime
+
+        st = datetime.datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+        print(f"{pre}{st}: {s}")
+
+    printt(f"Reading {len(fps)} pre-processed files")
+    sts = []  # datetime strings
+    ces = []
+    for fp in sorted(fps):
+        sts.append(fp.stem.split("__")[-1])
+        df = gpd.read_parquet(fp)
+        ces.append(df)
+
+    times = pd.to_datetime(sts, format=r"%Y-%m-%d_%H")
+
+    #
+    # Track
+    #
+
+    if track_kws is None:
+        track_kws = {}
+
+    printt("Tracking")
+    ce = tams.track(ces, times, **track_kws)
+
+    #
+    # Classify (CEs)
+    #
+
+    printt("Classifying")
+    ce = classify(ce, pre=pre)
+
+    printt("Done")
+
+    return ce

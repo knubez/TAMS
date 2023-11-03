@@ -1,5 +1,5 @@
 """
-Pre-process DYAMOND files and save Parquet files to TAR archive.
+Pre-process DYAMOND files and save to Parquet files.
 """
 from functools import partial
 
