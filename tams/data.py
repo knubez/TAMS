@@ -127,7 +127,7 @@ def load_example_mpas() -> xarray.Dataset:
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
 
     This dataset contains 127 time steps of hourly data:
-    2006-09-08 00 -- 2006-09-13 18
+    2006-09-08 12 -- 2006-09-13 18
     """
 
     ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
