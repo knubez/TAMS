@@ -186,9 +186,6 @@ def inspect_input_data():
             ds = xr.open_dataset(fp)
             if model == "MPAS":
                 ds = ds.rename(xtime="time")
-            if model == "OBS" and season == "Summer":
-                assert ds.dims["time"] == 2
-                ds = ds.isel(time=0).expand_dims("time", axis=0)
             assert {"time", "lon", "lat"} <= set(ds.dims)  # some also have 'bnds'
             assert ds.dims["time"] == 1
             print(pad, "t data:", ds.time.values[0])
@@ -292,9 +289,6 @@ def open_input(p: Path) -> xr.Dataset:
     # Specific adjustments
     if model == "MPAS":
         ds = ds.rename(xtime="time")
-    if model == "OBS" and season == "summer":
-        assert ds.dims["time"] == 2
-        ds = ds.isel(time=slice(0, 1))
 
     # Zhe said to ignore time difference from the hour,
     # just assume it is on the hour like the obs
