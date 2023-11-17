@@ -73,6 +73,7 @@ def download_examples():
     for id_, fn in [
         ("1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp", "Satellite_data.nc"),
         ("1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E", "MPAS_data.nc"),
+        ("1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf", "MPAS_unstructured_data.nc"),
     ]:
         url = f"https://drive.google.com/uc?export=download&id={id_}"
         cmd = ["wget", "--no-verbose", "--no-check-certificate", url, "-O", (HERE / fn).as_posix()]
