@@ -91,7 +91,7 @@ def load_example_ir() -> xarray.DataArray:
     2006-09-01 00--10
     """
 
-    ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
+    ds = xr.open_dataset(HERE / "Satellite_data.nc", lock=False).rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
     )
 
