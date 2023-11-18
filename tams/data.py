@@ -188,6 +188,42 @@ def load_example_mpas() -> xarray.Dataset:
     return ds
 
 
+def load_example_mpas_ug() -> xarray.Dataset:
+    """Load the example MPAS unstructured grid dataset.
+
+    This is a spatial and variable subset of native MPAS output.
+
+    It has been spatially subsetted so that
+    lat ranges from -5 to 20
+    and lon from 85 to 170,
+    like the example regridded MPAS dataset (:func:`load_example_mpas`).
+    """
+
+    ds = xr.open_dataset(HERE / "MPAS_unstructured_data.nc").rename(
+        Time="time",
+        nCells="cell",
+        latcell="lat",
+        loncell="lon",
+    )
+
+    # Mask zero values of Tb
+    ds["tb"] = ds.tb.where(ds.tb > 0)
+
+    # Set time (time variable in there just has elapsed hours as int)
+    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1H", periods=ds.dims["time"])
+
+    # Diff accumulated precip to get mm/h
+    ds["precip"] = ds.precip.diff("time", label="lower")
+
+    # Add variables attrs
+    ds.lat.attrs.update(long_name="Latitude (cell center)", units="degrees_north")
+    ds.lon.attrs.update(long_name="Longitude (cell center)", units="degrees_east")
+    ds.tb.attrs.update(long_name="Brightness temperature", units="K")
+    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
+
+    return ds
+
+
 def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> xarray.Dataset:
     """Derive a TAMS input dataset from post-processed MPAS runs for the PRECIP field campaign.
 

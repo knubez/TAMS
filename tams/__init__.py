@@ -15,5 +15,5 @@ from .core import (
     run,
     track,
 )
-from .data import load_example_mpas, load_example_tb, load_mpas_precip
+from .data import load_example_mpas, load_example_mpas_ug, load_example_tb, load_mpas_precip
 from .util import plot_tracked
