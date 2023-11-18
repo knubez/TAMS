@@ -66,23 +66,48 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
-def download_examples():
-    """Download the example datasets (using wget)."""
-    import subprocess
+def download_examples(*, gdown: bool = False):
+    """Download the example datasets using wget (default) or gdown.
 
-    for id_, fn in [
-        ("1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp", "Satellite_data.nc"),
-        ("1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E", "MPAS_data.nc"),
-        ("1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf", "MPAS_unstructured_data.nc"),
-    ]:
-        url = f"https://drive.google.com/uc?export=download&id={id_}&confirm=t"
-        cmd = ["wget", "--no-verbose", "--no-check-certificate", url, "-O", (HERE / fn).as_posix()]
+    .. note::
+       `gdown <https://github.com/wkentaro/gdown>`__ is not currently
+       a TAMS required dependency, so you must install it in order to use ``gdown=True``.
+       It is available on conda-forge and PyPI as ``gdown``.
+    """
 
+    files = [
+        ("1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp", "Satellite_data.nc"),  # < 100 MB
+        ("1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E", "MPAS_data.nc"),  # < 100 MB
+        ("1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf", "MPAS_unstructured_data.nc"),  # > 100 MB
+    ]
+
+    if gdown:
         try:
-            subprocess.run(cmd)
-        except Exception:
-            print(f"Running\n  {' '.join(cmd)}\nfailed:")
-            raise
+            import gdown
+        except ImportError as e:
+            raise RuntimeError("gdown required") from e
+
+        for id_, fn in files:
+            gdown.download(id=id_, output=(HERE / fn).as_posix(), quiet=False)
+    else:
+        import subprocess
+
+        for id_, fn in files:
+            url = f"https://drive.google.com/uc?export=download&id={id_}&confirm=t"
+            cmd = [
+                "wget",
+                "--no-verbose",
+                "--no-check-certificate",
+                url,
+                "-O",
+                (HERE / fn).as_posix(),
+            ]
+
+            try:
+                subprocess.run(cmd)
+            except Exception:
+                print(f"Running\n  {' '.join(cmd)}\nfailed:")
+                raise
 
 
 def load_example_ir() -> xarray.DataArray:
