@@ -178,10 +178,8 @@ def load_example_mpas() -> xarray.Dataset:
     # Mask 0 values of T (e.g. at initial time since OLR is zero then)
     ds["tb"] = ds.tb.where(ds.tb > 0)
 
-    # lat has attrs but not lon
-    ds.lon.attrs.update(long_name="Longitude", units="degrees_east")
-    ds.lat.attrs.update(long_name="Latitude")
-
+    ds.lat.attrs.update(long_name="Latitude", units="degree_north")
+    ds.lon.attrs.update(long_name="Longitude", units="degree_east")
     ds.tb.attrs.update(long_name="Brightness temperature", units="K")
     ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
 
@@ -216,8 +214,8 @@ def load_example_mpas_ug() -> xarray.Dataset:
     ds["precip"] = ds.precip.diff("time", label="lower")
 
     # Add variables attrs
-    ds.lat.attrs.update(long_name="Latitude (cell center)", units="degrees_north")
-    ds.lon.attrs.update(long_name="Longitude (cell center)", units="degrees_east")
+    ds.lat.attrs.update(long_name="Latitude (cell center)", units="degree_north")
+    ds.lon.attrs.update(long_name="Longitude (cell center)", units="degree_east")
     ds.tb.attrs.update(long_name="Brightness temperature", units="K")
     ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
 
