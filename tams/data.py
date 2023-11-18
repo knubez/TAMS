@@ -30,7 +30,7 @@ _tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
 HERE = Path(__file__).parent
 
 
-def tb_from_ir(r, ch: int):
+def tb_from_ir(r, ch: int) -> xarray.DataArray:
     """Compute brightness temperature from IR satellite radiances (`r`)
     in channel `ch` of the EUMETSAT MSG SEVIRI instrument.
 
