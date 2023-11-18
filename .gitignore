@@ -1,6 +1,7 @@
 *.ipynb_checkpoints
 Satellite_data.nc
 MPAS_data.nc
+MPAS_unstructured_data.nc
 docs/api/
 mosa3.o*
 mosa2.o*
