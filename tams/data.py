@@ -66,13 +66,22 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
-def download_examples(*, gdown: bool = False):
+def download_examples(*, gdown: bool = False, clobber: bool = False) -> None:
     """Download the example datasets using wget (default) or gdown.
 
-    .. note::
-       `gdown <https://github.com/wkentaro/gdown>`__ is not currently
-       a TAMS required dependency, so you must install it in order to use ``gdown=True``.
-       It is available on conda-forge and PyPI as ``gdown``.
+
+    Parameters
+    ----------
+    gdown
+        Use gdown. Otherwise, use wget.
+
+        .. note::
+           `gdown <https://github.com/wkentaro/gdown>`__ is not currently
+           a TAMS required dependency, so you must install it
+           in order to use ``gdown=True``.
+           It is available on conda-forge and PyPI as ``gdown``.
+    clobber
+        If set, overwrite existing files. Otherwise, skip downloading.
     """
 
     files = [
@@ -87,12 +96,13 @@ def download_examples(*, gdown: bool = False):
         except ImportError as e:
             raise RuntimeError("gdown required") from e
 
-        for id_, fn in files:
-            gdown.download(id=id_, output=(HERE / fn).as_posix(), quiet=False)
+        def download(id_: str, to: str):
+            gdown.download(id=id_, output=to, quiet=False)
+
     else:
         import subprocess
 
-        for id_, fn in files:
+        def download(id_: str, to: str):
             url = f"https://drive.google.com/uc?export=download&id={id_}&confirm=t"
             cmd = [
                 "wget",
@@ -100,14 +110,21 @@ def download_examples(*, gdown: bool = False):
                 "--no-check-certificate",
                 url,
                 "-O",
-                (HERE / fn).as_posix(),
+                to,
             ]
-
             try:
                 subprocess.run(cmd)
             except Exception:
                 print(f"Running\n  {' '.join(cmd)}\nfailed:")
                 raise
+
+    for id_, fn in files:
+        fp = HERE / fn
+        if not clobber and fp.is_file():
+            print(f"Skipping {fn} because it already exists at {fp.as_posix()}.")
+            continue
+        else:
+            download(id_, fp.as_posix())
 
 
 def load_example_ir() -> xarray.DataArray:
