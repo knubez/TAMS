@@ -198,11 +198,16 @@ def _identify_one(
     size_filter: bool = True,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    unstructured: bool | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
-    cs235 = sort_ew(_contours_to_gdf(contours(ctt, ctt_threshold))).reset_index(drop=True)
-    cs219 = sort_ew(_contours_to_gdf(contours(ctt, ctt_core_threshold))).reset_index(drop=True)
+    cs235 = sort_ew(
+        _contours_to_gdf(contours(ctt, ctt_threshold, unstructured=unstructured))
+    ).reset_index(drop=True)
+    cs219 = sort_ew(
+        _contours_to_gdf(contours(ctt, ctt_core_threshold, unstructured=unstructured))
+    ).reset_index(drop=True)
 
     if size_filter:
         cs235, cs219 = _size_filter_contours(cs235, cs219)
@@ -246,18 +251,25 @@ def identify(
         as an organized system.
         It helps target raining clouds.
     """
+    dims = tuple(ctt.dims)
+
+    unstructured = (len(dims) == 2 and "time" in dims) or (len(dims) == 1)
+
     f = functools.partial(
         _identify_one,
         size_filter=size_filter,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        unstructured=unstructured,
     )
-    dims = tuple(ctt.dims)
-    if len(dims) == 2:
+
+    if (not unstructured and len(dims) == 2) or (unstructured and len(dims) == 1):
         cs235, cs219 = f(ctt)
         css235, css219 = (cs235,), (cs219,)  # to tuple for consistency
 
-    elif len(dims) == 3 and "time" in dims:
+    elif "time" in dims and (
+        (not unstructured and len(dims) == 3) or (unstructured and len(dims) == 2)
+    ):
         assert ctt.time.ndim == 1
         itimes = np.arange(ctt.time.size)
 
@@ -277,7 +289,10 @@ def identify(
         css235, css219 = zip(*res)
 
     else:
-        raise ValueError("The dims of `ctt` either are not 2-D or are not 3-D with a 'time' dim")
+        raise ValueError(
+            "The dims of `ctt` either are not 2-D or are not 3-D with a 'time' dim. "
+            f"Got: {dims}."
+        )
 
     return list(css235), list(css219)
 
