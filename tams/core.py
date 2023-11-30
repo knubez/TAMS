@@ -31,15 +31,19 @@ def contours(
     unstructured: bool | None = None,
     **kwargs,
 ) -> list[numpy.ndarray]:
-    """Find contour definitions for 2-D data `x` at value `value`.
+    """Find contour definitions for data `x` at value `value`.
 
     Parameters
     ----------
     x
         Data to be contoured.
         Currently needs to have ``'lat'`` and ``'lon'`` coordinates.
+        The array should be 2-D if structured, 1-D if unstructured.
     value
         Find contours where `x` has this value.
+    unstructured
+        Whether the grid of `x` is unstructured (e.g. MPAS native output).
+        Default: assume unstructured if `x` is 1-D.
 
     Returns
     -------
