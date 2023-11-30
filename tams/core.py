@@ -16,6 +16,7 @@ from .util import _the_unique, sort_ew
 
 if TYPE_CHECKING:
     import geopandas
+    import matplotlib
     import numpy
     import shapely
     import xarray
@@ -203,14 +204,21 @@ def _identify_one(
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
     unstructured: bool | None = None,
+    triangulation: matplotlib.tri.Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
     cs235 = sort_ew(
-        _contours_to_gdf(contours(ctt, ctt_threshold, unstructured=unstructured))
+        _contours_to_gdf(
+            contours(ctt, ctt_threshold, unstructured=unstructured, triangulation=triangulation)
+        )
     ).reset_index(drop=True)
     cs219 = sort_ew(
-        _contours_to_gdf(contours(ctt, ctt_core_threshold, unstructured=unstructured))
+        _contours_to_gdf(
+            contours(
+                ctt, ctt_core_threshold, unstructured=unstructured, triangulation=triangulation
+            )
+        )
     ).reset_index(drop=True)
 
     if size_filter:
@@ -259,12 +267,26 @@ def identify(
 
     unstructured = (len(dims) == 2 and "time" in dims) or (len(dims) == 1)
 
+    triangulation = None
+    if unstructured:
+        if ctt.lat.ndim == 1 and ctt.lon.ndim == 1:
+            from matplotlib.tri import Triangulation
+
+            triangulation = Triangulation(x=ctt.lon, y=ctt.lat)
+        else:
+            warnings.warn(
+                "detected unstructured data but not 1-D lat/lon "
+                f"(got lat dims {ctt.lat.dims}, lon dims {ctt.lon.dims}), "
+                "not pre-computing the triangulation"
+            )
+
     f = functools.partial(
         _identify_one,
         size_filter=size_filter,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
         unstructured=unstructured,
+        triangulation=triangulation,
     )
 
     if (not unstructured and len(dims) == 2) or (unstructured and len(dims) == 1):
