@@ -24,7 +24,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
+def contours(
+    x: xarray.DataArray,
+    value: float,
+    *,
+    unstructured: bool | None = None,
+    **kwargs,
+) -> list[numpy.ndarray]:
     """Find contour definitions for 2-D data `x` at value `value`.
 
     Parameters
@@ -44,14 +50,29 @@ def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
     if x.isnull().all():
         raise ValueError("Input array `x` is all null (e.g. NaN)")
 
+    if unstructured is None:
+        unstructured = x.ndim == 1
+
     # TODO: have this return GDF instead?
     # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
+    # TODO: optionally filter out unclosed?
     import matplotlib.pyplot as plt
 
-    assert x.ndim == 2, "this is for a single image"
-    with plt.ioff():  # requires mpl 3.4
-        fig = plt.figure()
-        cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
+    if unstructured:
+        assert x.ndim == 1, "this is for a single time step"
+        tri = kwargs.get("triangulation")
+        if tri is None:
+            from matplotlib.tri import Triangulation
+
+            tri = Triangulation(x=x.lon, y=x.lat)
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = plt.tricontour(tri, x, levels=[value])
+    else:
+        assert x.ndim == 2, "this is for a single image"
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
 
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
