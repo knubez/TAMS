@@ -69,6 +69,12 @@ def tb_from_ir(r, ch: int) -> xarray.DataArray:
 def download_examples(*, gdown: bool = False, clobber: bool = False) -> None:
     """Download the example datasets using wget (default) or gdown.
 
+    * Satellite data (EUMETSAT IR radiance):
+      https://drive.google.com/file/d/1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp/view?usp=sharing
+    * MPAS regridded data (brightness temperature and precipitation):
+      https://drive.google.com/file/d/1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E/view?usp=sharing
+    * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
+      https://drive.google.com/file/d/1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf/view?usp=sharing
 
     Parameters
     ----------
@@ -82,6 +88,12 @@ def download_examples(*, gdown: bool = False, clobber: bool = False) -> None:
            It is available on conda-forge and PyPI as ``gdown``.
     clobber
         If set, overwrite existing files. Otherwise, skip downloading.
+
+    See Also
+    --------
+    tams.load_example_tb
+    tams.load_example_mpas
+    tams.load_example_mpas_ug
     """
 
     files = [
@@ -132,6 +144,10 @@ def load_example_ir() -> xarray.DataArray:
 
     This dataset contains 6 time steps of 2-hourly data (every 2 hours):
     2006-09-01 00--10
+
+    See Also
+    --------
+    tams.data.download_examples
     """
 
     ds = xr.open_dataset(HERE / "Satellite_data.nc", lock=False).rename_dims(
@@ -155,6 +171,12 @@ def load_example_tb() -> xarray.DataArray:
 
     This dataset contains 6 time steps of 2-hourly data (every 2 hours):
     2006-09-01 00--10
+
+    See Also
+    --------
+    tams.data.download_examples
+    tams.data.load_example_ir
+    tams.data.tb_from_ir
     """
 
     r = load_example_ir()
@@ -170,7 +192,12 @@ def load_example_mpas() -> xarray.Dataset:
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
 
     This dataset contains 127 time steps of hourly data:
-    2006-09-08 12 -- 2006-09-13 18
+    2006-09-08 12 -- 2006-09-13 18.
+
+    See Also
+    --------
+    tams.data.download_examples
+    tams.load_example_mpas_ug
     """
 
     ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
@@ -194,7 +221,19 @@ def load_example_mpas_ug() -> xarray.Dataset:
     It has been spatially subsetted so that
     lat ranges from -5 to 20
     and lon from 85 to 170,
-    like the example regridded MPAS dataset (:func:`load_example_mpas`).
+    similar to the example regridded MPAS dataset (:func:`load_example_mpas`)
+    except a lower lat upper bound.
+
+    Like the regridded MPAS dataset, it has hourly
+    ``tb`` (brightness temperature)
+    and ``precip`` (precipitation rate)
+    for the period
+    2006-09-08 12 -- 2006-09-13 18.
+
+    See Also
+    --------
+    tams.data.download_examples
+    tams.load_example_mpas
     """
 
     ds = xr.open_dataset(HERE / "MPAS_unstructured_data.nc").rename(
