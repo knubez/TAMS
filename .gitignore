@@ -3,6 +3,7 @@ Satellite_data.nc
 MPAS_data.nc
 MPAS_unstructured_data.nc
 docs/api/
+docs/examples/*.pdf
 mosa3.o*
 mosa2.o*
 mosa1.o*
