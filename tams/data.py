@@ -104,12 +104,12 @@ def download_examples(*, gdown: bool = False, clobber: bool = False) -> None:
 
     if gdown:
         try:
-            import gdown
+            import gdown as gdown_mod
         except ImportError as e:
             raise RuntimeError("gdown required") from e
 
         def download(id_: str, to: str):
-            gdown.download(id=id_, output=to, quiet=False)
+            gdown_mod.download(id=id_, output=to, quiet=False)
 
     else:
         import subprocess
