@@ -316,8 +316,9 @@ def identify(
 
     else:
         raise ValueError(
-            "The dims of `ctt` either are not 2-D or are not 3-D with a 'time' dim. "
-            f"Got: {dims}."
+            f"Got unexpected `ctt` dims: {dims}. "
+            "They should be 2-D (lat/lon) + optional 'time' dim for structured grid data, "
+            "or 1-D (cell) + optional 'time' dim for unstructured grid data."
         )
 
     return list(css235), list(css219)
