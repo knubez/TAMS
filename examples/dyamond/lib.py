@@ -815,20 +815,27 @@ def re_id(ce):
 def post(fp: Path) -> None:
     """Drop non-MCSs from frame and save mask file and dataframe without shapes."""
 
-    assert fp.name.endswith(".parquet")
     id_ = fp.stem
+    assert fp.name.endswith(".parquet")
+
+    def msg(s: str) -> None:
+        print(f"{id_} ({datetime.datetime.now()}): {s}")
+
+    msg("Opening TAMS output (Parquet)")
     gdf = gpd.read_parquet(fp)
 
     #
     # df
     #
 
+    msg("Converting to df")
     df = gdf_to_df(gdf)
 
     # Only CEs associated to MCS (as defined by MOSA)
     df_mcs = df[df.is_mcs].reset_index(drop=True).drop(columns=_CLASSIFY_COLS)
 
     # Save df
+    msg("Saving df")
     df_mcs.to_csv(BASE_DIR_OUT / f"{id_}.csv.gz", compression="gzip", index=False)
 
     #
@@ -843,9 +850,11 @@ def post(fp: Path) -> None:
     gdf_mcs_reid = gdf_mcs.assign(mcs_id=re_id(gdf_mcs), mcs_id_orig=gdf_mcs.mcs_id)
 
     # Create ds, featuring (time, y, x) mask array
+    msg("Converting to ds (mask representation)")
     ds = gdf_to_ds(gdf_mcs_reid, grid=grid)
 
     # Check ntimes
+    msg("Checking ds")
     nt_should_be = 39 * 24  # skipped first day
     assert ds.time.size == nt_should_be, f"expected {nt_should_be} times, found {ds.time.size}"
     assert (ds.time.diff("time") == np.timedelta64(1, "h")).all()
@@ -866,6 +875,7 @@ def post(fp: Path) -> None:
     # `mcs_mask_<Winter or Summer>_<model with its capitalization>.nc`
     # e.g. in the Globus:
     # /mcs_mask/Winter/PyFLEXTRKR/mcs_mask_Winter_XSHiELD.nc
+    msg("Saving ds")
     season, model = id_.split("__")
     title_season = season.title()
     display_model = model.upper()
