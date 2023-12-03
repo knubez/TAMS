@@ -19,7 +19,7 @@ def func(key, files):
 cases = get_preproced_paths()
 
 print(f"{len(cases)} cases")
-print("\n".join(sorted(cases)))
+print("\n".join("|".join(case) for case in sorted(cases)))
 
 if parallel:
     import joblib
