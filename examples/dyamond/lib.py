@@ -9,12 +9,14 @@ import datetime
 import re
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, Hashable
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+HERE = Path(__file__).parent.absolute()
 
 BASE_DIR_IN = Path("/glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP")
 """Base input data directory (Andy's).
@@ -27,8 +29,14 @@ e.g. ::
 /glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP/Winter/UM/olr_pcp_instantaneous/pr_rlut_um_winter_2020012007.nc
 """
 
+P_GRID = BASE_DIR_IN / "Summer/IFS/olr_pcp_instantaneous/pr_rlut_ifs_summer_2016080100.nc"
+"""Path to file to load grid from when constructing the masks."""
+
 BASE_DIR_OUT = Path("/glade/scratch/zmoon/dyamond")
 BASE_DIR_OUT_PRE = BASE_DIR_OUT / "pre"
+
+REPO = HERE.parent.parent
+assert REPO.is_dir() and REPO.name == "TAMS", "repo"
 
 
 def _make_vn_map():
@@ -616,3 +624,255 @@ def run(
     printt("Done")
 
     return ce
+
+
+def gdf_to_df(ce) -> pd.DataFrame:
+    """Convert CE gdf to a df of only stats (no contours/geometry)."""
+    import tams
+
+    cen = ce.geometry.to_crs("EPSG:32663").centroid.to_crs("EPSG:4326")
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", category=UserWarning, message="ellipse model failed for POLYGON"
+        )
+        eccen = ce.geometry.apply(tams.calc_ellipse_eccen)
+
+    col_order = [
+        "time",
+        "lat",
+        "lon",
+        "area_km2",
+        "area_core_km2",
+        "eccen",
+        "mcs_id",
+        "mean_pr",
+        "max_pr",
+        "min_pr",
+        "count_pr",
+    ] + _CLASSIFY_COLS
+
+    ce_ = (
+        ce.drop(
+            columns=[
+                "itime",
+                "dtime",
+                "geometry",
+            ]
+        )
+        .assign(eccen=eccen)
+        .assign(lat=cen.y, lon=cen.x)
+    )
+
+    assert set(ce_.columns) == set(col_order)
+
+    df = pd.DataFrame(ce_)[col_order]
+
+    return df
+
+
+def gdf_to_ds(ce, *, grid: xr.Dataset) -> xr.Dataset:
+    """Convert CE gdf to a MCS mask dataset.
+
+    - `mcs_mask` variable, with dims (time, y, x)
+    - 'lat'/'lon' with dims (y, x) (even if they only vary in one dim)
+    - file name: `<last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc`
+
+    Parameters
+    ----------
+    grid
+        File to get the lat/lon grid from in order to make the masks.
+        (This assumes that the grid is constant.)
+    """
+    import subprocess
+
+    import regionmask
+    from shapely.errors import ShapelyDeprecationWarning
+
+    import tams
+
+    time = sorted(ce.time.unique())
+
+    unique_cols = [col for col in _CLASSIFY_COLS if col in ce.columns]  # unique for a given MCS ID
+    bool_cols = unique_cols[:]
+    if "mcs_id_orig" in ce.columns:
+        unique_cols += ["mcs_id_orig"]
+
+    dfs = []
+    masks = []
+    for t in time:  # TODO: joblib?
+        ce_t = ce.loc[ce.time == t]
+        # NOTE: `numbers` can't have duplicates, so we use `.dissolve()` to combine
+        regions = regionmask.from_geopandas(
+            ce_t[["geometry", "mcs_id"]].dissolve(by="mcs_id").reset_index(),
+            numbers="mcs_id",
+        )
+        with warnings.catch_warnings():
+            # ShapelyDeprecationWarning: __len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.
+            warnings.filterwarnings(
+                "ignore",
+                category=ShapelyDeprecationWarning,
+                message="__len__ for multi-part geometries is deprecated",
+            )
+            mask = regions.mask(grid)
+        masks.append(mask)
+
+        # Agg some other info
+        gb = ce_t.groupby("mcs_id")
+        x1 = gb[["area_km2", "area_core_km2"]].sum()
+        x2 = gb[unique_cols].agg(tams.util._the_unique)
+        x3 = gb[["area_km2"]].count().rename(columns={"area_km2": "ce_count"})
+        x3["time"] = t
+
+        dfs.append(pd.concat([x1, x2, x3], axis="columns"))
+
+    da = xr.concat(masks, dim="time")
+    da["time"] = time
+
+    # Our IDs start at 0, but we want to use 0 for missing/null value
+    # (the sample file looks to be doing this)
+    assert da.min() == 0
+    da = (da + 1).fillna(0).astype(np.int64)
+    da.attrs.update(
+        long_name="MCS ID mask",
+        description=(
+            "Value 0 indicates null (no MCS), "
+            "so these are +1 compared to TAMS's standard output."
+        ),
+    )
+
+    ds = da.to_dataset().rename_vars(mask="mcs_mask")
+
+    # Remove current irrelevant 'coordinates' attrs from das
+    # ('mcs_mask' will still get `mcs_mask:coordinates = "lon lat"` in the saved file)
+    for _, v in ds.variables.items():
+        if "coordinates" in v.attrs:
+            del v.attrs["coordinates"]
+
+    # Add some info
+    try:
+        cmd = ["git", "-C", REPO.as_posix(), "rev-parse", "--verify", "--short", "HEAD"]
+        cp = subprocess.run(cmd, text=True, capture_output=True)
+    except Exception:
+        ver = ""
+    else:
+        ver = f" ({cp.stdout.strip()})"
+    now = datetime.datetime.utcnow().strftime(r"%Y-%m-%d %H:%M UTC")
+    ds.attrs.update(history=f"Created using TAMS{ver} at {now}.")
+
+    # Add the extra variables
+    df = pd.concat(dfs, axis="index")
+    df[["area_km2", "area_core_km2"]] = df[["area_km2", "area_core_km2"]].astype(np.float64)
+    df[bool_cols] = df[bool_cols].astype(np.bool_)
+    if "mcs_id_orig" in df.columns:
+        df["mcs_id_orig"] = df["mcs_id_orig"].astype(np.int64)
+
+    # (mcs_id, time) varying
+    ds2 = (
+        df.drop(columns=unique_cols)
+        .reset_index()  # mcs_id
+        .set_index(["mcs_id", "time"])
+        .to_xarray()
+    )
+    ds2["mcs_id"] = ds2.mcs_id + 1
+
+    # mcs_id-varying only
+    ds3 = (
+        df.reset_index()
+        .groupby("mcs_id")[unique_cols]
+        .apply(lambda g: g.apply(tams.util._the_unique, axis="index"))
+        .to_xarray()
+    )
+    ds3["mcs_id"] = ds3.mcs_id + 1
+
+    if "mcs_id_orig" in ds3:
+        ds3["mcs_id_orig"] = ds3.mcs_id_orig + 1
+        ds3["mcs_id_orig"].attrs.update(description="ID in mask if not dropping non-MOSA-MCSs")
+
+    ds = ds.merge(ds2, join="exact", compat="equals")
+    ds = ds.merge(ds3, join="exact", compat="equals")
+
+    ds["mcs_id"].attrs.update(
+        long_name="MCS ID",
+        description=(
+            "To accommodate null=0 in the mask, these are +1 compared to TAMS's standard output."
+        ),
+    )
+
+    # TODO: mcs_mask could be uint16 in most cases, or go up to uint32 if needed
+    # TODO: mcs_id could be uint32, float ones float32, ce_count int32 or uint32 with 0 for null?
+
+    return ds
+
+
+def re_id(ce):
+    """Return Series of re-assigned MCS IDs, 0 .. n_unique - 1."""
+    current_ids = sorted(ce.mcs_id.unique())
+    to_new_id = {old_id: new_id for new_id, old_id in enumerate(current_ids)}
+    return ce.mcs_id.map(to_new_id)
+
+
+def post(fp: Path) -> None:
+    """Drop non-MCSs from frame and save mask file and dataframe without shapes."""
+
+    assert fp.name.endswith(".parquet")
+    id_ = fp.stem
+    gdf = gpd.read_parquet(fp)
+
+    #
+    # df
+    #
+
+    df = gdf_to_df(gdf)
+
+    # Only CEs associated to MCS (as defined by MOSA)
+    df_mcs = df[df.is_mcs].reset_index(drop=True).drop(columns=_CLASSIFY_COLS)
+
+    # Save df
+    df_mcs.to_csv(BASE_DIR_OUT / f"{id_}.csv.gz", compression="gzip", index=False)
+
+    #
+    # ds
+    #
+
+    grid = xr.open_dataset(P_GRID).squeeze()
+
+    # Drop non-MCSs
+    gdf_mcs = gdf[gdf.is_mcs].drop(columns=_CLASSIFY_COLS)
+    assert gdf_mcs.mcs_id.nunique() < gdf.mcs_id.nunique()
+    gdf_mcs_reid = gdf_mcs.assign(mcs_id=re_id(gdf_mcs), mcs_id_orig=gdf_mcs.mcs_id)
+
+    # Create ds, featuring (time, y, x) mask array
+    ds = gdf_to_ds(gdf_mcs_reid, grid=grid)
+
+    # Check ntimes
+    nt_should_be = 39 * 24  # skipped first day
+    assert ds.time.size == nt_should_be, f"expected {nt_should_be} times, found {ds.time.size}"
+    assert (ds.time.diff("time") == np.timedelta64(1, "h")).all()
+
+    # Check mask IDs consistent with dim coord
+    mcs_mask_unique = np.unique(ds.mcs_mask)
+    assert set(mcs_mask_unique) - set(ds.mcs_id.values) == {0}
+
+    # Check for consistency with non-MCS gdfs
+    assert gdf_mcs.mcs_id.nunique() == ds.dims["mcs_id"], "same number of MCS"
+    assert (
+        mcs_mask_unique == np.r_[0, gdf_mcs_reid.mcs_id.unique() + 1]
+    ).all(), "mask only contains re-IDed MCSs"
+    assert (gdf_mcs.mcs_id.unique() == ds.mcs_id_orig - 1).all(), "MCS ID orig correct in ds"
+    assert (gdf_mcs_reid.mcs_id.unique() == ds.mcs_id - 1).all(), "MCS ID correct in ds"
+
+    # Save ds
+    # `mcs_mask_<Winter or Summer>_<model with its capitalization>.nc`
+    # e.g. in the Globus:
+    # /mcs_mask/Winter/PyFLEXTRKR/mcs_mask_Winter_XSHiELD.nc
+    season, model = id_.split("__")
+    title_season = season.title()
+    display_model = model.upper()
+    if display_model == "XSHIELD":
+        display_model = "XSHiELD"
+    encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
+    ds.to_netcdf(
+        BASE_DIR_OUT / f"mcs_mask_{title_season}_{display_model}.nc",
+        encoding=encoding,
+    )  # type: ignore[arg-type]

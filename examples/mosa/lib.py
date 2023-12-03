@@ -494,7 +494,6 @@ def gdf_to_df(ce) -> pd.DataFrame:
     assert set(ce_.columns) == set(col_order)
 
     df = pd.DataFrame(ce_)[col_order]
-    df
 
     return df
 
