@@ -886,3 +886,4 @@ def post(fp: Path) -> None:
         BASE_DIR_OUT / f"mcs_mask_{title_season}_{display_model}.nc",
         encoding=encoding,
     )  # type: ignore[arg-type]
+    msg("Done")
