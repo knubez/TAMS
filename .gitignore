@@ -2,11 +2,11 @@
 Satellite_data.nc
 MPAS_data.nc
 docs/api/
+docs/examples/*.pdf
+docs/examples/*.txt
 mosa3.o*
 mosa2.o*
 mosa1.o*
-sat-tracking-options-*
-mpas-tracking-options-*
 
 # GitHub Python default gitignore below:
 
