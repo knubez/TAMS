@@ -5,7 +5,8 @@ docs/api/
 mosa3.o*
 mosa2.o*
 mosa1.o*
-
+sat-tracking-options-*
+mpas-tracking-options-*
 
 # GitHub Python default gitignore below:
 
