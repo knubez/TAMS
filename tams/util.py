@@ -36,6 +36,8 @@ def plot_tracked(
     alpha: float = 0.25,
     background: str = "countries",
     label: str = "id",
+    add_colorbar: bool = False,
+    cbar_kwargs: dict | None = None,
     ax: matplotlib.axes.Axes | None = None,
     size: float = 4,
 ):
@@ -115,6 +117,25 @@ def plot_tracked(
                 )
                 for id_, x, y in zip(g.mcs_id, g.centroid.x, g.centroid.y):
                     ax.text(x, y, id_, **text_kwargs)
+
+    if add_colorbar:
+        import matplotlib as mpl
+
+        cbar_kwargs_default = {
+            "orientation": "horizontal",
+            "label": f"hours since {cs.time.min():%Y-%m-%d %H:%M}",
+            "shrink": 0.7,
+            "aspect": 40,
+        }
+        if cbar_kwargs is None:
+            cbar_kwargs = {}
+        cbar_kwargs = {**cbar_kwargs_default, **cbar_kwargs}
+
+        m = mpl.cm.ScalarMappable(
+            cmap=mpl.colors.ListedColormap(colors),
+            norm=mpl.colors.Normalize(vmin=0, vmax=nt),
+        )
+        plt.colorbar(m, ax=ax, **cbar_kwargs)
 
 
 def _the_unique(s: pandas.Series):
