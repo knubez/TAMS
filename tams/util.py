@@ -35,6 +35,7 @@ def plot_tracked(
     *,
     alpha: float = 0.25,
     background: str = "countries",
+    label: str = "id",
     ax: matplotlib.axes.Axes | None = None,
     size: float = 4,
 ):
@@ -46,6 +47,10 @@ def plot_tracked(
     valid_backgrounds = {"map", "countries", "none"}
     if background not in valid_backgrounds:
         raise ValueError(f"`background` must be one of {valid_backgrounds}")
+
+    valid_labels = {"id", "none"}
+    if label not in valid_labels:
+        raise ValueError(f"`label` must be one of {valid_labels}")
 
     x0, y0, x1, y1 = cs.total_bounds
     aspect = (x1 - x0) / (y1 - y0)
@@ -101,14 +106,15 @@ def plot_tracked(
         g.plot(ax=ax, **blob_kwargs)
 
         # Label blobs with assigned ID
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                category=UserWarning,
-                message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
-            )
-            for id_, x, y in zip(g.mcs_id, g.centroid.x, g.centroid.y):
-                ax.text(x, y, id_, **text_kwargs)
+        if label == "id":
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    category=UserWarning,
+                    message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
+                )
+                for id_, x, y in zip(g.mcs_id, g.centroid.x, g.centroid.y):
+                    ax.text(x, y, id_, **text_kwargs)
 
 
 def _the_unique(s: pandas.Series):
