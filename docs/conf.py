@@ -26,7 +26,6 @@ exclude_patterns = [
     "**.ipynb_checkpoints",
     # "api/**/*",
     "examples/t2.ipynb",
-    "examples/t3.ipynb",
 ]
 
 html_theme = "sphinx_book_theme"
@@ -73,7 +72,9 @@ napoleon_type_aliases = {
 }
 
 nb_execution_mode = "cache"
-nb_execution_excludepatterns = exclude_patterns
+nb_execution_excludepatterns = exclude_patterns + [
+    "examples/tracking-options.ipynb",
+]
 
 myst_enable_extensions = [
     "dollarmath",

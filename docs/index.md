@@ -15,6 +15,7 @@ The original TAMS is described in {cite:t}`TAMS1.0`.
 
 examples/sample-satellite-data.ipynb
 examples/tams-run.ipynb
+examples/tracking-options.ipynb
 ```
 
 ```{toctree}
