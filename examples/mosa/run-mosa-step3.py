@@ -100,6 +100,12 @@ def run_gdf(fp: Path, *, bench: bool = False) -> None:
     # Create ds, featuring (time, y, x) mask array
     ds = gdf_to_ds(gdf_mcs_reid, grid=grid)
 
+    # For bench case, just write out current result
+    if bench:
+        encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 1}}
+        ds.to_netcdf(OUT_DIR / out_name_mosa, encoding=encoding)  # type: ignore[arg-type]
+        return
+
     # Add null first time if WRF
     t0 = pd.Timestamp(ds.time.values[0])
     t0_should_be = pd.Timestamp(f"{wy - 1}/06/01")
