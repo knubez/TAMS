@@ -36,14 +36,14 @@ if do_bench:
     which = "wrf"
     wy = 2019
     gdf = run_preproced(files, kind=which, id_=f"{which.upper()}-WY{wy}")
-    print(f"track+classify took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
+    print(f"track+classify took {(perf_counter_ns() - tic) / 1e9:.1f} s")
 
     # Save
     tic = perf_counter_ns()
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
         gdf.to_parquet(OUT_DIR / "bench.parquet")
-    print(f"saving track+classify took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
+    print(f"saving track+classify took {(perf_counter_ns() - tic) / 1e9:.1f} s")
 
     raise SystemExit()
 

@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
         tic = perf_counter_ns()
         run_gdf(IN_DIR / "bench.parquet", bench=True)
-        print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
+        print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} s")
 
         raise SystemExit()
 

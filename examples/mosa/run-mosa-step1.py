@@ -51,7 +51,7 @@ if do_bench:
 
     tic = perf_counter_ns()
     proc(fn, files)
-    print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
+    print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} s")
 
     raise SystemExit()
 
