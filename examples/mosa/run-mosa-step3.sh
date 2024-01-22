@@ -12,4 +12,6 @@ cd /glade/u/home/zmoon/git/TAMS/examples/mosa
 module load conda/latest
 conda activate /glade/u/home/zmoon/mambaforge/envs/tams-dev
 
-python run-mosa-step3.py
+module load peak-memusage
+
+peak_memusage python run-mosa-step3.py
