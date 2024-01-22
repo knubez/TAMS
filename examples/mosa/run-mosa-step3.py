@@ -14,6 +14,8 @@ from lib import _classify_cols, gdf_to_df, gdf_to_ds, re_id
 IN_DIR = Path("/glade/derecho/scratch/zmoon/mosa")
 OUT_DIR = IN_DIR
 
+do_bench = True
+
 re_gdf_fn = re.compile(r"(wrf|gpm)_wy([0-9]{4})\.parquet")
 
 gdf_fps = sorted(IN_DIR.glob("???_wy????.parquet"))
@@ -146,6 +148,15 @@ def run_gdf(fp: Path) -> None:
 
 
 if __name__ == "__main__":
+    if do_bench:
+        from time import perf_counter_ns
+
+        tic = perf_counter_ns()
+        run_gdf(IN_DIR / "bench.parquet")
+        print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
+
+        raise SystemExit()
+
     import joblib
 
     joblib.Parallel(n_jobs=-2, verbose=1)(joblib.delayed(run_gdf)(fp) for fp in gdf_fps)
