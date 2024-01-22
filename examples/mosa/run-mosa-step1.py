@@ -10,6 +10,7 @@ NOTE: took 8.7 min for one WY using 19 procs
 """
 from functools import partial
 from pathlib import Path
+from time import perf_counter_ns
 
 import pandas as pd
 
@@ -45,6 +46,12 @@ if do_bench:
     print(files[0])
     print("...")
     print(files[-1], f"({len(files)} total)")
+
+    fn = partial(preproc_wrf_file, out_dir=out_dir)
+
+    tic = perf_counter_ns()
+    proc(fn, files)
+    print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
 
     raise SystemExit()
 
