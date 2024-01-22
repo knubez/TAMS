@@ -16,7 +16,7 @@ import pandas as pd
 from lib import BASE_DIR, preproc_gpm_file, preproc_wrf_file
 
 # Constants
-out_dir = Path("/glade/scratch/zmoon/mosa-pre")
+out_dir = Path("/glade/derecho/scratch/zmoon/mosa/pre")
 parallel = True
 do_wrf = True
 do_gpm = True
