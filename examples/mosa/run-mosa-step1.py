@@ -20,6 +20,7 @@ out_dir = Path("/glade/scratch/zmoon/mosa-pre")
 parallel = True
 do_wrf = True
 do_gpm = True
+do_bench = True
 wys = [2011, 2016, 2019]
 
 assert out_dir.is_dir()
@@ -34,6 +35,18 @@ def proc(fn, files):
     else:
         for fp in files:
             fn(fp)
+
+
+if do_bench:
+    # WRF 1--7 Nov 2018
+    times = pd.date_range("2018-11-01", "2018-11-07 23:00", freq="H")
+    files = [BASE_DIR / "WY2019" / "WRF" / f"tb_rainrate_{t:%Y-%m-%d_%H}:00.nc" for t in times]
+
+    print(files[0])
+    print("...")
+    print(files[-1], f"({len(files)} total)")
+
+    raise SystemExit()
 
 
 # WRF
