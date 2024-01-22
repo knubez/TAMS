@@ -42,7 +42,7 @@ if do_bench:
     tic = perf_counter_ns()
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
-        gdf.to_parquet(OUT_DIR / f"{which}_wy{wy}.parquet")
+        gdf.to_parquet(OUT_DIR / "bench.parquet")
     print(f"saving track+classify took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
 
     raise SystemExit()
