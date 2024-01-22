@@ -30,14 +30,18 @@ for col in _classify_cols:
     ds_null_val[col] = np.nan
 
 
-def run_gdf(fp: Path) -> None:
+def run_gdf(fp: Path, *, bench: bool = False) -> None:
     import geopandas as gpd
     import xarray as xr
 
-    m = re_gdf_fn.fullmatch(fp.name)
-    assert m is not None, f"{fp.name!r} should match {re_gdf_fn.pattern}"
-    which, s_wy = m.groups()
-    wy = int(s_wy)
+    if bench:
+        which = "wrf"
+        wy = 2019
+    else:
+        m = re_gdf_fn.fullmatch(fp.name)
+        assert m is not None, f"{fp.name!r} should match {re_gdf_fn.pattern}"
+        which, s_wy = m.groups()
+        wy = int(s_wy)
 
     if which == "wrf":
         which_mosa = "WRF"
@@ -56,6 +60,13 @@ def run_gdf(fp: Path) -> None:
     else:
         raise ValueError(f"Unexpected `which` {which!r}")
 
+    if bench:
+        out_stem_simple = "bench"
+        out_name_mosa = "bench.nc"
+    else:
+        out_stem_simple = f"{which}_wy{wy}"
+        out_name_mosa = f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file.nc"
+
     # Load CE gdf, which has non-MCS CEs, but classified to indicate so
     gdf = gpd.read_parquet(fp)
 
@@ -70,7 +81,7 @@ def run_gdf(fp: Path) -> None:
     df_mcs
 
     # Save df
-    df_mcs.to_csv(OUT_DIR / f"{which}_wy{wy}.csv.gz", index=False)
+    df_mcs.to_csv(OUT_DIR / f"{out_stem_simple}.csv.gz", index=False)
 
     #
     # ds
@@ -144,7 +155,7 @@ def run_gdf(fp: Path) -> None:
     # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
     # DATA can either be OBS or WRF
     encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
-    ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file.nc", encoding=encoding)  # type: ignore[arg-type]
+    ds.to_netcdf(OUT_DIR / out_name_mosa, encoding=encoding)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":
@@ -152,7 +163,7 @@ if __name__ == "__main__":
         from time import perf_counter_ns
 
         tic = perf_counter_ns()
-        run_gdf(IN_DIR / "bench.parquet")
+        run_gdf(IN_DIR / "bench.parquet", bench=True)
         print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
 
         raise SystemExit()
