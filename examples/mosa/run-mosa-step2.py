@@ -11,11 +11,41 @@ from __future__ import annotations
 import warnings
 from collections import defaultdict
 from pathlib import Path
+from time import perf_counter_ns
 
 from lib import run_preproced
 
 IN_DIR = Path("/glade/derecho/scratch/zmoon/mosa/pre")
 OUT_DIR = Path("/glade/derecho/scratch/zmoon/mosa")
+
+do_bench = True
+
+if do_bench:
+    import pandas as pd
+
+    # WRF 1--7 Nov 2018
+    times = pd.date_range("2018-11-01", "2018-11-07 23:00", freq="H")
+    files = [IN_DIR / f"tb_rainrate_{t:%Y-%m-%d_%H}:00_ce.parquet" for t in times]
+
+    print(files[0])
+    print("...")
+    print(files[-1], f"({len(files)} total)")
+
+    # Run
+    tic = perf_counter_ns()
+    which = "wrf"
+    wy = 2019
+    gdf = run_preproced(files, kind=which, id_=f"{which.upper()}-WY{wy}")
+    print(f"track+classify took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
+
+    # Save
+    tic = perf_counter_ns()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*initial implementation of Parquet.*")
+        gdf.to_parquet(OUT_DIR / f"{which}_wy{wy}.parquet")
+    print(f"saving track+classify took {(perf_counter_ns() - tic) / 1e9:.1f} sec")
+
+    raise SystemExit()
 
 
 #
