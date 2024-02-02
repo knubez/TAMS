@@ -41,7 +41,32 @@ def plot_tracked(
     ax: matplotlib.axes.Axes | None = None,
     size: float = 4,
 ):
-    """Plot CEs at a range of times (colors) with CE group ID (MCS ID) identified."""
+    """Plot CEs at a range of times (colors) with CE group ID (MCS ID) identified.
+
+    Parameters
+    ----------
+    cs
+        Tracked CEs (with MCS ID column).
+    alpha
+        Alpha applied when plotting the CEs.
+    background : {"map", "countries", "none"}
+        "map" uses Mercator projection Cartopy's stock image.
+        "countries" uses Mercator projection and adds Cartopy coastlines and country borders.
+        "none" plots without projection or background.
+        This setting is only relevant if `ax` is not provided.
+    label : {"id", "none"}
+        "id": label each CE with its MCS ID.
+    add_colorbar
+        Add colorbar with time info.
+    cbar_kwargs
+        Keyword arguments to pass to ``plt.colorbar``.
+    ax
+        Axes to plot on. If not provided, a new figure is created.
+        The figure size used is ``(size * aspect, size)``,
+        where `aspect` is estimated using the ``total_bounds`` of `cs`.
+    size
+        Height of the figure (in inches) if `ax` is not provided.
+    """
 
     import matplotlib.pyplot as plt
     import pandas as pd
