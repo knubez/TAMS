@@ -40,6 +40,7 @@ def plot_tracked(
     cbar_kwargs: dict | None = None,
     ax: matplotlib.axes.Axes | None = None,
     size: float = 4,
+    aspect: float | None = None,
 ):
     """Plot CEs at a range of times (colors) with CE group ID (MCS ID) identified.
 
@@ -62,10 +63,12 @@ def plot_tracked(
         Keyword arguments to pass to ``plt.colorbar``.
     ax
         Axes to plot on. If not provided, a new figure is created.
-        The figure size used is ``(size * aspect, size)``,
-        where `aspect` is estimated using the ``total_bounds`` of `cs`.
+        The figure size used is ``(size * aspect, size)``.
     size
         Height of the figure (in inches) if `ax` is not provided.
+    aspect
+        Figure width : height.
+        If not provided, it is estimated using the ``total_bounds`` of `cs`.
     """
 
     import matplotlib.pyplot as plt
@@ -80,10 +83,12 @@ def plot_tracked(
     if label not in valid_labels:
         raise ValueError(f"`label` must be one of {valid_labels}")
 
-    x0, y0, x1, y1 = cs.total_bounds
-    aspect = (x1 - x0) / (y1 - y0)
-    # ^ estimate for controlling figure size like in xarray
-    # https://xarray.pydata.org/en/stable/user-guide/plotting.html#controlling-the-figure-size
+    if aspect is None:
+        # TODO: maybe better to use `.envelope`
+        x0, y0, x1, y1 = cs.total_bounds
+        aspect = (x1 - x0) / (y1 - y0)
+        # ^ estimate for controlling figure size like in xarray
+        # https://xarray.pydata.org/en/stable/user-guide/plotting.html#controlling-the-figure-size
 
     blob_kwargs = dict(alpha=alpha, lw=1.5)
     text_kwargs = dict(
