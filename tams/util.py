@@ -57,6 +57,7 @@ def plot_tracked(
         This setting is only relevant if `ax` is not provided.
     label : {"id", "none"}
         "id": label each CE with its MCS ID.
+        "none": don't label CEs.
     add_colorbar
         Add colorbar with time info.
     cbar_kwargs
