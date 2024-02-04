@@ -66,8 +66,8 @@ def tb_from_ir(r, ch: int) -> xarray.DataArray:
     return tb
 
 
-def download_examples(*, gdown: bool = False, clobber: bool = False) -> None:
-    """Download the example datasets using wget (default) or gdown.
+def download_examples(*, clobber: bool = False) -> None:
+    """Download the example datasets.
 
     * Satellite data (EUMETSAT IR radiance):
       https://drive.google.com/file/d/1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp/view?usp=sharing
@@ -76,16 +76,21 @@ def download_examples(*, gdown: bool = False, clobber: bool = False) -> None:
     * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
       https://drive.google.com/file/d/1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf/view?usp=sharing
 
+    .. note::
+       `gdown <https://github.com/wkentaro/gdown>`__,
+       used for downloading the files,
+       is not currently a required dependency of the TAMS Python package,
+       although it is included in the conda-forge recipe.
+       gdown is available on conda-forge and PyPI as ``gdown``.
+       Files < 100 MB can be easily download with ``wget`` or similar,
+       but there are some subtleties with larger files.
+
+    .. note::
+       Alternatively, you can download the files manually
+       using the links above.
+
     Parameters
     ----------
-    gdown
-        Use gdown. Otherwise, use wget.
-
-        .. note::
-           `gdown <https://github.com/wkentaro/gdown>`__ is not currently
-           a TAMS required dependency, so you must install it
-           in order to use ``gdown=True``.
-           It is available on conda-forge and PyPI as ``gdown``.
     clobber
         If set, overwrite existing files. Otherwise, skip downloading.
 
@@ -102,33 +107,16 @@ def download_examples(*, gdown: bool = False, clobber: bool = False) -> None:
         ("1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf", "MPAS_unstructured_data.nc"),  # > 100 MB
     ]
 
-    if gdown:
-        try:
-            import gdown as gdown_mod
-        except ImportError as e:
-            raise RuntimeError("gdown required") from e
+    try:
+        import gdown
+    except ImportError as e:
+        raise RuntimeError(
+            "gdown is required in order to download the example data files. "
+            "It is available on conda-forge and PyPI as 'gdown'."
+        ) from e
 
-        def download(id_: str, to: str):
-            gdown_mod.download(id=id_, output=to, quiet=False)
-
-    else:
-        import subprocess
-
-        def download(id_: str, to: str):
-            url = f"https://drive.google.com/uc?export=download&id={id_}&confirm=t"
-            cmd = [
-                "wget",
-                "--no-verbose",
-                "--no-check-certificate",
-                url,
-                "-O",
-                to,
-            ]
-            try:
-                subprocess.run(cmd)
-            except Exception:
-                print(f"Running\n  {' '.join(cmd)}\nfailed:")
-                raise
+    def download(id_: str, to: str):
+        gdown.download(id=id_, output=to, quiet=False)
 
     for id_, fn in files:
         fp = HERE / fn
