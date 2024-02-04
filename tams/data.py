@@ -69,7 +69,7 @@ def tb_from_ir(r, ch: int):
 def download_examples(*, clobber: bool = False) -> None:
     """Download the example datasets.
 
-    * Satellite data (EUMETSAT IR radiance):
+    * Satellite data (EUMETSAT MSG SEVIRI 10.8 μm IR radiance):
       https://drive.google.com/file/d/1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp/view?usp=sharing
     * MPAS regridded data (brightness temperature and precipitation):
       https://drive.google.com/file/d/1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E/view?usp=sharing
@@ -85,7 +85,6 @@ def download_examples(*, clobber: bool = False) -> None:
        Files < 100 MB can be easily download with ``wget`` or similar,
        but there are some subtleties with larger files.
 
-    .. note::
        Alternatively, you can download the files manually
        using the links above.
 
@@ -96,7 +95,7 @@ def download_examples(*, clobber: bool = False) -> None:
 
     See Also
     --------
-    tams.load_example_ir
+    tams.data.load_example_ir
     tams.load_example_tb
     tams.load_example_mpas
     tams.load_example_mpas_ug
@@ -129,7 +128,10 @@ def download_examples(*, clobber: bool = False) -> None:
 
 
 def load_example_ir() -> xarray.DataArray:
-    """Load the example satellite IR radiance data (ch9) as a DataArray.
+    """Load the example satellite infrared radiance data.
+
+    This comes from the EUMETSAT MSG SEVIRI instrument,
+    specifically the 10.8 μm channel (ch9).
 
     This dataset contains 6 time steps of 2-hourly data (every 2 hours):
     2006-09-01 00--10
@@ -153,7 +155,7 @@ def load_example_ir() -> xarray.DataArray:
 
 
 def load_example_tb() -> xarray.DataArray:
-    """Load the example derived brightness temperature data as a DataArray.
+    """Load the example derived satellite brightness temperature data.
 
     This works by first invoking :func:`tams.data.load_example_ir`
     and then applying :func:`tams.data.tb_from_ir`.
@@ -180,8 +182,17 @@ def load_example_tb() -> xarray.DataArray:
 def load_example_mpas() -> xarray.Dataset:
     """Load the example MPAS dataset.
 
+    This is a spatial and variable subset of native MPAS output,
+    Furthermore, it has been regridded to a regular lat/lon grid (0.25°).
+
+    After regridding, it was spatially subsetted so that
+    lat ranges from -5 to 40°N
+    and lon from 85 to 170°E.
+    This domain relates to the PRECIP field campaign
+    (:func:`load_mpas_precip`).
+
     It has ``tb`` (estimated brightness temperature)
-    and ``precip`` (precipitation, derived by summing the MPAS accumulated
+    and ``precip`` (precipitation rate, derived by summing the MPAS accumulated
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
 
     This dataset contains 127 time steps of hourly data:
@@ -218,13 +229,13 @@ def load_example_mpas_ug() -> xarray.Dataset:
     This is a spatial and variable subset of native MPAS output.
 
     It has been spatially subsetted so that
-    lat ranges from -5 to 20
-    and lon from 85 to 170,
+    lat ranges from -5 to 20°N
+    and lon from 85 to 170°E,
     similar to the example regridded MPAS dataset (:func:`load_example_mpas`)
-    except a lower lat upper bound.
+    except for a smaller lat upper bound.
 
     Like the regridded MPAS dataset, it has hourly
-    ``tb`` (brightness temperature)
+    ``tb`` (estimated brightness temperature)
     and ``precip`` (precipitation rate)
     for the period
     2006-09-08 12 -- 2006-09-13 18.
