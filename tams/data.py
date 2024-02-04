@@ -259,7 +259,7 @@ def load_example_mpas_ug() -> xarray.Dataset:
     ds["tb"] = ds.tb.where(ds.tb > 0)
 
     # Set time (time variable in there just has elapsed hours as int)
-    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1H", periods=ds.dims["time"])
+    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1H", periods=ds.sizes["time"])
 
     # Diff accumulated precip to get mm/h
     ds["precip"] = ds.precip.diff("time", label="lower")

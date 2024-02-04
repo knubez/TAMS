@@ -150,7 +150,7 @@ def run_gdf(fp: Path, *, bench: bool = False) -> None:
     assert set(mcs_mask_unique) - set(ds.mcs_id.values) == {0}
 
     # Check for consistency with non-MCS gdfs
-    assert gdf_mcs.mcs_id.nunique() == ds.dims["mcs_id"], "same number of MCS"
+    assert gdf_mcs.mcs_id.nunique() == ds.sizes["mcs_id"], "same number of MCS"
     assert (
         mcs_mask_unique == np.r_[0, gdf_mcs_reid.mcs_id.unique() + 1]
     ).all(), "mask only contains re-IDed MCSs"
