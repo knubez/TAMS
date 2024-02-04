@@ -141,7 +141,7 @@ def load_example_ir() -> xarray.DataArray:
     tams.data.download_examples
     """
 
-    ds = xr.open_dataset(HERE / "Satellite_data.nc", lock=False).rename_dims(
+    ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
     )
 
