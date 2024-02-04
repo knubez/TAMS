@@ -403,20 +403,40 @@ def data_in_contours(
     data: xarray.DataArray | xarray.Dataset,
     contours: geopandas.GeoDataFrame,
     *,
-    agg=("mean", "std", "count"),
+    agg=("mean", "std", "count"),  # TODO: type
     method: str = "sjoin",
     merge: bool = False,
 ) -> geopandas.GeoDataFrame:
-    """Compute statistics on `data` within `contours`.
+    """Compute statistics on `data` within the shapes of `contours`.
+
+    With the default settings, we calculate,
+    for each shape (row) in the `contours` dataframe:
+
+    - the mean value of `data` within the shape
+    - the standard deviation of `data` within the shape
+    - the count of non-null values of `data` within the shape
 
     Parameters
     ----------
     data
+        It should have ``'lat'`` and ``'lon'`` coordinates.
+    contours
+        For example, dataframe of CE or MCS shapes, e.g.
+        from :func:`identify` or :func:`track`.
     agg : sequence of str or callable
         Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
     method : {'sjoin', 'regionmask'}
+        The regionmask method is suited for data on a structured grid,
+        while the GeoPandas sjoin method works for scattered point data as well.
+        The sjoin method is the default since it is more general
+        and currently often faster.
     merge
         Whether to merge the new data with `contours` or return a separate frame.
+
+    See Also
+    --------
+    :ref:`ctt_thresh_data_in_contours`
+        A usage example.
     """
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
@@ -428,6 +448,9 @@ def data_in_contours(
         raise NotImplementedError
     else:
         raise TypeError
+
+    if isinstance(agg, str):
+        agg = (agg,)
 
     args = (data, contours)
     kwargs = dict(varnames=varnames, agg=agg)
