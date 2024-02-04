@@ -39,6 +39,7 @@ dependencies:
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinx-copybutton
+  - sphinx-togglebutton
   - sphinxcontrib-bibtex
   - pip:
       - sphinx-prompt<1.6

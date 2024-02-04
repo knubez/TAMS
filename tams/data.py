@@ -183,7 +183,8 @@ def load_example_mpas() -> xarray.Dataset:
     """Load the example MPAS dataset.
 
     This is a spatial and variable subset of native MPAS output,
-    Furthermore, it has been regridded to a regular lat/lon grid (0.25°).
+    Furthermore, it has been regridded to a regular lat/lon grid (0.25°)
+    from the original 15-km mesh.
 
     After regridding, it was spatially subsetted so that
     lat ranges from -5 to 40°N
@@ -226,7 +227,7 @@ def load_example_mpas() -> xarray.Dataset:
 def load_example_mpas_ug() -> xarray.Dataset:
     """Load the example MPAS unstructured grid dataset.
 
-    This is a spatial and variable subset of native MPAS output.
+    This is a spatial and variable subset of native 15-km global mesh MPAS output.
 
     It has been spatially subsetted so that
     lat ranges from -5 to 20°N
