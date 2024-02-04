@@ -21,6 +21,8 @@ Datasets used in the examples can be retrieved with
 :hidden:
 
 examples/sample-satellite-data.ipynb
+examples/tams-run.ipynb
+examples/tracking-options.ipynb
 examples/sample-mpas-ug-data.ipynb
 ```
 

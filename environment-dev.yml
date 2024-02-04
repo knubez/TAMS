@@ -16,6 +16,7 @@ dependencies:
   #
   # Extras
   - cartopy>=0.21
+  - dask-core
   - joblib
   - netcdf4
   - ptitprince

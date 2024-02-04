@@ -824,7 +824,7 @@ def run(
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
-    r"""Run all TAMS steps, including precip.
+    r"""Run all TAMS steps, including precip assignment.
 
     .. important::
        `ds` must have ``'ctt'`` (cloud-top temperature) and ``'pr'`` (precip rate) variables.
@@ -851,6 +851,12 @@ def run(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
+
+    See Also
+    --------
+    tams.identify
+    tams.track
+    tams.classify
     """
     import itertools
 

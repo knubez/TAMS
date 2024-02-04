@@ -11,8 +11,10 @@ import pandas as pd
 
 from lib import _classify_cols, gdf_to_df, gdf_to_ds, re_id
 
-IN_DIR = Path("/glade/scratch/zmoon/mosa")
+IN_DIR = Path("/glade/derecho/scratch/zmoon/mosa")
 OUT_DIR = IN_DIR
+
+do_bench = True
 
 re_gdf_fn = re.compile(r"(wrf|gpm)_wy([0-9]{4})\.parquet")
 
@@ -28,14 +30,18 @@ for col in _classify_cols:
     ds_null_val[col] = np.nan
 
 
-def run_gdf(fp: Path) -> None:
+def run_gdf(fp: Path, *, bench: bool = False) -> None:
     import geopandas as gpd
     import xarray as xr
 
-    m = re_gdf_fn.fullmatch(fp.name)
-    assert m is not None, f"{fp.name!r} should match {re_gdf_fn.pattern}"
-    which, s_wy = m.groups()
-    wy = int(s_wy)
+    if bench:
+        which = "wrf"
+        wy = 2019
+    else:
+        m = re_gdf_fn.fullmatch(fp.name)
+        assert m is not None, f"{fp.name!r} should match {re_gdf_fn.pattern}"
+        which, s_wy = m.groups()
+        wy = int(s_wy)
 
     if which == "wrf":
         which_mosa = "WRF"
@@ -54,6 +60,13 @@ def run_gdf(fp: Path) -> None:
     else:
         raise ValueError(f"Unexpected `which` {which!r}")
 
+    if bench:
+        out_stem_simple = "bench"
+        out_name_mosa = "bench.nc"
+    else:
+        out_stem_simple = f"{which}_wy{wy}"
+        out_name_mosa = f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file.nc"
+
     # Load CE gdf, which has non-MCS CEs, but classified to indicate so
     gdf = gpd.read_parquet(fp)
 
@@ -68,7 +81,7 @@ def run_gdf(fp: Path) -> None:
     df_mcs
 
     # Save df
-    df_mcs.to_csv(OUT_DIR / f"{which}_wy{wy}.csv.gz", index=False)
+    df_mcs.to_csv(OUT_DIR / f"{out_stem_simple}.csv.gz", index=False)
 
     #
     # ds
@@ -86,6 +99,12 @@ def run_gdf(fp: Path) -> None:
 
     # Create ds, featuring (time, y, x) mask array
     ds = gdf_to_ds(gdf_mcs_reid, grid=grid)
+
+    # For bench case, just write out current result
+    if bench:
+        encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 1}}
+        ds.to_netcdf(OUT_DIR / out_name_mosa, encoding=encoding)  # type: ignore[arg-type]
+        return
 
     # Add null first time if WRF
     t0 = pd.Timestamp(ds.time.values[0])
@@ -142,10 +161,19 @@ def run_gdf(fp: Path) -> None:
     # <last_name>_WY<YYYY>_<DATA>_SAAG-MCS-mask-file.nc
     # DATA can either be OBS or WRF
     encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
-    ds.to_netcdf(OUT_DIR / f"TAMS_WY{wy}_{which_mosa}_SAAG-MCS-mask-file.nc", encoding=encoding)  # type: ignore[arg-type]
+    ds.to_netcdf(OUT_DIR / out_name_mosa, encoding=encoding)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":
+    if do_bench:
+        from time import perf_counter_ns
+
+        tic = perf_counter_ns()
+        run_gdf(IN_DIR / "bench.parquet", bench=True)
+        print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} s")
+
+        raise SystemExit()
+
     import joblib
 
     joblib.Parallel(n_jobs=-2, verbose=1)(joblib.delayed(run_gdf)(fp) for fp in gdf_fps)
