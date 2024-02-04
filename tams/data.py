@@ -96,6 +96,7 @@ def download_examples(*, clobber: bool = False) -> None:
 
     See Also
     --------
+    tams.load_example_ir
     tams.load_example_tb
     tams.load_example_mpas
     tams.load_example_mpas_ug
@@ -162,9 +163,13 @@ def load_example_tb() -> xarray.DataArray:
 
     See Also
     --------
-    tams.data.download_examples
-    tams.data.load_example_ir
-    tams.data.tb_from_ir
+    :func:`tams.data.download_examples`
+    :func:`tams.data.load_example_ir`
+    :func:`tams.data.tb_from_ir`
+
+    :doc:`/examples/sample-satellite-data`
+
+    :doc:`/examples/tracking-options`
     """
 
     r = load_example_ir()
@@ -184,8 +189,14 @@ def load_example_mpas() -> xarray.Dataset:
 
     See Also
     --------
-    tams.data.download_examples
-    tams.load_example_mpas_ug
+    :func:`tams.data.download_examples`
+    :func:`tams.load_example_mpas_ug`
+
+    :doc:`/examples/tams-run`
+
+    :doc:`/examples/tracking-options`
+
+    :doc:`/examples/sample-mpas-ug-data`
     """
 
     ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
@@ -220,8 +231,10 @@ def load_example_mpas_ug() -> xarray.Dataset:
 
     See Also
     --------
-    tams.data.download_examples
-    tams.load_example_mpas
+    :func:`tams.data.download_examples`
+    :func:`tams.load_example_mpas`
+
+    :doc:`/examples/sample-mpas-ug-data`
     """
 
     ds = xr.open_dataset(HERE / "MPAS_unstructured_data.nc").rename(

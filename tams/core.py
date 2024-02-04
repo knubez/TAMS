@@ -854,9 +854,11 @@ def run(
 
     See Also
     --------
-    tams.identify
-    tams.track
-    tams.classify
+    :func:`tams.identify`
+    :func:`tams.track`
+    :func:`tams.classify`
+
+    :doc:`/examples/tams-run`
     """
     import itertools
 
