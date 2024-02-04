@@ -30,7 +30,7 @@ _tb_from_ir_coeffs: dict[int, tuple[float, float, float]] = {
 HERE = Path(__file__).parent
 
 
-def tb_from_ir(r, ch: int) -> xarray.DataArray:
+def tb_from_ir(r, ch: int):
     """Compute brightness temperature from IR satellite radiances (`r`)
     in channel `ch` of the EUMETSAT MSG SEVIRI instrument.
 
@@ -48,7 +48,7 @@ def tb_from_ir(r, ch: int) -> xarray.DataArray:
     Returns
     -------
     tb
-        Brightness temperature (same type as `r`)
+        Brightness temperature (same type as `r`).
     """
     if ch not in range(4, 12):
         raise ValueError("channel must be in 4--11")
