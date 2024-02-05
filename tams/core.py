@@ -16,6 +16,7 @@ from .util import _the_unique, sort_ew
 
 if TYPE_CHECKING:
     import geopandas
+    import matplotlib
     import numpy
     import shapely
     import xarray
@@ -24,16 +25,26 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
-    """Find contour definitions for 2-D data `x` at value `value`.
+def contours(
+    x: xarray.DataArray,
+    value: float,
+    *,
+    unstructured: bool | None = None,
+    **kwargs,
+) -> list[numpy.ndarray]:
+    """Find contour definitions for data `x` at value `value`.
 
     Parameters
     ----------
     x
         Data to be contoured.
         Currently needs to have ``'lat'`` and ``'lon'`` coordinates.
+        The array should be 2-D if structured, 1-D if unstructured.
     value
         Find contours where `x` has this value.
+    unstructured
+        Whether the grid of `x` is unstructured (e.g. MPAS native output).
+        Default: assume unstructured if `x` is 1-D.
 
     Returns
     -------
@@ -44,14 +55,29 @@ def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
     if x.isnull().all():
         raise ValueError("Input array `x` is all null (e.g. NaN)")
 
+    if unstructured is None:
+        unstructured = x.ndim == 1
+
     # TODO: have this return GDF instead?
     # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
+    # TODO: optionally filter out unclosed?
     import matplotlib.pyplot as plt
 
-    assert x.ndim == 2, "this is for a single image"
-    with plt.ioff():  # requires mpl 3.4
-        fig = plt.figure()
-        cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
+    if unstructured:
+        assert x.ndim == 1, "this is for a single time step"
+        tri = kwargs.get("triangulation")
+        if tri is None:
+            from matplotlib.tri import Triangulation
+
+            tri = Triangulation(x=x.lon, y=x.lat)
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = plt.tricontour(tri, x, levels=[value])
+    else:
+        assert x.ndim == 2, "this is for a single image"
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
 
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
@@ -177,11 +203,23 @@ def _identify_one(
     size_filter: bool = True,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    unstructured: bool | None = None,
+    triangulation: matplotlib.tri.Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
-    cs235 = sort_ew(_contours_to_gdf(contours(ctt, ctt_threshold))).reset_index(drop=True)
-    cs219 = sort_ew(_contours_to_gdf(contours(ctt, ctt_core_threshold))).reset_index(drop=True)
+    cs235 = sort_ew(
+        _contours_to_gdf(
+            contours(ctt, ctt_threshold, unstructured=unstructured, triangulation=triangulation)
+        )
+    ).reset_index(drop=True)
+    cs219 = sort_ew(
+        _contours_to_gdf(
+            contours(
+                ctt, ctt_core_threshold, unstructured=unstructured, triangulation=triangulation
+            )
+        )
+    ).reset_index(drop=True)
 
     if size_filter:
         cs235, cs219 = _size_filter_contours(cs235, cs219)
@@ -225,18 +263,39 @@ def identify(
         as an organized system.
         It helps target raining clouds.
     """
+    dims = tuple(ctt.dims)
+
+    unstructured = (len(dims) == 2 and "time" in dims) or (len(dims) == 1)
+
+    triangulation = None
+    if unstructured:
+        if ctt.lat.ndim == 1 and ctt.lon.ndim == 1:
+            from matplotlib.tri import Triangulation
+
+            triangulation = Triangulation(x=ctt.lon, y=ctt.lat)
+        else:
+            warnings.warn(
+                "detected unstructured data but not 1-D lat/lon "
+                f"(got lat dims {ctt.lat.dims}, lon dims {ctt.lon.dims}), "
+                "not pre-computing the triangulation"
+            )
+
     f = functools.partial(
         _identify_one,
         size_filter=size_filter,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        unstructured=unstructured,
+        triangulation=triangulation,
     )
-    dims = tuple(ctt.dims)
-    if len(dims) == 2:
+
+    if (not unstructured and len(dims) == 2) or (unstructured and len(dims) == 1):
         cs235, cs219 = f(ctt)
         css235, css219 = (cs235,), (cs219,)  # to tuple for consistency
 
-    elif len(dims) == 3 and "time" in dims:
+    elif "time" in dims and (
+        (not unstructured and len(dims) == 3) or (unstructured and len(dims) == 2)
+    ):
         assert ctt.time.ndim == 1
         itimes = np.arange(ctt.time.size)
 
@@ -256,7 +315,11 @@ def identify(
         css235, css219 = zip(*res)
 
     else:
-        raise ValueError("The dims of `ctt` either are not 2-D or are not 3-D with a 'time' dim")
+        raise ValueError(
+            f"Got unexpected `ctt` dims: {dims}. "
+            "They should be 2-D (lat/lon) + optional 'time' dim for structured grid data, "
+            "or 1-D (cell) + optional 'time' dim for unstructured grid data."
+        )
 
     return list(css235), list(css219)
 
@@ -340,20 +403,40 @@ def data_in_contours(
     data: xarray.DataArray | xarray.Dataset,
     contours: geopandas.GeoDataFrame,
     *,
-    agg=("mean", "std", "count"),
+    agg=("mean", "std", "count"),  # TODO: type
     method: str = "sjoin",
     merge: bool = False,
 ) -> geopandas.GeoDataFrame:
-    """Compute statistics on `data` within `contours`.
+    """Compute statistics on `data` within the shapes of `contours`.
+
+    With the default settings, we calculate,
+    for each shape (row) in the `contours` dataframe:
+
+    - the mean value of `data` within the shape
+    - the standard deviation of `data` within the shape
+    - the count of non-null values of `data` within the shape
 
     Parameters
     ----------
     data
+        It should have ``'lat'`` and ``'lon'`` coordinates.
+    contours
+        For example, dataframe of CE or MCS shapes, e.g.
+        from :func:`identify` or :func:`track`.
     agg : sequence of str or callable
         Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
     method : {'sjoin', 'regionmask'}
+        The regionmask method is suited for data on a structured grid,
+        while the GeoPandas sjoin method works for scattered point data as well.
+        The sjoin method is the default since it is more general
+        and currently often faster.
     merge
         Whether to merge the new data with `contours` or return a separate frame.
+
+    See Also
+    --------
+    :ref:`ctt_thresh_data_in_contours`
+        A usage example.
     """
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
@@ -365,6 +448,9 @@ def data_in_contours(
         raise NotImplementedError
     else:
         raise TypeError
+
+    if isinstance(agg, str):
+        agg = (agg,)
 
     args = (data, contours)
     kwargs = dict(varnames=varnames, agg=agg)
@@ -791,9 +877,11 @@ def run(
 
     See Also
     --------
-    tams.identify
-    tams.track
-    tams.classify
+    :func:`tams.identify`
+    :func:`tams.track`
+    :func:`tams.classify`
+
+    :doc:`/examples/tams-run`
     """
     import itertools
 

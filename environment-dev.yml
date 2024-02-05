@@ -17,6 +17,7 @@ dependencies:
   # Extras
   - cartopy>=0.21
   - dask-core
+  - gdown
   - joblib
   - netcdf4
   - ptitprince
@@ -38,6 +39,7 @@ dependencies:
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinx-copybutton
+  - sphinx-togglebutton
   - sphinxcontrib-bibtex
   - pip:
       - sphinx-prompt<1.6

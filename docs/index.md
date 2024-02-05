@@ -2,12 +2,19 @@
 "og:description": TAMS (Tracking Algorithm for Mesoscale Convective Systems) in Python
 ---
 
+```{module} tams
+
+```
+
 # TAMS
 
 TAMS (**T**racking **A**lgorithm for **M**esoscale Convective **S**ystems) in Python and with more flexibility.
 
 The original TAMS is described in {cite:t}`TAMS1.0`.
 {cite:t}`AEW-MCS` applied TAMS to African Easterly Wave research.
+
+Datasets used in the examples can be retrieved with
+{func}`tams.data.download_examples`.
 
 ```{toctree}
 :caption: Examples
@@ -16,6 +23,7 @@ The original TAMS is described in {cite:t}`TAMS1.0`.
 examples/sample-satellite-data.ipynb
 examples/tams-run.ipynb
 examples/tracking-options.ipynb
+examples/sample-mpas-ug-data.ipynb
 ```
 
 ```{toctree}

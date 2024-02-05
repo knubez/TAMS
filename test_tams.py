@@ -115,4 +115,4 @@ def test_mpas_precip_loader():
 
     assert set(ds.data_vars) == {"tb", "precip"}
     assert tuple(ds.dims) == ("time", "lat", "lon")
-    assert ds.dims["time"] == 24
+    assert ds.sizes["time"] == 24

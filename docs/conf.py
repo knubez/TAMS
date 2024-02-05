@@ -19,6 +19,7 @@ extensions = [
     "sphinxext.opengraph",
     "sphinx-prompt",
     "sphinx_copybutton",
+    "sphinx_togglebutton",
 ]
 
 exclude_patterns = [
