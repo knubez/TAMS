@@ -108,17 +108,17 @@ def plot_tracked(
             tran = ccrs.PlateCarree()
             fig = plt.figure(figsize=(size * aspect, size))
             ax = fig.add_subplot(projection=proj)
-            ax.set_extent([x0, x1, y0, y1])
-            ax.gridlines(draw_labels=True)
+            ax.set_extent([x0, x1, y0, y1])  # type: ignore[attr-defined]
+            ax.gridlines(draw_labels=True)  # type: ignore[attr-defined]
 
             if background == "map":
                 # TODO: a more high-res image
-                ax.stock_img()
+                ax.stock_img()  # type: ignore[attr-defined]
             else:  # countries
                 import cartopy.feature as cfeature
 
-                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")
-                ax.coastlines()
+                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")  # type: ignore[attr-defined]
+                ax.coastlines()  # type: ignore[attr-defined]
 
             blob_kwargs.update(transform=tran)
             text_kwargs.update(transform=tran)
@@ -156,7 +156,7 @@ def plot_tracked(
                     message="Geometry is in a geographic CRS. Results from 'centroid' are likely incorrect.",
                 )
                 for id_, x, y in zip(g.mcs_id, g.centroid.x, g.centroid.y):
-                    ax.text(x, y, id_, **text_kwargs)
+                    ax.text(x, y, id_, **text_kwargs)  # type: ignore[arg-type]
 
     if add_colorbar:
         import matplotlib as mpl
