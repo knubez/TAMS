@@ -1,6 +1,7 @@
 """
 Core routines that make up the TAMS algorithm.
 """
+
 from __future__ import annotations
 
 import functools

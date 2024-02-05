@@ -1,6 +1,7 @@
 """
 Convert from CE gdf output to summary formats (step 3)
 """
+
 import re
 from calendar import isleap
 from pathlib import Path

@@ -5,6 +5,7 @@ This library defines load and run functions
 for the MOSA data
 for the different steps of the TAMS workflow.
 """
+
 from __future__ import annotations
 
 import datetime
