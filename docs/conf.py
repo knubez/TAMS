@@ -6,7 +6,7 @@ sys.path.append("../")
 project = "tams"
 html_title = "TAMS"
 html_logo = "_static/TAMS-logo.png"
-copyright = "2022, K. M. Núñez Ocasio and Z. Moon"
+copyright = "2022\u20132024, K. M. Núñez Ocasio and Z. Moon"
 
 extensions = [
     "sphinx.ext.autodoc",
