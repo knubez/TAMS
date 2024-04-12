@@ -13,6 +13,8 @@ TAMS (**T**racking **A**lgorithm for **M**esoscale Convective **S**ystems) in Py
 The original TAMS is described in {cite:t}`TAMS1.0`.
 {cite:t}`AEW-MCS` applied TAMS to African Easterly Wave research.
 
+A paper describing this version of TAMS {cite:p}`TAMS2.0` is currently under review for publication in _GMD_.
+
 Datasets used in the examples can be retrieved with
 {func}`tams.data.download_examples`.
 
