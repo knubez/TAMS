@@ -45,6 +45,15 @@ TAMS is [available on conda-forge](https://anaconda.org/conda-forge/tams).
 conda install -c conda-forge tams
 ```
 
+[The recipe](https://github.com/conda-forge/tams-feedstock/blob/main/recipe/meta.yaml)
+includes the core dependencies and some extras, but you may also wish to install:
+
+- `pyarrow` -- to save results
+  with {abbr}`CE (cloud element)` or MCS shapes
+  in {class}`~geopandas.GeoDataFrame` format
+  to disk as Parquet files with {meth}`~geopandas.GeoDataFrame.to_parquet`
+- `ipykernel` -- to use your Conda env in other env's Juptyer
+
 ### Development install
 
 If you want to modify the code, you can first clone the repo
