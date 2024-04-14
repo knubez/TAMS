@@ -13,7 +13,9 @@ TAMS (**T**racking **A**lgorithm for **M**esoscale Convective **S**ystems) in Py
 The original TAMS is described in {cite:t}`TAMS1.0`.
 {cite:t}`AEW-MCS` applied TAMS to African Easterly Wave research.
 
-A paper describing this version of TAMS {cite:p}`TAMS2.0` is currently under review for publication in _GMD_.
+```{note}
+A paper describing _this_ implementation of TAMS {cite:p}`TAMS2.0` is currently under review for publication in _GMD_.
+```
 
 Datasets used in the examples can be retrieved with
 {func}`tams.data.download_examples`.
@@ -53,6 +55,12 @@ includes the core dependencies and some extras, but you may also wish to install
   in {class}`~geopandas.GeoDataFrame` format
   to disk as Parquet files with {meth}`~geopandas.GeoDataFrame.to_parquet`
 - `ipykernel` -- to use your Conda env in other env's Juptyer
+
+```{attention}
+Current {func}`tams.identify` [doesn't work](https://github.com/knubez/TAMS/issues/13)
+with `matplotlib` 3.8.0 (mid Sep 2023) , but 3.8.1 (end of Oct 2023)
+restored the previous behavior.
+```
 
 ### Development install
 
