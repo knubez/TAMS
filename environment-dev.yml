@@ -27,6 +27,7 @@ dependencies:
   #
   # Development and tests
   - flit
+  - ipywidgets
   - jupyterlab
   - mypy
   - pytest >=6.0
@@ -44,3 +45,4 @@ dependencies:
   - pip:
       - sphinx-prompt <1.6
       - sphinxext-opengraph
+      - xrframes
