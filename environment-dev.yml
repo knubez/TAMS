@@ -46,4 +46,4 @@ dependencies:
   - pip:
       - sphinx-prompt <1.6
       - sphinxext-opengraph
-      - xrframes
+      - xrframes >=0.0.4
