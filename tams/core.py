@@ -434,6 +434,11 @@ def data_in_contours(
     merge
         Whether to merge the new data with `contours` or return a separate frame.
 
+    Raises
+    ------
+    ValueError
+        If the input data is all null or the input frame of shapes is empty.
+
     See Also
     --------
     :ref:`ctt_thresh_data_in_contours`
@@ -449,6 +454,9 @@ def data_in_contours(
         raise NotImplementedError
     else:
         raise TypeError
+
+    if contours.empty:
+        raise ValueError("Input frame `contours` is empty")
 
     if isinstance(agg, str):
         agg = (agg,)
