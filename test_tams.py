@@ -3,6 +3,7 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import pytest
+import xarray as xr
 
 import tams
 
@@ -137,3 +138,20 @@ def test_classify_cols_check():
     )
     with pytest.raises(ValueError, match="missing these columns"):
         _ = tams.classify(cs)
+
+
+def test_identify_no_ces_warning():
+    tb_p100 = tb + 100
+    with pytest.warns(UserWarning, match="No CEs identified"):
+        _ = tams.identify(tb_p100)
+
+    ctt = xr.concat(
+        [
+            tb,
+            tb_p100.assign_coords(time=tb_p100.time + np.timedelta64(1, "h")),
+            tb_p100.assign_coords(time=tb_p100.time + np.timedelta64(2, "h")),
+        ],
+        dim="time",
+    )
+    with pytest.warns(UserWarning, match=r"No CEs identified for time steps: \[1, 2\]"):
+        _ = tams.identify(ctt)

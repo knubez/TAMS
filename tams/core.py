@@ -322,6 +322,12 @@ def identify(
             "or 1-D (cell) + optional 'time' dim for unstructured grid data."
         )
 
+    inds_empty = [i for i, cs235 in enumerate(css235) if cs235.empty]
+    if len(inds_empty) == len(css235):
+        warnings.warn("No CEs identified")
+    elif inds_empty:
+        warnings.warn(f"No CEs identified for time steps: {inds_empty}")
+
     return list(css235), list(css219)
 
 
