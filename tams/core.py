@@ -831,11 +831,17 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
     """Classify the CE groups into MCS classes, adding a categorical ``'mcs_class'`` column
     to the input frame.
     """
-
-    assert {"mcs_id", "time", "dtime"} < set(cs.columns), "needed by the classify algo"
     if cs.empty:
         warnings.warn("empty input frame")
         return cs.assign(mcs_class=None)
+
+    cols = set(cs.columns)
+    cols_needed = {"mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"}
+    missing = cols_needed - cols
+    if missing:
+        raise ValueError(
+            f"missing these columns needed by the classify algorithm: {sorted(missing)}"
+        )
 
     classes = cs.groupby("mcs_id").apply(_classify_one)
     cs["mcs_class"] = cs.mcs_id.map(classes).astype("category")
