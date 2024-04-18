@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np
 import pytest
 
@@ -116,3 +117,23 @@ def test_mpas_precip_loader():
     assert set(ds.data_vars) == {"tb", "precip"}
     assert tuple(ds.dims) == ("time", "lat", "lon")
     assert ds.sizes["time"] == 24
+
+
+def test_classify_empty():
+    cs = gpd.GeoDataFrame(
+        columns=["mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"],
+        crs="EPSG:4326",
+    )
+    with pytest.warns(UserWarning, match="empty input frame"):
+        cs_ = tams.classify(cs)
+        assert "mcs_class" in cs_ and "mcs_class" not in cs
+
+
+def test_classify_cols_check():
+    cs = gpd.GeoDataFrame(
+        columns=["mcs_id", "geometry", "time", "area_km2", "area219_km2"],
+        data=np.full((1, 5), np.nan),
+        crs="EPSG:4326",
+    )
+    with pytest.raises(ValueError, match="missing these columns"):
+        _ = tams.classify(cs)
