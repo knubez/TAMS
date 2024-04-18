@@ -828,8 +828,8 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
 
 
 def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-    """Classify the CE groups into MCS classes, adding a categorical ``'mcs_class'`` column
-    to the input frame.
+    """Classify the CE groups into MCS classes
+    (categorical column ``'mcs_class'`` in the result).
     """
     if cs.empty:
         warnings.warn("empty input frame")
@@ -844,9 +844,8 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         )
 
     classes = cs.groupby("mcs_id").apply(_classify_one)
-    cs["mcs_class"] = cs.mcs_id.map(classes).astype("category")
 
-    return cs
+    return cs.assign(mcs_class=cs.mcs_id.map(classes).astype("category"))
 
 
 def run(
