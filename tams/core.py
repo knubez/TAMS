@@ -833,6 +833,9 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
     """
 
     assert {"mcs_id", "time", "dtime"} < set(cs.columns), "needed by the classify algo"
+    if cs.empty:
+        warnings.warn("empty input frame")
+        return cs.assign(mcs_class=None)
 
     classes = cs.groupby("mcs_id").apply(_classify_one)
     cs["mcs_class"] = cs.mcs_id.map(classes).astype("category")
