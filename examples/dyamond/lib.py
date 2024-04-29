@@ -284,6 +284,42 @@ def iter_input_paths():
                 yield fp
 
 
+def iter_input_paths2(include_models: str | list[str] = None):
+    """Yield paths to input files."""
+
+    if isinstance(include_models, str):
+        include_models = [include_models]
+
+    for season in SEASONS:
+        season_dir = BASE_DIR_IN2 / season.title()
+        assert season_dir.is_dir()
+
+        start = START[season]
+
+        # Some models don't have first hour or first day
+        # Zhe said skipping first day is ok
+        time_range = pd.date_range(
+            start=start + pd.Timedelta("1D"),
+            periods=(40 - 1) * 24,
+            freq="1H",
+        )
+
+        for model_dir in sorted(season_dir.glob("*")):
+            model = model_dir.name
+            if include_models is not None and model not in include_models:
+                continue
+
+            files = sorted(model_dir.glob("**/*.nc"))
+            t_to_file = {get_t_file(fp): fp for fp in files}
+
+            for t in time_range:
+                fp = t_to_file.get(t)
+                if fp is None:
+                    print(f"missing file for {season} | {model} | {t:%Y-%m-%d %H}")
+                    continue
+                yield fp
+
+
 def open_input(p: Path) -> xr.Dataset:
     """Open a single input nc file as an `xarray.Dataset`.
 
