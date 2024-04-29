@@ -7,6 +7,7 @@ Run TAMS on MOSA pre-processed data and produce output files (step 2)
 from lib import BASE_DIR_OUT, get_preproced_paths, run
 
 parallel = True
+new_data = True
 
 
 def func(key, files):
@@ -17,6 +18,13 @@ def func(key, files):
 
 
 cases = get_preproced_paths()
+
+if new_data:
+    cases = {
+        key: files
+        for key, files in cases.items()
+        if key[1] in {"OBSv7".lower(), "SCREAMv1".lower()}
+    }
 
 print(f"{len(cases)} cases")
 print("\n".join("|".join(case) for case in sorted(cases)))
