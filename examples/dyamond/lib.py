@@ -390,12 +390,13 @@ def open_input2(p: Path) -> xr.Dataset:
     *_, upper_season, model, stime = p.stem.split("_")
     season = upper_season.lower()
     assert season in SEASONS
+    t_file = get_t_file(p.stem)
 
     ds = xr.open_dataset(p)
     assert ds.sizes["time"] == 1
 
     # For models, compute Tb from OLR
-    if model != "OBS":
+    if model not in {"OBS", "OBSv7"}:
         from scipy.constants import Stefan_Boltzmann as sigma
 
         assert ds.data_vars.keys() == {"olr", "precipitation"}
@@ -420,8 +421,10 @@ def open_input2(p: Path) -> xr.Dataset:
     ds.attrs.update(
         _season=season,
         _model=model,
-        _time=pd.Timestamp(stime).strftime(r"%Y-%m-%d %H"),
+        _time=t_file.strftime(r"%Y-%m-%d %H"),
     )
+
+    return ds.squeeze()
 
 
 def preproc_file(p: Path, *, overwrite: bool = True) -> None:
