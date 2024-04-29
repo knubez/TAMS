@@ -37,7 +37,7 @@ BASE_DIR_IN2 = Path(
 P_GRID = BASE_DIR_IN / "Summer/IFS/olr_pcp_instantaneous/pr_rlut_ifs_summer_2016080100.nc"
 """Path to file to load grid from when constructing the masks."""
 
-BASE_DIR_OUT = Path("/glade/scratch/zmoon/dyamond")
+BASE_DIR_OUT = Path("/glade/derecho/scratch/zmoon/dyamond")
 BASE_DIR_OUT_PRE = BASE_DIR_OUT / "pre"
 
 REPO = HERE.parent.parent
