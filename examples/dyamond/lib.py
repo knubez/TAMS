@@ -971,6 +971,10 @@ def post(fp: Path) -> None:
     display_model = model.upper()
     if display_model == "XSHIELD":
         display_model = "XSHiELD"
+    if display_model == "OBSV7":
+        display_model = "OBSv7"
+    if display_model == "SCREAMV1":
+        display_model = "SCREAMv1"
     encoding: dict[Hashable, dict[str, Any]] = {"mcs_mask": {"zlib": True, "complevel": 5}}
     ds.to_netcdf(
         BASE_DIR_OUT / f"mcs_mask_{title_season}_{display_model}.nc",
