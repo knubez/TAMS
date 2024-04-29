@@ -29,6 +29,11 @@ e.g. ::
 /glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP/Winter/UM/olr_pcp_instantaneous/pr_rlut_um_winter_2020012007.nc
 """
 
+BASE_DIR_IN2 = Path(
+    "/glade/campaign/mmm/c3we/prein/Papers/2023_Zhe-MCSMIP/clean_data/OLR_Precipitation"
+)
+"""This has the variable names normalized and has the new datasets."""
+
 P_GRID = BASE_DIR_IN / "Summer/IFS/olr_pcp_instantaneous/pr_rlut_ifs_summer_2016080100.nc"
 """Path to file to load grid from when constructing the masks."""
 
@@ -341,6 +346,48 @@ def open_input(p: Path) -> xr.Dataset:
     return ds.squeeze()
 
 
+def open_input2(p: Path) -> xr.Dataset:
+    """Open a single input nc file as an `xarray.Dataset`.
+    Andy's ``clean_data`` version.
+    """
+    assert p.name.startswith("olr_pcp_")
+    *_, upper_season, model, stime = p.stem.split("_")
+    season = upper_season.lower()
+    assert season in SEASONS
+
+    ds = xr.open_dataset(p)
+    assert ds.sizes["time"] == 1
+
+    # For models, compute Tb from OLR
+    if model != "OBS":
+        from scipy.constants import Stefan_Boltzmann as sigma
+
+        assert ds.data_vars.keys() == {"olr", "precipitation"}
+
+        # Yang and Sligo (2001)
+        # Given by Zhe
+        a = 1.228
+        b = -1.106e-3
+        tf = (ds["olr"] / sigma) ** 0.25
+        ds["tb"] = (-a + np.sqrt(a**2 + 4 * b * tf)) / (2 * b)
+        ds["tb"].attrs.update(
+            long_name="brightness temperature",
+            units="K",
+        )
+        ds = ds.drop_vars("olr")
+    else:
+        assert ds.data_vars.keys() == {"Tb", "precipitation"}
+        ds = ds.rename_vars({"Tb": "tb"})
+    ds = ds.rename_vars({"precipitation": "pr"})
+    assert ds.data_vars.keys() == {"pr", "tb"}
+
+    ds.attrs.update(
+        _season=season,
+        _model=model,
+        _time=pd.Timestamp(stime).strftime(r"%Y-%m-%d %H"),
+    )
+
+
 def preproc_file(p: Path, *, overwrite: bool = True) -> None:
     """Preprocess a single input data nc file and save it to Parquet.
 
@@ -352,7 +399,11 @@ def preproc_file(p: Path, *, overwrite: bool = True) -> None:
     """
     import tams
 
-    ds = open_input(p)
+    if BASE_DIR_IN2 in p.parents:
+        ds = open_input2(p)
+    else:
+        ds = open_input(p)
+
     id_ = f"{ds._season}__{ds._model.lower()}__{ds._time.replace(' ', '_')}"
 
     p_out = BASE_DIR_OUT_PRE / f"{id_}.parquet"
