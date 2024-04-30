@@ -284,7 +284,7 @@ def iter_input_paths():
                 yield fp
 
 
-def iter_input_paths2(include_models: str | list[str] = None):
+def iter_input_paths2(include_models: str | list[str] | None = None):
     """Yield paths to input files."""
 
     if isinstance(include_models, str):
