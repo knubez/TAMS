@@ -14,7 +14,7 @@ The original TAMS is described in {cite:t}`TAMS1.0`.
 {cite:t}`AEW-MCS` applied TAMS to African Easterly Wave research.
 
 ```{note}
-A paper describing _this_ implementation of TAMS {cite:p}`TAMS2.0` is currently under review for publication in _GMD_.
+A paper describing _this_ implementation of TAMS {cite:p}`TAMS2.0` in Python is currently under review for publication in _GMD_.
 ```
 
 Datasets used in the examples can be retrieved with
@@ -54,7 +54,7 @@ includes the core dependencies and some extras, but you may also wish to install
   with {abbr}`CE (cloud element)` or MCS shapes
   in {class}`~geopandas.GeoDataFrame` format
   to disk as Parquet files with {meth}`~geopandas.GeoDataFrame.to_parquet`
-- `ipykernel` -- to use your Conda env in other env's Juptyer
+- `ipykernel` -- to use your Conda env in another env's Jupyter
 
 ```{attention}
 Current {func}`tams.identify` [doesn't work](https://github.com/knubez/TAMS/issues/13)
