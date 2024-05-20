@@ -58,7 +58,7 @@ includes the core dependencies and some extras, but you may also wish to install
 
 ```{attention}
 Current {func}`tams.identify` [doesn't work](https://github.com/knubez/TAMS/issues/13)
-with `matplotlib` 3.8.0 (mid Sep 2023) , but 3.8.1 (end of Oct 2023)
+with `matplotlib` 3.8.0 (mid Sep 2023), but 3.8.1 (end of Oct 2023)
 restored the previous behavior.
 ```
 
