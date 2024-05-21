@@ -27,9 +27,11 @@ dependencies:
   #
   # Development and tests
   - flit
+  - ipywidgets
   - jupyterlab
   - mypy
   - pytest >=6.0
+  - rich
   #
   # Docs
   - docutils <0.18
@@ -44,3 +46,4 @@ dependencies:
   - pip:
       - sphinx-prompt <1.6
       - sphinxext-opengraph
+      - xrframes >=0.0.4
