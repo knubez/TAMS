@@ -359,7 +359,7 @@ def open_input(p: Path) -> xr.Dataset:
 
         assert ds.data_vars.keys() == {"pr", "olr"}
 
-        # Yang and Sligo (2001)
+        # Yang and Slingo (2001)
         # Given by Zhe
         a = 1.228
         b = -1.106e-3
@@ -401,7 +401,7 @@ def open_input2(p: Path) -> xr.Dataset:
 
         assert ds.data_vars.keys() == {"olr", "precipitation"}
 
-        # Yang and Sligo (2001)
+        # Yang and Slingo (2001)
         # Given by Zhe
         a = 1.228
         b = -1.106e-3
