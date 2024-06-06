@@ -83,7 +83,7 @@ def download_examples(*, clobber: bool = False) -> None:
        is not currently a required dependency of the TAMS Python package,
        although it is included in the conda-forge recipe.
        gdown is available on conda-forge and PyPI as ``gdown``.
-       Files < 100 MB can be easily download with ``wget`` or similar,
+       Files < 100 MB can be easily downloaded from Google Drive with ``wget`` or similar,
        but there are some subtleties with larger files.
 
        Alternatively, you can download the files manually
