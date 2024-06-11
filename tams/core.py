@@ -166,7 +166,7 @@ def _size_filter_contours(
         i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
         for i235 in cs235.index
     }
-    cs235["area219_km2"] = pd.Series(sum219s)
+    cs235["area219_km2"] = pd.Series(sum219s, dtype=float)
     big_enough = cs235.area219_km2 >= threshold
     if not big_enough.empty:
         logger.info(
