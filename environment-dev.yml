@@ -43,6 +43,7 @@ dependencies:
   - sphinx-copybutton
   - sphinx-togglebutton
   - sphinxcontrib-bibtex
+  - watermark
   - pip:
       - sphinx-prompt <1.6
       - sphinxext-opengraph
