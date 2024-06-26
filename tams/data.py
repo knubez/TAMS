@@ -181,7 +181,7 @@ def load_example_tb() -> xarray.DataArray:
 
 
 def load_example_mpas() -> xarray.Dataset:
-    """Load the example MPAS dataset.
+    r"""Load the example MPAS dataset.
 
     This is a spatial and variable subset of native MPAS output,
     Furthermore, it has been regridded to a regular lat/lon grid (0.25°)
@@ -196,6 +196,16 @@ def load_example_mpas() -> xarray.Dataset:
     It has ``tb`` (estimated brightness temperature)
     and ``precip`` (precipitation rate, derived by summing the MPAS accumulated
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
+
+    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
+
+    .. math::
+       E = \sigma T^4
+       \implies T = (E / \sigma)^{1/4}
+
+    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
+    in W m\ :sup:`-2`
+    and :math:`\sigma` is the Stefan--Boltzmann constant.
 
     This dataset contains 127 time steps of hourly data:
     2006-09-08 12 -- 2006-09-13 18.
@@ -226,7 +236,7 @@ def load_example_mpas() -> xarray.Dataset:
 
 
 def load_example_mpas_ug() -> xarray.Dataset:
-    """Load the example MPAS unstructured grid dataset.
+    r"""Load the example MPAS unstructured grid dataset.
 
     This is a spatial and variable subset of native 15-km global mesh MPAS output.
 
@@ -241,6 +251,17 @@ def load_example_mpas_ug() -> xarray.Dataset:
     and ``precip`` (precipitation rate)
     for the period
     2006-09-08 12 -- 2006-09-13 18.
+
+    Like the regridded MPAS dataset,
+    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
+
+    .. math::
+       E = \sigma T^4
+       \implies T = (E / \sigma)^{1/4}
+
+    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
+    in W m\ :sup:`-2`
+    and :math:`\sigma` is the Stefan--Boltzmann constant.
 
     See Also
     --------
