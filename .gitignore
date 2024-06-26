@@ -4,6 +4,7 @@ MPAS_data.nc
 MPAS_unstructured_data.nc
 docs/api/
 docs/examples/*.pdf
+docs/examples/*.png
 docs/examples/*.txt
 docs/examples/tb.gif
 mosa3.o*
