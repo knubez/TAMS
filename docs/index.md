@@ -62,6 +62,21 @@ with `matplotlib` 3.8.0 (mid Sep 2023), but 3.8.1 (end of Oct 2023)
 restored the previous behavior.
 ```
 
+```{note}
+In the past (before TAMS v0.1.5, mid Aug 2024),
+the TAMS conda-forge recipe included PyGEOS,
+in order to make certain GeoPandas and regionmask operations faster.
+[In Shapely v2](https://shapely.readthedocs.io/en/stable/release/2.x.html)
+(mid Dec 2022, but not relevant to TAMS
+[until mid 2023](https://geopandas.org/en/stable/docs/user_guide/pygeos_to_shapely.html)),
+[PyGEOS is part of Shapely](https://shapely.readthedocs.io/en/stable/migration_pygeos.html)
+and doesn't need to be installed separately.
+GeoPandas dropped support for Shapely v1 and PyGEOS in
+[their v1 release](https://github.com/geopandas/geopandas/releases/tag/v1.0.0) (late Jun 2024).
+[PyGEOS on conda-forge](https://github.com/conda-forge/pygeos-feedstock) has been retired,
+so you likely won't be able to install it in new Conda environments in any case.
+```
+
 ### Development install
 
 If you want to modify the code, you can first clone the repo
