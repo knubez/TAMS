@@ -21,7 +21,6 @@ dependencies:
   - joblib
   - netcdf4
   - ptitprince
-  - pygeos
   - regionmask >=0.9
   - scipy
   #
