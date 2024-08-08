@@ -20,9 +20,9 @@ dependencies:
   - gdown
   - joblib
   - netcdf4
-  - ptitprince
   - regionmask >=0.9
   - scipy
+  - seaborn >=0.13.2
   #
   # Development and tests
   - flit
