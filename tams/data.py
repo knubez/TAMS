@@ -71,11 +71,11 @@ def download_examples(*, clobber: bool = False) -> None:
     """Download the example datasets.
 
     * Satellite data (EUMETSAT MSG SEVIRI 10.8 μm IR radiance):
-      https://drive.google.com/file/d/1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp/view?usp=sharing
+      https://drive.google.com/file/d/1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD/view?usp=sharing
     * MPAS regridded data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E/view?usp=sharing
+      https://drive.google.com/file/d/1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-/view?usp=sharing
     * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf/view?usp=sharing
+      https://drive.google.com/file/d/1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248/view?usp=sharing
 
     .. note::
        `gdown <https://github.com/wkentaro/gdown>`__,
@@ -103,9 +103,9 @@ def download_examples(*, clobber: bool = False) -> None:
     """
 
     files = [
-        ("1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp", "Satellite_data.nc"),  # < 100 MB
-        ("1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E", "MPAS_data.nc"),  # < 100 MB
-        ("1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf", "MPAS_unstructured_data.nc"),  # > 100 MB
+        ("1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD", "Satellite_data.nc"),  # < 100 MB
+        ("1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-", "MPAS_data.nc"),  # < 100 MB
+        ("1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248", "MPAS_unstructured_data.nc"),  # > 100 MB
     ]
 
     try:
