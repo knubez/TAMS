@@ -41,7 +41,7 @@ def proc(fn, files):
 
 if do_bench:
     # WRF 1--7 Nov 2018
-    times = pd.date_range("2018-11-01", "2018-11-07 23:00", freq="H")
+    times = pd.date_range("2018-11-01", "2018-11-07 23:00", freq="h")
     files = [BASE_DIR / "WY2019" / "WRF" / f"tb_rainrate_{t:%Y-%m-%d_%H}:00.nc" for t in times]
 
     print(files[0])
@@ -77,7 +77,7 @@ if do_gpm:
     fn = partial(preproc_gpm_file, out_dir=out_dir)
     for wy in wys:
         # The WRF file sets start in June of previous year
-        ts = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")[:-1]
+        ts = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="h")[:-1]
         rfns = ts.strftime(r"%Y") + "/merg_" + ts.strftime(r"%Y%m%d%H") + "_4km-pixel.nc"
         files = [BASE_DIR / "GPM" / rfn for rfn in rfns]
         print(files[0])

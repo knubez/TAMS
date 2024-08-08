@@ -150,7 +150,7 @@ def load_example_ir() -> xarray.DataArray:
     ds.lat.attrs.update(long_name="Latitude")
 
     # Times are 2006-Sep-01 00 -- 10, every 2 hours
-    ds["time"] = pd.date_range("2006-Sep-01", freq="2H", periods=6)
+    ds["time"] = pd.date_range("2006-Sep-01", freq="2h", periods=6)
 
     return ds.ch9
 
@@ -282,7 +282,7 @@ def load_example_mpas_ug() -> xarray.Dataset:
     ds["tb"] = ds.tb.where(ds.tb > 0)
 
     # Set time (time variable in there just has elapsed hours as int)
-    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1H", periods=ds.sizes["time"])
+    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1h", periods=ds.sizes["time"])
 
     # Diff accumulated precip to get mm/h
     ds["precip"] = ds.precip.diff("time", label="lower")
