@@ -5,7 +5,7 @@ repos:
       - id: check-useless-excludes
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: "v4.5.0"
+    rev: "v4.6.0"
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -14,7 +14,7 @@ repos:
       - id: check-yaml
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: "v3.15.0"
+    rev: "v3.17.0"
     hooks:
       - id: pyupgrade
         args: [--py37-plus]
@@ -25,12 +25,12 @@ repos:
       - id: isort
 
   - repo: https://github.com/psf/black
-    rev: "24.1.1"
+    rev: "24.8.0"
     hooks:
       - id: black
 
   - repo: https://github.com/PyCQA/flake8
-    rev: "7.0.0"
+    rev: "7.1.1"
     hooks:
       - id: flake8
 
