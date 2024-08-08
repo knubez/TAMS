@@ -2,7 +2,7 @@
 TAMS - Tracking Algorithm for Mesoscale Convective Systems
 """
 
-__version__ = "0.1.3"
+__version__ = "0.1.5"
 
 from .core import (
     calc_ellipse_eccen,
