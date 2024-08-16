@@ -14,7 +14,7 @@ The original TAMS is described in {cite:t}`TAMS1.0`.
 {cite:t}`AEW-MCS` applied TAMS to African Easterly Wave research.
 
 ```{note}
-A paper describing _this_ implementation of TAMS {cite:p}`TAMS2.0` in Python has been accepted for publication in _GMD_.
+A paper describing _this_ implementation of TAMS {cite:p}`TAMS2.0` in Python has been published in _GMD_ (2024-08-15).
 ```
 
 Datasets used in the examples can be retrieved with
@@ -89,6 +89,13 @@ conda env create -f environment-dev.yml
 conda activate tams-dev
 pip install -e . --no-deps
 ```
+
+## Citing
+
+If you use TAMS in your research, we would appreciate it if you cite {cite:t}`TAMS2.0`.
+Since v0.1.2 (late Sep 2023),
+you can additionally cite the specific version of TAMS that you used
+[via Zenodo](https://doi.org/10.5281/zenodo.8393890).
 
 ## References
 
