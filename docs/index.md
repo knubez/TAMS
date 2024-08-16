@@ -90,6 +90,13 @@ conda activate tams-dev
 pip install -e . --no-deps
 ```
 
+## Citing
+
+If you use TAMS in your research, we would appreciate it if you cite {cite:t}`TAMS2.0`.
+Since v0.1.2 (late Sep 2023),
+you can additionally cite the specific version of TAMS that you used
+[via Zenodo](https://zenodo.org/search?q=parent.id%3A8393890&f=allversions%3Atrue&l=list&p=1&s=20&sort=version).
+
 ## References
 
 ```{bibliography}
