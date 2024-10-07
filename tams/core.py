@@ -90,6 +90,14 @@ def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
     from geopandas import GeoDataFrame
     from shapely.geometry.polygon import LinearRing, LineString, Point, orient
 
+    if isinstance(cs, np.ndarray) and cs.ndim == 2 and cs.shape[1] == 2:
+        # Single array, probably mpl 3.8.0
+        import matplotlib
+
+        mpl_ver = getattr(matplotlib, "__version__", "?")
+
+        logger.debug(f"got single array `cs`; matplotlib version: {mpl_ver}")
+
     polys = []
     for c in cs:
         x, y = c.T
@@ -278,7 +286,8 @@ def identify(
             warnings.warn(
                 "detected unstructured data but not 1-D lat/lon "
                 f"(got lat dims {ctt.lat.dims}, lon dims {ctt.lon.dims}), "
-                "not pre-computing the triangulation"
+                "not pre-computing the triangulation",
+                stacklevel=2,
             )
 
     f = functools.partial(
@@ -321,6 +330,12 @@ def identify(
             "They should be 2-D (lat/lon) + optional 'time' dim for structured grid data, "
             "or 1-D (cell) + optional 'time' dim for unstructured grid data."
         )
+
+    inds_empty = [i for i, cs235 in enumerate(css235) if cs235.empty]
+    if len(inds_empty) == len(css235):
+        warnings.warn("No CEs identified", stacklevel=2)
+    elif inds_empty:
+        warnings.warn(f"No CEs identified for time steps: {inds_empty}", stacklevel=2)
 
     return list(css235), list(css219)
 
@@ -435,6 +450,11 @@ def data_in_contours(
     merge
         Whether to merge the new data with `contours` or return a separate frame.
 
+    Raises
+    ------
+    ValueError
+        If the input data is all null or the input frame of shapes is empty.
+
     See Also
     --------
     :ref:`ctt_thresh_data_in_contours`
@@ -450,6 +470,9 @@ def data_in_contours(
         raise NotImplementedError
     else:
         raise TypeError
+
+    if contours.empty:
+        raise ValueError("Input frame `contours` is empty")
 
     if isinstance(agg, str):
         agg = (agg,)
@@ -616,13 +639,13 @@ def track(
         dt = times[1:] - times[:-1]
         assert (dt.astype(np.int64) > 0).all()
         if not dt.unique().size == 1:
-            warnings.warn("unequal time spacing")
+            warnings.warn("unequal time spacing detected", stacklevel=2)
         dt = dt.insert(-1, dt[-1])
 
     # IDEA: even at initial time, could put CEs together in groups based on edge-to-edge distance
 
     if look in {"f", "forward"}:
-        warnings.warn("forward `look` considered experimental")
+        warnings.warn("forward `look` considered experimental", stacklevel=2)
 
     css: list[geopandas.GeoDataFrame] = []
     for i in itimes:
@@ -754,7 +777,7 @@ def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
     success = m.estimate(xy)
 
     if not success:
-        warnings.warn(f"ellipse model failed for {p}")
+        warnings.warn(f"ellipse model failed for {p}", stacklevel=2)
         return np.nan
 
     _, _, xhw, yhw, _ = m.params
@@ -829,16 +852,24 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
 
 
 def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-    """Classify the CE groups into MCS classes, adding a categorical ``'mcs_class'`` column
-    to the input frame.
+    """Classify the CE groups into MCS classes
+    (categorical column ``'mcs_class'`` in the result).
     """
+    if cs.empty:
+        warnings.warn("empty input frame supplied to `classify`", stacklevel=2)
+        return cs.assign(mcs_class=None)
 
-    assert {"mcs_id", "time", "dtime"} < set(cs.columns), "needed by the classify algo"
+    cols = set(cs.columns)
+    cols_needed = {"mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"}
+    missing = cols_needed - cols
+    if missing:
+        raise ValueError(
+            f"missing these columns needed by the classify algorithm: {sorted(missing)}"
+        )
 
     classes = cs.groupby("mcs_id").apply(_classify_one)
-    cs["mcs_class"] = cs.mcs_id.map(classes).astype("category")
 
-    return cs
+    return cs.assign(mcs_class=cs.mcs_id.map(classes).astype("category"))
 
 
 def run(
@@ -934,6 +965,9 @@ def run(
     #
     # 4. Stats (including precip)
     #
+
+    if ce.empty:
+        raise RuntimeError("no MCSs, unable to compute stats")
 
     msg("Starting statistics calculations")
 
