@@ -131,7 +131,7 @@ def run_gdf(fp: Path, *, bench: bool = False) -> None:
         for vn in vns_non_time:
             ds[vn] = ds0[vn]
 
-    times_should_be = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")[:-1]
+    times_should_be = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="h")[:-1]
     nt_missing = 0
     for t_ in times_should_be:
         if t_ not in ds.time.values:

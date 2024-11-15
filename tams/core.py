@@ -166,7 +166,7 @@ def _size_filter_contours(
         i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
         for i235 in cs235.index
     }
-    cs235["area219_km2"] = pd.Series(sum219s)
+    cs235["area219_km2"] = pd.Series(sum219s, dtype=float)
     big_enough = cs235.area219_km2 >= threshold
     if not big_enough.empty:
         logger.info(
@@ -380,7 +380,8 @@ def _data_in_contours_regionmask(
     # Form regionmask(s)
     shapes = contours[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(data)  # works but takes long (though shorter with pygeos)!
+    mask = regions.mask(data)
+    # Note: before Shapely v2, having `pygeos` installed made this faster
 
     # Aggregate points inside contour
     new_data_ = {
@@ -1126,7 +1127,7 @@ if __name__ == "__main__":
     # Trying regionmask
     shapes = cs235[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
+    mask = regions.mask(tb)
 
     regions.plot(ax=ax)
 
