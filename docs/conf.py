@@ -40,6 +40,7 @@ intersphinx_mapping = {
     "geopandas": ("https://geopandas.org/en/stable/", None),
     "dask": ("https://docs.dask.org/en/latest/", None),
     "shapely": ("https://shapely.readthedocs.io/en/stable/", None),
+    "earthaccess": ("https://earthaccess.readthedocs.io/en/stable/", None),
 }
 
 napoleon_google_docstring = False

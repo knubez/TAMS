@@ -398,7 +398,11 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
     return ds
 
 
-def get_mergir_tb(time_or_range: Any | tuple[Any, Any], **kwargs) -> xarray.DataArray:
+def get_mergir_tb(
+    time_or_range: Any | tuple[Any, Any],
+    version: str = "1",
+    **kwargs,
+) -> xarray.DataArray:
     """Stream GPM MERGIR bright temperature from NASA Earthdata.
 
     https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary
@@ -406,8 +410,19 @@ def get_mergir_tb(time_or_range: Any | tuple[Any, Any], **kwargs) -> xarray.Data
     This is half-hourly ~ 4-km resolution data.
     Each nc file contains one hour (two half-hourly time steps).
 
-    See https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
-    for more info about logging in.
+    .. note::
+       A NASA Earthdata account is required.
+       See https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
+       for more info.
+
+    Parameters
+    ----------
+    time_or_range
+        Specific time or time range (inclusive) to request.
+    version
+        Currently '1' is the only option.
+    **kwargs
+        Passed to :func:`earthaccess.login`.
     """
     import earthaccess
 
@@ -429,7 +444,7 @@ def get_mergir_tb(time_or_range: Any | tuple[Any, Any], **kwargs) -> xarray.Data
 
     results = earthaccess.search_data(
         short_name="GPM_MERGIR",
-        version="1",
+        version=version,
         cloud_hosted=True,
         temporal=(t0, t1),
         count=-1,
