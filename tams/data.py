@@ -488,6 +488,7 @@ def get_imerg(
     https://gpm.nasa.gov/data/directory
 
     This is half-hourly 0.1° (~ 10-km) resolution data.
+    Each HDF5 file contains one time step.
 
     .. note::
        A NASA Earthdata account is required.
