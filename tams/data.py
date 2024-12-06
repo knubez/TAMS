@@ -530,9 +530,9 @@ def get_imerg(
     elif n >= 1:
         files = earthaccess.open(results)
         if n == 1:
-            ds = xr.open_dataset(files[0])
+            ds = xr.open_dataset(files[0], group="Grid")
         else:
-            ds = xr.open_mfdataset(files, combine="nested", concat_dim="time")
+            ds = xr.open_mfdataset(files, group="Grid", combine="nested", concat_dim="time")
 
     breakpoint()
 
