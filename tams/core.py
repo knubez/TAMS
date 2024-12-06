@@ -326,7 +326,7 @@ def identify(
 
 
 def _data_in_contours_sjoin(
-    data: xr.DataArray | xr.Dataset,
+    data: xr.DataArray | xr.Dataset | geopandas.GeoDataFrame | pd.DataFrame,
     contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
@@ -339,11 +339,17 @@ def _data_in_contours_sjoin(
     import geopandas as gpd
 
     # Convert possibly-2-D data to GeoDataFrame of points
-    data_df = data.to_dataframe().reset_index(drop=set(data.dims) != {"lat", "lon"})
-    lat = data_df["lat"].values
-    lon = data_df["lon"].values
-    geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points
-    points = gpd.GeoDataFrame(data_df, geometry=geom)
+    if isinstance(data, geopandas.GeoDataFrame):
+        points = data
+    else:
+        if isinstance(data, pd.DataFrame):
+            data_df = data
+        else:
+            data_df = data.to_dataframe().reset_index(drop=set(data.dims) != {"lat", "lon"})
+        lat = data_df["lat"].values
+        lon = data_df["lon"].values
+        geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points
+        points = gpd.GeoDataFrame(data_df, geometry=geom)
 
     # Determine which contour (if any) each point is inside
     points = points.sjoin(contours, predicate="within", how="left", rsuffix="contour")
