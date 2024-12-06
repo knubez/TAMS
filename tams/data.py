@@ -12,7 +12,7 @@ import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from typing import Any, Sequence
 
     import xarray
 
@@ -396,3 +396,61 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
     ds = ds.drop_vars(["aprecip"])
 
     return ds
+
+
+def get_mergir_tb(time_or_range: Any | tuple[Any, Any], **kwargs) -> xarray.DataArray:
+    """Stream GPM MERGIR bright temperature from NASA Earthdata.
+
+    https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary
+
+    This is half-hourly ~ 4-km resolution data.
+    Each nc file contains one hour (two half-hourly time steps).
+
+    See https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
+    for more info about logging in.
+    """
+    import earthaccess
+
+    # Convert time to pandas
+    if isinstance(time_or_range, tuple):
+        t0_, t1_ = time_or_range
+        t0 = pd.to_datetime(t0_)
+        t1 = pd.to_datetime(t1_)
+    else:  # Assume single time
+        t0 = pd.to_datetime(time_or_range)
+        t1 = t0
+    if not isinstance(t0, pd.Timestamp) or not isinstance(t1, pd.Timestamp):
+        raise TypeError(
+            "`time_or_range` must be a single time or a tuple of two times "
+            "in a format accepted by pandas.to_datetime"
+        )
+
+    _ = earthaccess.login(**kwargs)
+
+    results = earthaccess.search_data(
+        short_name="GPM_MERGIR",
+        version="1",
+        cloud_hosted=True,
+        temporal=(t0, t1),
+        count=-1,
+    )
+
+    n = len(results)
+    if n == 0:
+        raise ValueError("no results")
+    elif n >= 1:
+        files = earthaccess.open(results)
+        if n == 1:
+            ds = xr.open_dataset(files[0])
+        else:
+            ds = xr.open_mfdataset(files, combine="nested", concat_dim="time")
+
+    da = ds["Tb"].rename("tb").assign_attrs(long_name="brightness temperature")
+
+    # Some times are off by sub-seconds, but we know it should be half-hourly
+    da["time"] = da.time.dt.round("30min")
+
+    # Select request
+    da = da.sel(time=slice(t0, t1)).squeeze()
+
+    return da
