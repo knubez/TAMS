@@ -398,6 +398,24 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
     return ds
 
 
+def _time_input_to_pandas(
+    time_or_range: Any | tuple[Any, Any]
+) -> tuple[pd.Timestamp | None, pd.Timestamp | None]:
+    if isinstance(time_or_range, tuple):
+        t0_, t1_ = time_or_range
+        t0 = pd.to_datetime(t0_)
+        t1 = pd.to_datetime(t1_)
+    else:  # Assume single time
+        t0 = pd.to_datetime(time_or_range)
+        t1 = t0
+    if not isinstance(t0, pd.Timestamp) or not isinstance(t1, pd.Timestamp):
+        raise TypeError(
+            "`time_or_range` must be a single time or a tuple of two times "
+            "in a format accepted by pandas.to_datetime"
+        )
+    return t0, t1
+
+
 def get_mergir_tb(
     time_or_range: Any | tuple[Any, Any],
     version: str = "1",
@@ -426,19 +444,7 @@ def get_mergir_tb(
     """
     import earthaccess
 
-    # Convert time to pandas
-    if isinstance(time_or_range, tuple):
-        t0_, t1_ = time_or_range
-        t0 = pd.to_datetime(t0_)
-        t1 = pd.to_datetime(t1_)
-    else:  # Assume single time
-        t0 = pd.to_datetime(time_or_range)
-        t1 = t0
-    if not isinstance(t0, pd.Timestamp) or not isinstance(t1, pd.Timestamp):
-        raise TypeError(
-            "`time_or_range` must be a single time or a tuple of two times "
-            "in a format accepted by pandas.to_datetime"
-        )
+    t0, t1 = _time_input_to_pandas(time_or_range)
 
     _ = earthaccess.login(**kwargs)
 
@@ -469,3 +475,68 @@ def get_mergir_tb(
     da = da.sel(time=slice(t0, t1)).squeeze()
 
     return da
+
+
+def get_imerg(
+    time_or_range: Any | tuple[Any, Any],
+    version: str = "07",
+    run: str = "final",
+    **kwargs,
+) -> xarray.Dataset:
+    """Stream GPM IMERG L3 precipitation from NASA Earthdata.
+
+    https://gpm.nasa.gov/data/directory
+
+    This is half-hourly 0.1° (~ 10-km) resolution data.
+
+    .. note::
+       A NASA Earthdata account is required.
+       See https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
+       for more info.
+
+    Parameters
+    ----------
+    time_or_range
+        Specific time or time range (inclusive) to request.
+    version
+        For example: '06', '07'.
+    run
+        'early' and 'late' are available in near-realtime;
+        'final' is delayed by a few months.
+    **kwargs
+        Passed to :func:`earthaccess.login`.
+    """
+    import earthaccess
+
+    t0, t1 = _time_input_to_pandas(time_or_range)
+
+    if run != "final":
+        raise NotImplementedError
+
+    _ = earthaccess.login(**kwargs)
+
+    results = earthaccess.search_data(
+        short_name="GPM_3IMERGHH",
+        version=version,
+        cloud_hosted=True,
+        temporal=(t0, t1),
+        count=-1,
+    )
+
+    n = len(results)
+    breakpoint()
+    if n == 0:
+        raise ValueError("no results")
+    elif n >= 1:
+        files = earthaccess.open(results)
+        if n == 1:
+            ds = xr.open_dataset(files[0])
+        else:
+            ds = xr.open_mfdataset(files, combine="nested", concat_dim="time")
+
+    breakpoint()
+
+    # # Select request
+    # ds = ds.sel(time=slice(t0, t1))
+
+    return ds
