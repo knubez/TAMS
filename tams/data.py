@@ -458,7 +458,7 @@ def get_mergir_tb(
 
     n = len(results)
     if n == 0:
-        raise ValueError("no results")
+        raise ValueError(f"no results for period=({t0}, {t1}), version={version!r}")
     elif n >= 1:
         files = earthaccess.open(results)
         if n == 1:
@@ -516,8 +516,20 @@ def get_imerg(
 
     _ = earthaccess.login(**kwargs)
 
+    try:
+        short_name = (
+            "GPM_3IMERGHH"
+            + {
+                "early": "E",
+                "late": "L",
+                "final": "",
+            }[run.lower()]
+        )
+    except KeyError as e:
+        raise ValueError(f"invalid `run` {run!r}") from e
+
     results = earthaccess.search_data(
-        short_name="GPM_3IMERGHH",
+        short_name=short_name,
         version=version,
         cloud_hosted=True,
         temporal=(t0, t1),
@@ -527,7 +539,9 @@ def get_imerg(
     n = len(results)
     breakpoint()
     if n == 0:
-        raise ValueError("no results")
+        raise ValueError(
+            f"no {short_name} ({run.lower()}) results for period=({t0}, {t1}), version={version!r}"
+        )
     elif n >= 1:
         files = earthaccess.open(results)
         if n == 1:
