@@ -511,9 +511,6 @@ def get_imerg(
 
     t0, t1 = _time_input_to_pandas(time_or_range)
 
-    if run != "final":
-        raise NotImplementedError
-
     _ = earthaccess.login(**kwargs)
 
     try:
