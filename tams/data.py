@@ -449,8 +449,9 @@ def get_mergir_tb(
 
     _ = earthaccess.login(**kwargs)
 
+    short_name = "GPM_MERGIR"
     results = earthaccess.search_data(
-        short_name="GPM_MERGIR",
+        short_name=short_name,
         version=version,
         cloud_hosted=True,
         temporal=(t0, t1),
@@ -582,6 +583,10 @@ def get_imerg(
             "long_name": long_names[vn],
             "description": " ".join(ds[vn].attrs["LongName"].strip().split()),
         }
-    ds.attrs["GridHeader"] = ds.attrs["GridHeader"].strip().replace("\n", "")
+    ds.attrs = {
+        "ShortName": short_name,
+        "Version": version,
+        "GridHeader": ds.attrs["GridHeader"].strip().replace("\n", ""),
+    }
 
     return ds
