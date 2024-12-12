@@ -420,6 +420,7 @@ def _time_input_to_pandas(
 def get_mergir_tb(
     time_or_range: Any | tuple[Any, Any],
     version: str = "1",
+    parallel: bool = False,
     **kwargs,
 ) -> xarray.DataArray:
     """Stream GPM MERGIR bright temperature from NASA Earthdata.
@@ -427,7 +428,7 @@ def get_mergir_tb(
     https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary
 
     This is half-hourly ~ 4-km resolution data.
-    Each nc file contains one hour (two half-hourly time steps).
+    Each netCDF file contains one hour (two half-hourly time steps).
 
     .. note::
        A NASA Earthdata account is required.
@@ -440,6 +441,10 @@ def get_mergir_tb(
         Specific time or time range (inclusive) to request.
     version
         Currently '1' is the only option.
+    parallel
+        Passed to :func:`xarray.open_mfdataset`, telling it to open files in parallel using Dask.
+        This may speed up loading if you are requesting more than a few hours,
+        especially if you are using ``dask.distributed``.
     **kwargs
         Passed to :func:`earthaccess.login`.
     """
@@ -466,7 +471,7 @@ def get_mergir_tb(
         if n == 1:
             ds = xr.open_dataset(files[0])
         else:
-            ds = xr.open_mfdataset(files, combine="nested", concat_dim="time")
+            ds = xr.open_mfdataset(files, combine="nested", concat_dim="time", parallel=parallel)
 
     da = ds["Tb"].rename("tb").assign_attrs(long_name="brightness temperature")
 
@@ -483,6 +488,7 @@ def get_imerg(
     time_or_range: Any | tuple[Any, Any],
     version: str = "07",
     run: str = "final",
+    parallel: bool = False,
     **kwargs,
 ) -> xarray.Dataset:
     """Stream GPM IMERG L3 precipitation from NASA Earthdata.
@@ -506,6 +512,10 @@ def get_imerg(
     run
         'early' and 'late' are available in near-realtime;
         'final' is delayed by a few months.
+    parallel
+        Passed to :func:`xarray.open_mfdataset`, telling it to open files in parallel using Dask.
+        This may speed up loading if you are requesting more than a few hours,
+        especially if you are using ``dask.distributed``.
     **kwargs
         Passed to :func:`earthaccess.login`.
     """
@@ -545,7 +555,9 @@ def get_imerg(
         if n == 1:
             ds = xr.open_dataset(files[0], group="Grid")
         else:
-            ds = xr.open_mfdataset(files, group="Grid", combine="nested", concat_dim="time")
+            ds = xr.open_mfdataset(
+                files, group="Grid", combine="nested", concat_dim="time", parallel=parallel
+            )
 
     # Convert to normal datetime
     with warnings.catch_warnings():
