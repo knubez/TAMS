@@ -4,6 +4,7 @@ Loaders for various data sets.
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -534,7 +535,6 @@ def get_imerg(
     )
 
     n = len(results)
-    breakpoint()
     if n == 0:
         raise ValueError(
             f"no {short_name} ({run.lower()}) results for period=({t0}, {t1}), version={version!r}"
@@ -546,9 +546,42 @@ def get_imerg(
         else:
             ds = xr.open_mfdataset(files, group="Grid", combine="nested", concat_dim="time")
 
-    breakpoint()
+    # Convert to normal datetime
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        ds["time"] = ds.indexes["time"].to_datetimeindex()
 
-    # # Select request
-    # ds = ds.sel(time=slice(t0, t1))
+    ds = (
+        ds.drop_dims(["nv", "lonv", "latv"])  # bounds
+        .drop_vars(["probabilityLiquidPrecipitation"])
+        .rename_vars(
+            {
+                "precipitation": "pr",
+                "randomError": "pr_err",
+                "precipitationQualityIndex": "pr_qi",
+            }
+        )
+        .squeeze()
+    )
+
+    # Clean up attrs
+    long_names = {
+        "time": "time",
+        "lat": "latitude",
+        "lon": "longitude",
+        "pr": "precipitation rate",
+        "pr_err": "RMSE error estimate for precipitation rate",
+        "pr_qi": "quality index for precipitation rate",
+    }
+    ds["pr_qi"].attrs.update(units="1")
+    for vn in ds.variables:
+        if vn == "time":
+            continue
+        ds[vn].attrs = {
+            "units": ds[vn].attrs["units"],
+            "long_name": long_names[vn],
+            "description": " ".join(ds[vn].attrs["LongName"].strip().split()),
+        }
+    ds.attrs["GridHeader"] = ds.attrs["GridHeader"].strip().replace("\n", "")
 
     return ds
