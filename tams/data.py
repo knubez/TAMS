@@ -418,7 +418,8 @@ def _time_input_to_pandas(
 
 
 def get_mergir(
-    time_or_range: Any | tuple[Any, Any],
+    time_or_range: Any | tuple[Any, Any],  # TODO: positional-only
+    *,
     version: str = "1",
     parallel: bool = False,
     **kwargs,
@@ -502,7 +503,8 @@ def get_mergir(
 
 
 def get_imerg(
-    time_or_range: Any | tuple[Any, Any],
+    time_or_range: Any | tuple[Any, Any],  # TODO: positional-only
+    *,
     version: str = "07",
     run: str = "final",
     parallel: bool = False,
