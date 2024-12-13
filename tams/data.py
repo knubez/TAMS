@@ -417,12 +417,12 @@ def _time_input_to_pandas(
     return t0, t1
 
 
-def get_mergir_tb(
+def get_mergir(
     time_or_range: Any | tuple[Any, Any],
     version: str = "1",
     parallel: bool = False,
     **kwargs,
-) -> xarray.DataArray:
+) -> xarray.Dataset:
     """Stream GPM MERGIR bright temperature from NASA Earthdata.
 
     https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary
@@ -473,15 +473,25 @@ def get_mergir_tb(
         else:
             ds = xr.open_mfdataset(files, combine="nested", concat_dim="time", parallel=parallel)
 
-    da = ds["Tb"].rename("tb").assign_attrs(long_name="brightness temperature")
+    ds = ds.rename_vars({"Tb": "tb"})
+    for vn in ds.variables:
+        if vn == "time":
+            continue
+        ds[vn].attrs["long_name"] = ds[vn].attrs["standard_name"].replace("_", " ")
 
     # Some times are off by sub-seconds, but we know it should be half-hourly
-    da["time"] = da.time.dt.round("30min")
+    ds["time"] = ds.time.dt.round("30min")
 
     # Select request
-    da = da.sel(time=slice(t0, t1)).squeeze()
+    ds = ds.sel(time=slice(t0, t1)).squeeze()
 
-    return da
+    ds.attrs["FileHeader"] = ds.attrs["FileHeader"].strip().replace("\n", "")
+    ds.attrs.update(
+        ShortName=short_name,
+        Version=version,
+    )
+
+    return ds
 
 
 def get_imerg(
