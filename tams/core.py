@@ -255,7 +255,8 @@ def identify(
         Disable this option to return all identified CEs.
         Note that all 219s are returned regardless of this setting.
 
-        When enabled, this also identifies the 219s (if any) that are within each 235.
+        When enabled (default), this also identifies the 219s (if any) that are within each 235.
+        Only 235s with enough 219 area (`size_threshold`) are kept.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
     ctt_threshold
@@ -267,6 +268,18 @@ def identify(
         It helps target raining clouds.
     size_threshold
         Area threshold (units: km²) to use when `size_filter` is enabled.
+
+    Returns
+    -------
+    css235
+        List of dataframes of 235 K contour polygons (CEs).
+        If `size_filter` is enabled (default), an ``area_km2`` column is included,
+        column ``cs219`` gives the cold cores for each CE as a multi-polygon,
+        and those rows that don't meet the size filtering criteria are dropped.
+    css219
+        List of dataframes of 219 K contour polygons (cold cores).
+        If `size_filter` is enabled (default), an ``area_km2`` column is included,
+        but all rows are included, regardless of the area value.
 
     See Also
     --------
