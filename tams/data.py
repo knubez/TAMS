@@ -427,7 +427,7 @@ def get_mergir_tb(
 
     https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary
 
-    This is half-hourly ~ 4-km resolution data.
+    This is half-hourly ~ 4-km resolution data in the 60°S--60°N latitude band.
     Each netCDF file contains one hour (two half-hourly time steps).
 
     .. note::
