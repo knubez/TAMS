@@ -471,7 +471,13 @@ def get_mergir(
         if n == 1:
             ds = xr.open_dataset(files[0])
         else:
-            ds = xr.open_mfdataset(files, combine="nested", concat_dim="time", parallel=parallel)
+            ds = xr.open_mfdataset(
+                files,
+                combine="nested",
+                concat_dim="time",
+                combine_attrs="drop_conflicts",
+                parallel=parallel,
+            )
 
     ds = ds.rename_vars({"Tb": "tb"})
     for vn in ds.variables:
@@ -485,7 +491,8 @@ def get_mergir(
     # Select request
     ds = ds.sel(time=slice(t0, t1)).squeeze()
 
-    ds.attrs["FileHeader"] = ds.attrs["FileHeader"].strip().replace("\n", "")
+    if "FileHeader" in ds.attrs:
+        ds.attrs["FileHeader"] = ds.attrs["FileHeader"].strip().replace("\n", "")
     ds.attrs.update(
         ShortName=short_name,
         Version=version,
@@ -566,7 +573,12 @@ def get_imerg(
             ds = xr.open_dataset(files[0], group="Grid")
         else:
             ds = xr.open_mfdataset(
-                files, group="Grid", combine="nested", concat_dim="time", parallel=parallel
+                files,
+                group="Grid",
+                combine="nested",
+                concat_dim="time",
+                combine_attrs="drop_conflicts",
+                parallel=parallel,
             )
 
     # Convert to normal datetime
@@ -606,9 +618,9 @@ def get_imerg(
             "description": " ".join(ds[vn].attrs["LongName"].strip().split()),
         }
     ds.attrs = {
+        "GridHeader": ds.attrs["GridHeader"].strip().replace("\n", ""),
         "ShortName": short_name,
         "Version": version,
-        "GridHeader": ds.attrs["GridHeader"].strip().replace("\n", ""),
     }
 
     return ds
