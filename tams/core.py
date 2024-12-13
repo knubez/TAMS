@@ -201,9 +201,9 @@ def _size_filter_contours(
 def _identify_one(
     ctt: xr.DataArray,
     *,
-    size_filter: bool = True,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_filter: bool = True,
     size_threshold: float = 4000,
     unstructured: bool | None = None,
     triangulation: matplotlib.tri.Triangulation | None = None,
@@ -232,11 +232,11 @@ def _identify_one(
 def identify(
     ctt: xarray.DataArray,
     *,
-    size_filter: bool = True,
-    parallel: bool = False,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_filter: bool = True,
     size_threshold: float = 4000,
+    parallel: bool = False,
 ) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The 235 K contours returned (first list) serve to identify cloud elements (CEs).
@@ -248,6 +248,15 @@ def identify(
     ----------
     ctt
         Cloud-top temperature array.
+    ctt_threshold
+        Used to identify the edges of cloud elements.
+    ctt_core_threshold
+        Used to identify deep convective cloud regions within larger cloud areas.
+        This is used to determine whether or not a system is eligible for being classified
+        as an organized system.
+        It helps target raining clouds.
+    size_threshold
+        Area threshold (units: km²) to use when `size_filter` is enabled.
     size_filter
         Whether to apply size-filtering
         (using 235 K and 219 K areas to filter out CEs that are not MCS material).
@@ -259,15 +268,6 @@ def identify(
         Only 235s with enough 219 area (`size_threshold`) are kept.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
-    ctt_threshold
-        Used to identify the edges of cloud elements.
-    ctt_core_threshold
-        Used to identify deep convective cloud regions within larger cloud areas.
-        This is used to determine whether or not a system is eligible for being classified
-        as an organized system.
-        It helps target raining clouds.
-    size_threshold
-        Area threshold (units: km²) to use when `size_filter` is enabled.
 
     Returns
     -------
@@ -305,9 +305,9 @@ def identify(
 
     f = functools.partial(
         _identify_one,
-        size_filter=size_filter,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        size_filter=size_filter,
         size_threshold=size_threshold,
         unstructured=unstructured,
         triangulation=triangulation,
@@ -867,10 +867,10 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
 def run(
     ds: xarray.DataArray,
     *,
-    parallel: bool = True,
-    u_projection: float = 0,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    u_projection: float = 0,
+    parallel: bool = True,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     r"""Run all TAMS steps, including precip assignment.
 
@@ -888,10 +888,6 @@ def run(
     ----------
     ds
         Dataset containing 3-D cloud-top temperature and precipitation rate.
-    parallel
-        Whether to apply parallelization (where possible).
-    u_projection
-        *x*\-direction projection velocity to apply before computing overlaps.
     ctt_threshold
         Used to identify the edges of cloud elements.
     ctt_core_threshold
@@ -899,6 +895,10 @@ def run(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
+    u_projection
+        *x*\-direction projection velocity to apply before computing overlaps.
+    parallel
+        Whether to apply parallelization (where possible).
 
     See Also
     --------
@@ -933,9 +933,9 @@ def run(
     msg("Starting `identify`")
     cs235, cs219 = identify(
         ds.ctt,
-        parallel=parallel,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        parallel=parallel,
     )
 
     #
