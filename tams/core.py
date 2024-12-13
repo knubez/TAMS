@@ -204,6 +204,7 @@ def _identify_one(
     size_filter: bool = True,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_threshold: float = 4000,
     unstructured: bool | None = None,
     triangulation: matplotlib.tri.Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
@@ -223,7 +224,7 @@ def _identify_one(
     ).reset_index(drop=True)
 
     if size_filter:
-        cs235, cs219 = _size_filter_contours(cs235, cs219)
+        cs235, cs219 = _size_filter_contours(cs235, cs219, threshold=size_threshold)
 
     return cs235, cs219
 
@@ -235,6 +236,7 @@ def identify(
     parallel: bool = False,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_threshold: float = 4000,
 ) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The 235 K contours returned (first list) serve to identify cloud elements (CEs).
@@ -263,6 +265,8 @@ def identify(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
+    size_threshold
+        Area threshold (units: km²) to use when `size_filter` is enabled.
     """
     dims = tuple(ctt.dims)
 
@@ -286,6 +290,7 @@ def identify(
         size_filter=size_filter,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        size_threshold=size_threshold,
         unstructured=unstructured,
         triangulation=triangulation,
     )
