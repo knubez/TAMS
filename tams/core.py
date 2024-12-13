@@ -267,6 +267,11 @@ def identify(
         It helps target raining clouds.
     size_threshold
         Area threshold (units: km²) to use when `size_filter` is enabled.
+
+    See Also
+    --------
+    :doc:`/examples/identify`
+        Demonstrating the impacts of options.
     """
     dims = tuple(ctt.dims)
 

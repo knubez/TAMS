@@ -28,6 +28,7 @@ examples/sample-satellite-data.ipynb
 examples/tams-run.ipynb
 examples/tracking-options.ipynb
 examples/sample-mpas-ug-data.ipynb
+examples/identify.ipynb
 ```
 
 ```{toctree}
