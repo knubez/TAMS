@@ -255,8 +255,6 @@ def identify(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
-    size_threshold
-        Area threshold (units: km²) to use when `size_filter` is enabled.
     size_filter
         Whether to apply size-filtering
         (using 235 K and 219 K areas to filter out CEs that are not MCS material).
@@ -266,6 +264,8 @@ def identify(
 
         When enabled (default), this also identifies the 219s (if any) that are within each 235.
         Only 235s with enough 219 area (`size_threshold`) are kept.
+    size_threshold
+        Area threshold (units: km²) to use when `size_filter` is enabled.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
 
