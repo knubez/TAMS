@@ -602,7 +602,7 @@ def get_imerg(
     # Convert to normal datetime
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-        ds["time"] = ds.indexes["time"].to_datetimeindex()
+        ds["time"] = ds.indexes["time"].to_datetimeindex()  # type: ignore[attr-defined]
 
     ds = (
         ds.drop_dims(["nv", "lonv", "latv"])  # bounds
@@ -628,6 +628,7 @@ def get_imerg(
     }
     ds["pr_qi"].attrs.update(units="1")
     for vn in ds.variables:
+        assert isinstance(vn, str)
         if vn == "time":
             continue
         ds[vn].attrs = {
