@@ -78,7 +78,7 @@ nb_execution_excludepatterns = exclude_patterns + [
     "examples/tracking-options.ipynb",
 ]
 nb_execution_raise_on_error = True
-nb_execution_timeout = 60
+nb_execution_timeout = 180
 
 myst_enable_extensions = [
     "dollarmath",
