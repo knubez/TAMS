@@ -432,9 +432,13 @@ def get_mergir(
     Each netCDF file contains one hour (two half-hourly time steps).
 
     .. note::
-       A NASA Earthdata account is required.
-       See https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
-       for more info.
+       The Python package
+       `earthaccess <https://earthaccess.readthedocs.io/en/stable/quick-start/>`__
+       is required.
+       Addtionally, you must have a
+       `NASA Earthdata account <https://www.earthdata.nasa.gov/>`__
+       (see https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
+       for more info).
 
     Parameters
     ----------
@@ -518,9 +522,13 @@ def get_imerg(
     Each HDF5 file contains one time step.
 
     .. note::
-       A NASA Earthdata account is required.
-       See https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
-       for more info.
+       The Python package
+       `earthaccess <https://earthaccess.readthedocs.io/en/stable/quick-start/>`__
+       is required.
+       Addtionally, you must have a
+       `NASA Earthdata account <https://www.earthdata.nasa.gov/>`__
+       (see https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
+       for more info).
 
     Parameters
     ----------
