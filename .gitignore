@@ -1,4 +1,5 @@
 *.ipynb_checkpoints
+.dodsrc
 Satellite_data.nc
 MPAS_data.nc
 MPAS_unstructured_data.nc
