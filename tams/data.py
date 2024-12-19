@@ -452,6 +452,10 @@ def get_mergir(
         especially if you are using ``dask.distributed``.
     **kwargs
         Passed to :func:`earthaccess.login`.
+
+    See Also
+    --------
+    :doc:`/examples/get`
     """
     import earthaccess
 
@@ -545,6 +549,10 @@ def get_imerg(
         especially if you are using ``dask.distributed``.
     **kwargs
         Passed to :func:`earthaccess.login`.
+
+    See Also
+    --------
+    :doc:`/examples/get`
     """
     import earthaccess
 
