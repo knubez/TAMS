@@ -621,6 +621,7 @@ def get_imerg(
                 "precipitationQualityIndex": "pr_qi",
             }
         )
+        .transpose("time", "lat", "lon")
         .squeeze()
     )
     ds = ds.drop_vars(ds.data_vars.keys() - {"pr", "pr_err", "pr_qi"})
