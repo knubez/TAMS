@@ -461,7 +461,9 @@ def get_mergir(
 
     t0, t1 = _time_input_to_pandas(time_or_range)
 
-    _ = earthaccess.login(**kwargs)
+    auth = earthaccess.login(**kwargs)
+    if not auth.authenticated:
+        raise RuntimeError("NASA Earthdata authentication failed")
 
     short_name = "GPM_MERGIR"
     results = earthaccess.search_data(
@@ -558,7 +560,9 @@ def get_imerg(
 
     t0, t1 = _time_input_to_pandas(time_or_range)
 
-    _ = earthaccess.login(**kwargs)
+    auth = earthaccess.login(**kwargs)
+    if not auth.authenticated:
+        raise RuntimeError("NASA Earthdata authentication failed")
 
     try:
         short_name = (
