@@ -54,7 +54,7 @@ def test_data_in_contours_raises_full_nan():
 
 def test_data_in_contours_pass_df():
     data_da = tb
-    contours = tams.core._contours_to_gdf(tams.contours(tb, 235))
+    contours = tams.identify(tb)[0][0]
 
     data_ds = data_da.to_dataset()
     data_df = data_da.to_dataframe().reset_index(drop=True)  # drop (lat, lon) index
@@ -80,6 +80,17 @@ def test_data_in_contours_pass_df():
     for left, right in zip(results[:-1], results[1:]):
         assert left is not right
         pd.testing.assert_frame_equal(left, right)
+
+
+@pytest.mark.parametrize("method", ["sjoin", "regionmask"])
+def test_data_in_contours_pass_ds_multiple_vars(method):
+    # TODO: rename to 'tb' in `tb_from_ir` (and update examples/tests)
+    data = tb.rename("tb").to_dataset().assign(tb_p100=tb + 100)
+    contours = tams.identify(tb)[0][0]
+
+    df = tams.data_in_contours(data, contours, method=method, agg="mean")
+    assert tuple(df.columns) == ("mean_tb", "mean_tb_p100")
+    np.isclose(df["mean_tb_p100"].astype(float), df["mean_tb"].astype(float) + 100).all()
 
 
 def test_load_mpas_sample():
