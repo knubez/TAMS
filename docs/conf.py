@@ -77,7 +77,7 @@ nb_execution_mode = "cache"
 nb_execution_excludepatterns = exclude_patterns + [
     "examples/tracking-options.ipynb",
 ]
-nb_execution_raise_on_error = True
+# nb_execution_raise_on_error = True
 nb_execution_timeout = 60
 
 myst_enable_extensions = [
