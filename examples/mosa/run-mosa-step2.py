@@ -25,7 +25,7 @@ if do_bench:
     import pandas as pd
 
     # WRF 1--7 Nov 2018
-    times = pd.date_range("2018-11-01", "2018-11-07 23:00", freq="H")
+    times = pd.date_range("2018-11-01", "2018-11-07 23:00", freq="h")
     files = [IN_DIR / f"tb_rainrate_{t:%Y-%m-%d_%H}:00_ce.parquet" for t in times]
 
     print(files[0])

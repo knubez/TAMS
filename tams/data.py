@@ -71,11 +71,11 @@ def download_examples(*, clobber: bool = False) -> None:
     """Download the example datasets.
 
     * Satellite data (EUMETSAT MSG SEVIRI 10.8 μm IR radiance):
-      https://drive.google.com/file/d/1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp/view?usp=sharing
+      https://drive.google.com/file/d/1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD/view?usp=sharing
     * MPAS regridded data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E/view?usp=sharing
+      https://drive.google.com/file/d/1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-/view?usp=sharing
     * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf/view?usp=sharing
+      https://drive.google.com/file/d/1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248/view?usp=sharing
 
     .. note::
        `gdown <https://github.com/wkentaro/gdown>`__,
@@ -103,9 +103,9 @@ def download_examples(*, clobber: bool = False) -> None:
     """
 
     files = [
-        ("1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp", "Satellite_data.nc"),  # < 100 MB
-        ("1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E", "MPAS_data.nc"),  # < 100 MB
-        ("1bexeAGSzS3FPEy3a120Z2Qsz0LC5_HPf", "MPAS_unstructured_data.nc"),  # > 100 MB
+        ("1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD", "Satellite_data.nc"),  # < 100 MB
+        ("1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-", "MPAS_data.nc"),  # < 100 MB
+        ("1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248", "MPAS_unstructured_data.nc"),  # > 100 MB
     ]
 
     try:
@@ -150,7 +150,7 @@ def load_example_ir() -> xarray.DataArray:
     ds.lat.attrs.update(long_name="Latitude")
 
     # Times are 2006-Sep-01 00 -- 10, every 2 hours
-    ds["time"] = pd.date_range("2006-Sep-01", freq="2H", periods=6)
+    ds["time"] = pd.date_range("2006-Sep-01", freq="2h", periods=6)
 
     return ds.ch9
 
@@ -181,7 +181,7 @@ def load_example_tb() -> xarray.DataArray:
 
 
 def load_example_mpas() -> xarray.Dataset:
-    """Load the example MPAS dataset.
+    r"""Load the example MPAS dataset.
 
     This is a spatial and variable subset of native MPAS output,
     Furthermore, it has been regridded to a regular lat/lon grid (0.25°)
@@ -196,6 +196,16 @@ def load_example_mpas() -> xarray.Dataset:
     It has ``tb`` (estimated brightness temperature)
     and ``precip`` (precipitation rate, derived by summing the MPAS accumulated
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
+
+    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
+
+    .. math::
+       E = \sigma T^4
+       \implies T = (E / \sigma)^{1/4}
+
+    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
+    in W m\ :sup:`-2`
+    and :math:`\sigma` is the Stefan--Boltzmann constant.
 
     This dataset contains 127 time steps of hourly data:
     2006-09-08 12 -- 2006-09-13 18.
@@ -226,7 +236,7 @@ def load_example_mpas() -> xarray.Dataset:
 
 
 def load_example_mpas_ug() -> xarray.Dataset:
-    """Load the example MPAS unstructured grid dataset.
+    r"""Load the example MPAS unstructured grid dataset.
 
     This is a spatial and variable subset of native 15-km global mesh MPAS output.
 
@@ -241,6 +251,17 @@ def load_example_mpas_ug() -> xarray.Dataset:
     and ``precip`` (precipitation rate)
     for the period
     2006-09-08 12 -- 2006-09-13 18.
+
+    Like the regridded MPAS dataset,
+    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
+
+    .. math::
+       E = \sigma T^4
+       \implies T = (E / \sigma)^{1/4}
+
+    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
+    in W m\ :sup:`-2`
+    and :math:`\sigma` is the Stefan--Boltzmann constant.
 
     See Also
     --------
@@ -261,7 +282,7 @@ def load_example_mpas_ug() -> xarray.Dataset:
     ds["tb"] = ds.tb.where(ds.tb > 0)
 
     # Set time (time variable in there just has elapsed hours as int)
-    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1H", periods=ds.sizes["time"])
+    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1h", periods=ds.sizes["time"])
 
     # Diff accumulated precip to get mm/h
     ds["precip"] = ds.precip.diff("time", label="lower")

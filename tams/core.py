@@ -209,9 +209,10 @@ def _size_filter_contours(
 def _identify_one(
     ctt: xr.DataArray,
     *,
-    size_filter: bool = True,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_filter: bool = True,
+    size_threshold: float = 4000,
     unstructured: bool | None = None,
     triangulation: matplotlib.tri.Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
@@ -231,7 +232,7 @@ def _identify_one(
     ).reset_index(drop=True)
 
     if size_filter:
-        cs235, cs219 = _size_filter_contours(cs235, cs219)
+        cs235, cs219 = _size_filter_contours(cs235, cs219, threshold=size_threshold)
 
     return cs235, cs219
 
@@ -239,10 +240,11 @@ def _identify_one(
 def identify(
     ctt: xarray.DataArray,
     *,
-    size_filter: bool = True,
-    parallel: bool = False,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_filter: bool = True,
+    size_threshold: float = 4000,
+    parallel: bool = False,
 ) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The 235 K contours returned (first list) serve to identify cloud elements (CEs).
@@ -254,16 +256,6 @@ def identify(
     ----------
     ctt
         Cloud-top temperature array.
-    size_filter
-        Whether to apply size-filtering
-        (using 235 K and 219 K areas to filter out CEs that are not MCS material).
-        Filtering at this stage makes TAMS more computationally efficient overall.
-        Disable this option to return all identified CEs.
-        Note that all 219s are returned regardless of this setting.
-
-        When enabled, this also identifies the 219s (if any) that are within each 235.
-    parallel
-        Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
     ctt_threshold
         Used to identify the edges of cloud elements.
     ctt_core_threshold
@@ -271,6 +263,36 @@ def identify(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
+    size_filter
+        Whether to apply size-filtering
+        (using 235 K and 219 K areas to filter out CEs that are not MCS material).
+        Filtering at this stage makes TAMS more computationally efficient overall.
+        Disable this option to return all identified CEs.
+        Note that all 219s are returned regardless of this setting.
+
+        When enabled (default), this also identifies the 219s (if any) that are within each 235.
+        Only 235s with enough 219 area (`size_threshold`) are kept.
+    size_threshold
+        Area threshold (units: km²) to use when `size_filter` is enabled.
+    parallel
+        Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
+
+    Returns
+    -------
+    css235
+        List of dataframes of 235 K contour polygons (CEs).
+        If `size_filter` is enabled (default), an ``area_km2`` column is included,
+        column ``cs219`` gives the cold cores for each CE as a multi-polygon,
+        and those rows that don't meet the size filtering criteria are dropped.
+    css219
+        List of dataframes of 219 K contour polygons (cold cores).
+        If `size_filter` is enabled (default), an ``area_km2`` column is included,
+        but all rows are included, regardless of the area value.
+
+    See Also
+    --------
+    :doc:`/examples/identify`
+        Demonstrating the impacts of options.
     """
     dims = tuple(ctt.dims)
 
@@ -292,9 +314,10 @@ def identify(
 
     f = functools.partial(
         _identify_one,
-        size_filter=size_filter,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        size_filter=size_filter,
+        size_threshold=size_threshold,
         unstructured=unstructured,
         triangulation=triangulation,
     )
@@ -395,7 +418,8 @@ def _data_in_contours_regionmask(
     # Form regionmask(s)
     shapes = contours[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(data)  # works but takes long (though shorter with pygeos)!
+    mask = regions.mask(data)
+    # Note: before Shapely v2, having `pygeos` installed made this faster
 
     # Aggregate points inside contour
     new_data_ = {
@@ -874,10 +898,10 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
 def run(
     ds: xarray.DataArray,
     *,
-    parallel: bool = True,
-    u_projection: float = 0,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    u_projection: float = 0,
+    parallel: bool = True,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     r"""Run all TAMS steps, including precip assignment.
 
@@ -895,10 +919,6 @@ def run(
     ----------
     ds
         Dataset containing 3-D cloud-top temperature and precipitation rate.
-    parallel
-        Whether to apply parallelization (where possible).
-    u_projection
-        *x*\-direction projection velocity to apply before computing overlaps.
     ctt_threshold
         Used to identify the edges of cloud elements.
     ctt_core_threshold
@@ -906,6 +926,10 @@ def run(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
+    u_projection
+        *x*\-direction projection velocity to apply before computing overlaps.
+    parallel
+        Whether to apply parallelization (where possible).
 
     See Also
     --------
@@ -940,9 +964,9 @@ def run(
     msg("Starting `identify`")
     cs235, cs219 = identify(
         ds.ctt,
-        parallel=parallel,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        parallel=parallel,
     )
 
     #
@@ -1160,7 +1184,7 @@ if __name__ == "__main__":
     # Trying regionmask
     shapes = cs235[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
+    mask = regions.mask(tb)
 
     regions.plot(ax=ax)
 
