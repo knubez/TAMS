@@ -458,10 +458,9 @@ def data_in_contours(
             raise ValueError("Input array `data` is all null (e.g. NaN)")
             # TODO: warn instead for this and return cols of NaNs?
     elif isinstance(data, xr.Dataset):
-        # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
-        raise NotImplementedError
+        varnames = list(data.data_vars)
     elif isinstance(data, (pd.DataFrame, gpd.GeoDataFrame)):
-        if method == "regionmask":
+        if method in {"regionmask"}:
             raise TypeError(f"method {method!r} requires `data` to be in xarray format")
         varnames = [vn for vn in data.columns if vn not in {"time", "lat", "lon", "geometry"}]
     else:

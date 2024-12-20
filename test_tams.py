@@ -56,6 +56,7 @@ def test_data_in_contours_pass_df():
     data_da = tb
     contours = tams.core._contours_to_gdf(tams.contours(tb, 235))
 
+    data_ds = data_da.to_dataset()
     data_df = data_da.to_dataframe().reset_index(drop=True)  # drop (lat, lon) index
     data_gdf = gpd.GeoDataFrame(
         data_df,
@@ -64,17 +65,19 @@ def test_data_in_contours_pass_df():
     )
 
     in_contours_data_da = tams.data_in_contours(data_da, contours)
+    in_contours_data_ds = tams.data_in_contours(data_ds, contours)
     in_contours_data_df = tams.data_in_contours(data_df, contours)
     in_contours_data_gdf = tams.data_in_contours(data_gdf, contours)
 
     results = [
         in_contours_data_da,
+        in_contours_data_ds,
         in_contours_data_df,
         in_contours_data_gdf,
     ]
     for res in results:
         assert isinstance(res, pd.DataFrame), "just df with merge=False"
-    for left, right in zip(results, results[1:]):
+    for left, right in zip(results[:-1], results[1:]):
         pd.testing.assert_frame_equal(left, right)
 
 
