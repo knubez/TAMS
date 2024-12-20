@@ -52,6 +52,11 @@ def contours(
     :
         List of 2-D arrays describing contours.
         The arrays are shape ``(n, 2)``; each row is a coordinate pair.
+
+    Raises
+    ------
+    ValueError
+        If all values in `x` are null.
     """
     if x.isnull().all():
         raise ValueError("Input array `x` is all null (e.g. NaN)")
@@ -877,6 +882,11 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
 def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
     """Classify the CE groups into MCS classes
     (categorical column ``'mcs_class'`` in the result).
+
+    Raises
+    ------
+    ValueError
+        If the input frame is missing required columns.
     """
     if cs.empty:
         warnings.warn("empty input frame supplied to `classify`", stacklevel=2)
