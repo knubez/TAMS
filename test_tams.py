@@ -78,6 +78,7 @@ def test_data_in_contours_pass_df():
     for res in results:
         assert isinstance(res, pd.DataFrame), "just df with merge=False"
     for left, right in zip(results[:-1], results[1:]):
+        assert left is not right
         pd.testing.assert_frame_equal(left, right)
 
 

@@ -429,8 +429,12 @@ def data_in_contours(
     ----------
     data
         It should have ``'lat'`` and ``'lon'`` coordinates.
+        If you pass a :class:`xarray.Dataset`,
+        all :attr:`~xarray.Dataset.data_vars` will be included.
+        If you pass a dataframe (supported for default `method` ``'sjoin'``),
+        all columns except ``{'time', 'lat', 'lon', 'geometry'}`` will be included.
     contours
-        For example, dataframe of CE or MCS shapes, e.g.
+        For example, a dataframe of CE or MCS shapes, e.g.
         from :func:`identify` or :func:`track`.
     agg : sequence of str or callable
         Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
@@ -443,7 +447,7 @@ def data_in_contours(
         Whether to merge the new data with `contours` or return a separate frame.
         If false (default), the index of the returned non-geo frame
         will be the same as that of `contours`
-        (e.g. corresponding to an individual CE or MCS at a certain time).
+        (e.g. a row corresponding to an individual CE or MCS at a certain time).
 
     See Also
     --------
