@@ -545,6 +545,8 @@ def get_imerg(
     run
         'early' and 'late' are available in near-realtime;
         'final' is delayed by a few months.
+        See what's available at
+        `NASA GES DISC <https://disc.gsfc.nasa.gov/datasets?keywords=gpm%20imerg&page=1&temporalResolution=30%20minutes>`__.
     parallel
         Passed to :func:`xarray.open_mfdataset`, telling it to open files in parallel using Dask.
         This may speed up loading if you are requesting more than a few hours,
@@ -608,9 +610,10 @@ def get_imerg(
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         ds["time"] = ds.indexes["time"].to_datetimeindex()  # type: ignore[attr-defined]
 
+    if "precipitationCal" in ds:
+        ds = ds.rename_vars({"precipitationCal": "precipitation"})
     ds = (
         ds.drop_dims(["nv", "lonv", "latv"])  # bounds
-        .drop_vars(["probabilityLiquidPrecipitation"])
         .rename_vars(
             {
                 "precipitation": "pr",
@@ -620,6 +623,7 @@ def get_imerg(
         )
         .squeeze()
     )
+    ds = ds.drop_vars(ds.data_vars.keys() - {"pr", "pr_err", "pr_qi"})
 
     # Clean up attrs
     long_names = {
@@ -635,11 +639,16 @@ def get_imerg(
         assert isinstance(vn, str)
         if vn == "time":
             continue
+        try:
+            desc = " ".join(ds[vn].attrs["LongName"].strip().split())
+        except KeyError:
+            desc = None
         ds[vn].attrs = {
             "units": ds[vn].attrs["units"],
             "long_name": long_names[vn],
-            "description": " ".join(ds[vn].attrs["LongName"].strip().split()),
         }
+        if desc is not None:
+            ds[vn].attrs["description"] = desc
     ds.attrs = {
         "GridHeader": ds.attrs["GridHeader"].strip().replace("\n", ""),
         "ShortName": short_name,
