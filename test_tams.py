@@ -1,6 +1,8 @@
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 
 import tams
@@ -48,6 +50,32 @@ def test_data_in_contours_raises_full_nan():
     assert data.isnull().all()
     with pytest.raises(ValueError, match="all null"):
         tams.data_in_contours(data, cs)
+
+
+def test_data_in_contours_pass_df():
+    data_da = tb
+    contours = tams.core._contours_to_gdf(tams.contours(tb, 235))
+
+    data_df = data_da.to_dataframe().reset_index(drop=True)  # drop (lat, lon) index
+    data_gdf = gpd.GeoDataFrame(
+        data_df,
+        geometry=gpd.points_from_xy(data_df.lon, data_df.lat),
+        crs="EPSG:4326",
+    )
+
+    in_contours_data_da = tams.data_in_contours(data_da, contours)
+    in_contours_data_df = tams.data_in_contours(data_df, contours)
+    in_contours_data_gdf = tams.data_in_contours(data_gdf, contours)
+
+    results = [
+        in_contours_data_da,
+        in_contours_data_df,
+        in_contours_data_gdf,
+    ]
+    for res in results:
+        assert isinstance(res, pd.DataFrame), "just df with merge=False"
+    for left, right in zip(results, results[1:]):
+        pd.testing.assert_frame_equal(left, right)
 
 
 def test_load_mpas_sample():

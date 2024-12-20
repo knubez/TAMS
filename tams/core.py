@@ -326,7 +326,7 @@ def identify(
 
 
 def _data_in_contours_sjoin(
-    data: xr.DataArray | xr.Dataset | geopandas.GeoDataFrame | pd.DataFrame,
+    data: xr.DataArray | xr.Dataset | pd.DataFrame | geopandas.GeoDataFrame,
     contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
@@ -339,7 +339,7 @@ def _data_in_contours_sjoin(
     import geopandas as gpd
 
     # Convert possibly-2-D data to GeoDataFrame of points
-    if isinstance(data, geopandas.GeoDataFrame):
+    if isinstance(data, gpd.GeoDataFrame):
         points = data
     else:
         if isinstance(data, pd.DataFrame):
@@ -446,6 +446,8 @@ def data_in_contours(
     :ref:`ctt_thresh_data_in_contours`
         A usage example.
     """
+    import geopandas as gpd
+
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
         if data.isnull().all():
@@ -454,6 +456,8 @@ def data_in_contours(
     elif isinstance(data, xr.Dataset):
         # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
         raise NotImplementedError
+    elif isinstance(data, (pd.DataFrame, gpd.GeoDataFrame)):
+        varnames = [vn for vn in data.columns if vn not in {"time", "lat", "lon", "geometry"}]
     else:
         raise TypeError
 
