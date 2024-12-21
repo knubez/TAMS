@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     import geopandas
     import matplotlib
     import numpy
+    import pandas
     import shapely
     import xarray
 
@@ -369,12 +370,12 @@ def identify(
 
 
 def _data_in_contours_sjoin(
-    data: xr.DataArray | xr.Dataset,
+    data: xarray.DataArray | xarray.Dataset | pandas.DataFrame | geopandas.GeoDataFrame,
     contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
     agg=("mean", "std", "count"),
-) -> geopandas.GeoDataFrame:
+) -> pandas.DataFrame:
     """Compute stats on `data` within `contours` using :func:`~geopandas.tools.sjoin`.
 
     `data` must have ``'lat'`` and ``'lon'`` variables.
@@ -382,11 +383,17 @@ def _data_in_contours_sjoin(
     import geopandas as gpd
 
     # Convert possibly-2-D data to GeoDataFrame of points
-    data_df = data.to_dataframe().reset_index(drop=set(data.dims) != {"lat", "lon"})
-    lat = data_df["lat"].values
-    lon = data_df["lon"].values
-    geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points
-    points = gpd.GeoDataFrame(data_df, geometry=geom)
+    if isinstance(data, gpd.GeoDataFrame):
+        points = data
+    else:
+        if isinstance(data, pd.DataFrame):
+            data_df = data
+        else:
+            data_df = data.to_dataframe().reset_index(drop=set(data.dims) != {"lat", "lon"})
+        lat = data_df["lat"].values
+        lon = data_df["lon"].values
+        geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points
+        points = gpd.GeoDataFrame(data_df, geometry=geom)
 
     # Determine which contour (if any) each point is inside
     points = points.sjoin(contours, predicate="within", how="left", rsuffix="contour")
@@ -412,12 +419,12 @@ def _data_in_contours_sjoin(
 
 
 def _data_in_contours_regionmask(
-    data: xr.DataArray | xr.Dataset,
+    data: xarray.DataArray | xarray.Dataset,
     contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
     agg=("mean", "std", "count"),
-) -> geopandas.GeoDataFrame:
+) -> pandas.DataFrame:
     import regionmask
 
     # Form regionmask(s)
@@ -445,13 +452,13 @@ def _data_in_contours_regionmask(
 
 
 def data_in_contours(
-    data: xarray.DataArray | xarray.Dataset,
+    data: xarray.DataArray | xarray.Dataset | pandas.DataFrame | geopandas.GeoDataFrame,
     contours: geopandas.GeoDataFrame,
     *,
     agg=("mean", "std", "count"),  # TODO: type
     method: str = "sjoin",
     merge: bool = False,
-) -> geopandas.GeoDataFrame:
+) -> pandas.DataFrame | geopandas.GeoDataFrame:
     """Compute statistics on `data` within the shapes of `contours`.
 
     With the default settings, we calculate,
@@ -465,8 +472,12 @@ def data_in_contours(
     ----------
     data
         It should have ``'lat'`` and ``'lon'`` coordinates.
+        If you pass a :class:`xarray.Dataset`,
+        all :attr:`~xarray.Dataset.data_vars` will be included.
+        If you pass a dataframe (supported for default `method` ``'sjoin'``),
+        all columns except ``{'time', 'lat', 'lon', 'geometry'}`` will be included.
     contours
-        For example, dataframe of CE or MCS shapes, e.g.
+        For example, a dataframe of CE or MCS shapes, e.g.
         from :func:`identify` or :func:`track`.
     agg : sequence of str or callable
         Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
@@ -477,6 +488,9 @@ def data_in_contours(
         and currently often faster.
     merge
         Whether to merge the new data with `contours` or return a separate frame.
+        If false (default), the index of the returned non-geo frame
+        will be the same as that of `contours`
+        (e.g. a row corresponding to an individual CE or MCS at a certain time).
 
     Raises
     ------
@@ -488,16 +502,21 @@ def data_in_contours(
     :ref:`ctt_thresh_data_in_contours`
         A usage example.
     """
+    import geopandas as gpd
+
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
         if data.isnull().all():
             raise ValueError("Input array `data` is all null (e.g. NaN)")
             # TODO: warn instead for this and return cols of NaNs?
     elif isinstance(data, xr.Dataset):
-        # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
-        raise NotImplementedError
+        varnames = list(data.data_vars)
+    elif isinstance(data, (pd.DataFrame, gpd.GeoDataFrame)):
+        if method in {"regionmask"}:
+            raise TypeError(f"method {method!r} requires `data` to be in xarray format")
+        varnames = [vn for vn in data.columns if vn not in {"time", "lat", "lon", "geometry"}]
     else:
-        raise TypeError
+        raise TypeError(f"`data` has invalid type {type(data)!r}")
 
     if contours.empty:
         raise ValueError("Input frame `contours` is empty")
@@ -511,7 +530,7 @@ def data_in_contours(
     if method in {"sjoin", "geopandas", "gpd"}:
         new_data = _data_in_contours_sjoin(*args, **kwargs)
     elif method in {"regionmask"}:
-        new_data = _data_in_contours_regionmask(*args, **kwargs)
+        new_data = _data_in_contours_regionmask(*args, **kwargs)  # type: ignore[arg-type]
     else:
         raise ValueError(f"method {method!r} not recognized")
 

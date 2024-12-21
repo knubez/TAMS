@@ -2,6 +2,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 import xarray as xr
 
@@ -50,6 +51,47 @@ def test_data_in_contours_raises_full_nan():
     assert data.isnull().all()
     with pytest.raises(ValueError, match="all null"):
         tams.data_in_contours(data, cs)
+
+
+def test_data_in_contours_pass_df():
+    data_da = tb
+    contours = tams.identify(tb)[0][0]
+
+    data_ds = data_da.to_dataset()
+    data_df = data_da.to_dataframe().reset_index(drop=True)  # drop (lat, lon) index
+    data_gdf = gpd.GeoDataFrame(
+        data_df,
+        geometry=gpd.points_from_xy(data_df.lon, data_df.lat),
+        crs="EPSG:4326",
+    )
+
+    in_contours_data_da = tams.data_in_contours(data_da, contours)
+    in_contours_data_ds = tams.data_in_contours(data_ds, contours)
+    in_contours_data_df = tams.data_in_contours(data_df, contours)
+    in_contours_data_gdf = tams.data_in_contours(data_gdf, contours)
+
+    results = [
+        in_contours_data_da,
+        in_contours_data_ds,
+        in_contours_data_df,
+        in_contours_data_gdf,
+    ]
+    for res in results:
+        assert isinstance(res, pd.DataFrame), "just df with merge=False"
+    for left, right in zip(results[:-1], results[1:]):
+        assert left is not right
+        pd.testing.assert_frame_equal(left, right)
+
+
+@pytest.mark.parametrize("method", ["sjoin", "regionmask"])
+def test_data_in_contours_pass_ds_multiple_vars(method):
+    # TODO: rename to 'tb' in `tb_from_ir` (and update examples/tests)
+    data = tb.rename("tb").to_dataset().assign(tb_p100=tb + 100)
+    contours = tams.identify(tb)[0][0]
+
+    df = tams.data_in_contours(data, contours, method=method, agg="mean")
+    assert tuple(df.columns) == ("mean_tb", "mean_tb_p100")
+    np.isclose(df["mean_tb_p100"].astype(float), df["mean_tb"].astype(float) + 100).all()
 
 
 def test_load_mpas_sample():
