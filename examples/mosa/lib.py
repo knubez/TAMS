@@ -23,7 +23,7 @@ import xarray as xr
 BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking")
 """Base location on NCAR GLADE.
 
-Note that this location is only accessibly on Casper, not Cheyenne(?)!
+Note that this location is only accessible on Casper, not Cheyenne
 
 ├── GPM
 │   ├── 2000
