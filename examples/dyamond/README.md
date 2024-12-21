@@ -1,12 +1,10 @@
-## MOSA
+## DYAMOND
 
-MOSA: MCSs Over South America [^mosa]
+DYAMOND: DYnamics of the Atmospheric general circulation Modeled On Non-hydrostatic Domains [^dyamond]
 
-An MCS tracker intercomparison project of the NCAR SAAG Convective Working Group, focusing on the South American region.
+Similar to [the MOSA runs](../MOSA/README.md), the observations consist of [GPM_MERGIR](https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary) brightness temperature and [IMERG](https://gpm.nasa.gov/data/imerg) precip (v07 instead of v06). In addition to the obs, we ran TAMS for multiple high-resolution global models, for one winter and one summer period, each a bit more than a month long.
 
-Publication: [Prein et al. (2024)](https://doi.org/10.1029/2023JD040254).
-
-TAMS is run on observational ([GPM_MERGIR](https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary) brightness temperature and [IMERG](https://gpm.nasa.gov/data/imerg) precip) and model (WRF) datasets for three water years (2011, 2016, 2019).
+Publication: [Feng et al., submitted](https://doi.org/10.22541/essoar.172405876.67413040/v1).
 
 > [!IMPORTANT]
 > This used TAMS v0.1.x.
@@ -27,4 +25,4 @@ This directory includes Python and PBS job scripts (for NCAR Casper) for three s
 
 3. Convert to mask representation (requires dissolving constituent CEs into single shape per time per track) and drop tracks that are not MCS under the MOSA criteria, saving to netCDF
 
-[^mosa]: Original working title for the project, but not used in the journal article.
+[^dyamond]: https://www.esiwace.eu/the-project/past-phases/dyamond-initiative
