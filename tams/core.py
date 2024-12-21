@@ -1,6 +1,7 @@
 """
 Core routines that make up the TAMS algorithm.
 """
+
 from __future__ import annotations
 
 import functools
@@ -16,6 +17,7 @@ from .util import _the_unique, sort_ew
 
 if TYPE_CHECKING:
     import geopandas
+    import matplotlib
     import numpy
     import shapely
     import xarray
@@ -24,16 +26,26 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
-    """Find contour definitions for 2-D data `x` at value `value`.
+def contours(
+    x: xarray.DataArray,
+    value: float,
+    *,
+    unstructured: bool | None = None,
+    **kwargs,
+) -> list[numpy.ndarray]:
+    """Find contour definitions for data `x` at value `value`.
 
     Parameters
     ----------
     x
         Data to be contoured.
         Currently needs to have ``'lat'`` and ``'lon'`` coordinates.
+        The array should be 2-D if structured, 1-D if unstructured.
     value
         Find contours where `x` has this value.
+    unstructured
+        Whether the grid of `x` is unstructured (e.g. MPAS native output).
+        Default: assume unstructured if `x` is 1-D.
 
     Returns
     -------
@@ -44,14 +56,29 @@ def contours(x: xarray.DataArray, value: float) -> list[numpy.ndarray]:
     if x.isnull().all():
         raise ValueError("Input array `x` is all null (e.g. NaN)")
 
+    if unstructured is None:
+        unstructured = x.ndim == 1
+
     # TODO: have this return GDF instead?
     # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
+    # TODO: optionally filter out unclosed?
     import matplotlib.pyplot as plt
 
-    assert x.ndim == 2, "this is for a single image"
-    with plt.ioff():  # requires mpl 3.4
-        fig = plt.figure()
-        cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
+    if unstructured:
+        assert x.ndim == 1, "this is for a single time step"
+        tri = kwargs.get("triangulation")
+        if tri is None:
+            from matplotlib.tri import Triangulation
+
+            tri = Triangulation(x=x.lon, y=x.lat)
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = plt.tricontour(tri, x, levels=[value])
+    else:
+        assert x.ndim == 2, "this is for a single image"
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
 
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
@@ -139,7 +166,7 @@ def _size_filter_contours(
         i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
         for i235 in cs235.index
     }
-    cs235["area219_km2"] = pd.Series(sum219s)
+    cs235["area219_km2"] = pd.Series(sum219s, dtype=float)
     big_enough = cs235.area219_km2 >= threshold
     if not big_enough.empty:
         logger.info(
@@ -174,17 +201,30 @@ def _size_filter_contours(
 def _identify_one(
     ctt: xr.DataArray,
     *,
-    size_filter: bool = True,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_filter: bool = True,
+    size_threshold: float = 4000,
+    unstructured: bool | None = None,
+    triangulation: matplotlib.tri.Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
-    cs235 = sort_ew(_contours_to_gdf(contours(ctt, ctt_threshold))).reset_index(drop=True)
-    cs219 = sort_ew(_contours_to_gdf(contours(ctt, ctt_core_threshold))).reset_index(drop=True)
+    cs235 = sort_ew(
+        _contours_to_gdf(
+            contours(ctt, ctt_threshold, unstructured=unstructured, triangulation=triangulation)
+        )
+    ).reset_index(drop=True)
+    cs219 = sort_ew(
+        _contours_to_gdf(
+            contours(
+                ctt, ctt_core_threshold, unstructured=unstructured, triangulation=triangulation
+            )
+        )
+    ).reset_index(drop=True)
 
     if size_filter:
-        cs235, cs219 = _size_filter_contours(cs235, cs219)
+        cs235, cs219 = _size_filter_contours(cs235, cs219, threshold=size_threshold)
 
     return cs235, cs219
 
@@ -192,10 +232,11 @@ def _identify_one(
 def identify(
     ctt: xarray.DataArray,
     *,
-    size_filter: bool = True,
-    parallel: bool = False,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    size_filter: bool = True,
+    size_threshold: float = 4000,
+    parallel: bool = False,
 ) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The 235 K contours returned (first list) serve to identify cloud elements (CEs).
@@ -207,16 +248,6 @@ def identify(
     ----------
     ctt
         Cloud-top temperature array.
-    size_filter
-        Whether to apply size-filtering
-        (using 235 K and 219 K areas to filter out CEs that are not MCS material).
-        Filtering at this stage makes TAMS more computationally efficient overall.
-        Disable this option to return all identified CEs.
-        Note that all 219s are returned regardless of this setting.
-
-        When enabled, this also identifies the 219s (if any) that are within each 235.
-    parallel
-        Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
     ctt_threshold
         Used to identify the edges of cloud elements.
     ctt_core_threshold
@@ -224,19 +255,71 @@ def identify(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
+    size_filter
+        Whether to apply size-filtering
+        (using 235 K and 219 K areas to filter out CEs that are not MCS material).
+        Filtering at this stage makes TAMS more computationally efficient overall.
+        Disable this option to return all identified CEs.
+        Note that all 219s are returned regardless of this setting.
+
+        When enabled (default), this also identifies the 219s (if any) that are within each 235.
+        Only 235s with enough 219 area (`size_threshold`) are kept.
+    size_threshold
+        Area threshold (units: km²) to use when `size_filter` is enabled.
+    parallel
+        Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
+
+    Returns
+    -------
+    css235
+        List of dataframes of 235 K contour polygons (CEs).
+        If `size_filter` is enabled (default), an ``area_km2`` column is included,
+        column ``cs219`` gives the cold cores for each CE as a multi-polygon,
+        and those rows that don't meet the size filtering criteria are dropped.
+    css219
+        List of dataframes of 219 K contour polygons (cold cores).
+        If `size_filter` is enabled (default), an ``area_km2`` column is included,
+        but all rows are included, regardless of the area value.
+
+    See Also
+    --------
+    :doc:`/examples/identify`
+        Demonstrating the impacts of options.
     """
+    dims = tuple(ctt.dims)
+
+    unstructured = (len(dims) == 2 and "time" in dims) or (len(dims) == 1)
+
+    triangulation = None
+    if unstructured:
+        if ctt.lat.ndim == 1 and ctt.lon.ndim == 1:
+            from matplotlib.tri import Triangulation
+
+            triangulation = Triangulation(x=ctt.lon, y=ctt.lat)
+        else:
+            warnings.warn(
+                "detected unstructured data but not 1-D lat/lon "
+                f"(got lat dims {ctt.lat.dims}, lon dims {ctt.lon.dims}), "
+                "not pre-computing the triangulation"
+            )
+
     f = functools.partial(
         _identify_one,
-        size_filter=size_filter,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        size_filter=size_filter,
+        size_threshold=size_threshold,
+        unstructured=unstructured,
+        triangulation=triangulation,
     )
-    dims = tuple(ctt.dims)
-    if len(dims) == 2:
+
+    if (not unstructured and len(dims) == 2) or (unstructured and len(dims) == 1):
         cs235, cs219 = f(ctt)
         css235, css219 = (cs235,), (cs219,)  # to tuple for consistency
 
-    elif len(dims) == 3 and "time" in dims:
+    elif "time" in dims and (
+        (not unstructured and len(dims) == 3) or (unstructured and len(dims) == 2)
+    ):
         assert ctt.time.ndim == 1
         itimes = np.arange(ctt.time.size)
 
@@ -256,7 +339,11 @@ def identify(
         css235, css219 = zip(*res)
 
     else:
-        raise ValueError("The dims of `ctt` either are not 2-D or are not 3-D with a 'time' dim")
+        raise ValueError(
+            f"Got unexpected `ctt` dims: {dims}. "
+            "They should be 2-D (lat/lon) + optional 'time' dim for structured grid data, "
+            "or 1-D (cell) + optional 'time' dim for unstructured grid data."
+        )
 
     return list(css235), list(css219)
 
@@ -316,7 +403,8 @@ def _data_in_contours_regionmask(
     # Form regionmask(s)
     shapes = contours[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(data)  # works but takes long (though shorter with pygeos)!
+    mask = regions.mask(data)
+    # Note: before Shapely v2, having `pygeos` installed made this faster
 
     # Aggregate points inside contour
     new_data_ = {
@@ -340,20 +428,40 @@ def data_in_contours(
     data: xarray.DataArray | xarray.Dataset,
     contours: geopandas.GeoDataFrame,
     *,
-    agg=("mean", "std", "count"),
+    agg=("mean", "std", "count"),  # TODO: type
     method: str = "sjoin",
     merge: bool = False,
 ) -> geopandas.GeoDataFrame:
-    """Compute statistics on `data` within `contours`.
+    """Compute statistics on `data` within the shapes of `contours`.
+
+    With the default settings, we calculate,
+    for each shape (row) in the `contours` dataframe:
+
+    - the mean value of `data` within the shape
+    - the standard deviation of `data` within the shape
+    - the count of non-null values of `data` within the shape
 
     Parameters
     ----------
     data
+        It should have ``'lat'`` and ``'lon'`` coordinates.
+    contours
+        For example, dataframe of CE or MCS shapes, e.g.
+        from :func:`identify` or :func:`track`.
     agg : sequence of str or callable
         Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
     method : {'sjoin', 'regionmask'}
+        The regionmask method is suited for data on a structured grid,
+        while the GeoPandas sjoin method works for scattered point data as well.
+        The sjoin method is the default since it is more general
+        and currently often faster.
     merge
         Whether to merge the new data with `contours` or return a separate frame.
+
+    See Also
+    --------
+    :ref:`ctt_thresh_data_in_contours`
+        A usage example.
     """
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
@@ -365,6 +473,9 @@ def data_in_contours(
         raise NotImplementedError
     else:
         raise TypeError
+
+    if isinstance(agg, str):
+        agg = (agg,)
 
     args = (data, contours)
     kwargs = dict(varnames=varnames, agg=agg)
@@ -756,12 +867,12 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
 def run(
     ds: xarray.DataArray,
     *,
-    parallel: bool = True,
-    u_projection: float = 0,
     ctt_threshold: float = 235,
     ctt_core_threshold: float = 219,
+    u_projection: float = 0,
+    parallel: bool = True,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
-    r"""Run all TAMS steps, including precip.
+    r"""Run all TAMS steps, including precip assignment.
 
     .. important::
        `ds` must have ``'ctt'`` (cloud-top temperature) and ``'pr'`` (precip rate) variables.
@@ -777,10 +888,6 @@ def run(
     ----------
     ds
         Dataset containing 3-D cloud-top temperature and precipitation rate.
-    parallel
-        Whether to apply parallelization (where possible).
-    u_projection
-        *x*\-direction projection velocity to apply before computing overlaps.
     ctt_threshold
         Used to identify the edges of cloud elements.
     ctt_core_threshold
@@ -788,6 +895,18 @@ def run(
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
+    u_projection
+        *x*\-direction projection velocity to apply before computing overlaps.
+    parallel
+        Whether to apply parallelization (where possible).
+
+    See Also
+    --------
+    :func:`tams.identify`
+    :func:`tams.track`
+    :func:`tams.classify`
+
+    :doc:`/examples/tams-run`
     """
     import itertools
 
@@ -814,9 +933,9 @@ def run(
     msg("Starting `identify`")
     cs235, cs219 = identify(
         ds.ctt,
-        parallel=parallel,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
+        parallel=parallel,
     )
 
     #
@@ -1031,7 +1150,7 @@ if __name__ == "__main__":
     # Trying regionmask
     shapes = cs235[["geometry"]]
     regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(tb)  # works but takes long (though shorter with pygeos)!
+    mask = regions.mask(tb)
 
     regions.plot(ax=ax)
 

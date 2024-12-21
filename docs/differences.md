@@ -15,7 +15,6 @@
 ### Classification
 
 1. Unlike the definition in TAMS v1.0, {abbr}`DSL (disorganized short-lived)` in TAMS v2.0 are classified as anything with duration shorter than 6 hours.
-2. Unlike in TAMS v1.0, the time criterion for MCC classification in TAMS v2.0 needs to hold for 6 consecutive hours.
 
 [^v1]: "TAMS v1.0": TAMS as published in {cite:t}`TAMS1.0`, written in Matlab.
 

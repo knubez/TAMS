@@ -8,18 +8,21 @@ warning: no pr data in contours for tb_rainrate_2015-07-08_19:00.nc
 
 NOTE: took 8.7 min for one WY using 19 procs
 """
+
 from functools import partial
 from pathlib import Path
+from time import perf_counter_ns
 
 import pandas as pd
 
 from lib import BASE_DIR, preproc_gpm_file, preproc_wrf_file
 
 # Constants
-out_dir = Path("/glade/scratch/zmoon/mosa-pre")
+out_dir = Path("/glade/derecho/scratch/zmoon/mosa/pre")
 parallel = True
 do_wrf = True
 do_gpm = True
+do_bench = True
 wys = [2011, 2016, 2019]
 
 assert out_dir.is_dir()
@@ -34,6 +37,24 @@ def proc(fn, files):
     else:
         for fp in files:
             fn(fp)
+
+
+if do_bench:
+    # WRF 1--7 Nov 2018
+    times = pd.date_range("2018-11-01", "2018-11-07 23:00", freq="h")
+    files = [BASE_DIR / "WY2019" / "WRF" / f"tb_rainrate_{t:%Y-%m-%d_%H}:00.nc" for t in times]
+
+    print(files[0])
+    print("...")
+    print(files[-1], f"({len(files)} total)")
+
+    fn = partial(preproc_wrf_file, out_dir=out_dir)
+
+    tic = perf_counter_ns()
+    proc(fn, files)
+    print(f"took {(perf_counter_ns() - tic) / 1e9:.1f} s")
+
+    raise SystemExit()
 
 
 # WRF
@@ -56,7 +77,7 @@ if do_gpm:
     fn = partial(preproc_gpm_file, out_dir=out_dir)
     for wy in wys:
         # The WRF file sets start in June of previous year
-        ts = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="H")[:-1]
+        ts = pd.date_range(f"{wy - 1}/06/01", f"{wy}/06/01", freq="h")[:-1]
         rfns = ts.strftime(r"%Y") + "/merg_" + ts.strftime(r"%Y%m%d%H") + "_4km-pixel.nc"
         files = [BASE_DIR / "GPM" / rfn for rfn in rfns]
         print(files[0])

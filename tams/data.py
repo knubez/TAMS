@@ -1,6 +1,7 @@
 """
 Loaders for various data sets.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -48,7 +49,7 @@ def tb_from_ir(r, ch: int):
     Returns
     -------
     tb
-        Brightness temperature (same type as `r`)
+        Brightness temperature (same type as `r`).
     """
     if ch not in range(4, 12):
         raise ValueError("channel must be in 4--11")
@@ -66,29 +67,79 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
-def download_examples():
-    """Download the example datasets (using wget)."""
-    import subprocess
+def download_examples(*, clobber: bool = False) -> None:
+    """Download the example datasets.
 
-    for id_, fn in [
-        ("1HAhAlfqZGjnTk8NAjyx_lmVumUu_1TMp", "Satellite_data.nc"),
-        ("1vtx6UeSS8FM5Hy9DEQe3x78Ey-Hn-83E", "MPAS_data.nc"),
-    ]:
-        url = f"https://drive.google.com/uc?export=download&id={id_}"
-        cmd = ["wget", "--no-verbose", "--no-check-certificate", url, "-O", (HERE / fn).as_posix()]
+    * Satellite data (EUMETSAT MSG SEVIRI 10.8 μm IR radiance):
+      https://drive.google.com/file/d/1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD/view?usp=sharing
+    * MPAS regridded data (brightness temperature and precipitation):
+      https://drive.google.com/file/d/1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-/view?usp=sharing
+    * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
+      https://drive.google.com/file/d/1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248/view?usp=sharing
 
-        try:
-            subprocess.run(cmd)
-        except Exception:
-            print(f"Running\n  {' '.join(cmd)}\nfailed:")
-            raise
+    .. note::
+       `gdown <https://github.com/wkentaro/gdown>`__,
+       used for downloading the files,
+       is not currently a required dependency of the TAMS Python package,
+       although it is included in the conda-forge recipe.
+       gdown is available on conda-forge and PyPI as ``gdown``.
+       Files < 100 MB can be easily downloaded from Google Drive with ``wget`` or similar,
+       but there are some subtleties with larger files.
+
+       Alternatively, you can download the files manually
+       using the links above.
+
+    Parameters
+    ----------
+    clobber
+        If set, overwrite existing files. Otherwise, skip downloading.
+
+    See Also
+    --------
+    tams.data.load_example_ir
+    tams.load_example_tb
+    tams.load_example_mpas
+    tams.load_example_mpas_ug
+    """
+
+    files = [
+        ("1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD", "Satellite_data.nc"),  # < 100 MB
+        ("1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-", "MPAS_data.nc"),  # < 100 MB
+        ("1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248", "MPAS_unstructured_data.nc"),  # > 100 MB
+    ]
+
+    try:
+        import gdown
+    except ImportError as e:
+        raise RuntimeError(
+            "gdown is required in order to download the example data files. "
+            "It is available on conda-forge and PyPI as 'gdown'."
+        ) from e
+
+    def download(id_: str, to: str):
+        gdown.download(id=id_, output=to, quiet=False)
+
+    for id_, fn in files:
+        fp = HERE / fn
+        if not clobber and fp.is_file():
+            print(f"Skipping {fn} because it already exists at {fp.as_posix()}.")
+            continue
+        else:
+            download(id_, fp.as_posix())
 
 
 def load_example_ir() -> xarray.DataArray:
-    """Load the example satellite IR radiance data (ch9) as a DataArray.
+    """Load the example satellite infrared radiance data.
+
+    This comes from the EUMETSAT MSG SEVIRI instrument,
+    specifically the 10.8 μm channel (ch9).
 
     This dataset contains 6 time steps of 2-hourly data (every 2 hours):
     2006-09-01 00--10
+
+    See Also
+    --------
+    tams.data.download_examples
     """
 
     ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
@@ -99,19 +150,29 @@ def load_example_ir() -> xarray.DataArray:
     ds.lat.attrs.update(long_name="Latitude")
 
     # Times are 2006-Sep-01 00 -- 10, every 2 hours
-    ds["time"] = pd.date_range("2006-Sep-01", freq="2H", periods=6)
+    ds["time"] = pd.date_range("2006-Sep-01", freq="2h", periods=6)
 
     return ds.ch9
 
 
 def load_example_tb() -> xarray.DataArray:
-    """Load the example derived brightness temperature data as a DataArray.
+    """Load the example derived satellite brightness temperature data.
 
     This works by first invoking :func:`tams.data.load_example_ir`
     and then applying :func:`tams.data.tb_from_ir`.
 
     This dataset contains 6 time steps of 2-hourly data (every 2 hours):
     2006-09-01 00--10
+
+    See Also
+    --------
+    :func:`tams.data.download_examples`
+    :func:`tams.data.load_example_ir`
+    :func:`tams.data.tb_from_ir`
+
+    :doc:`/examples/sample-satellite-data`
+
+    :doc:`/examples/tracking-options`
     """
 
     r = load_example_ir()
@@ -120,14 +181,45 @@ def load_example_tb() -> xarray.DataArray:
 
 
 def load_example_mpas() -> xarray.Dataset:
-    """Load the example MPAS dataset.
+    r"""Load the example MPAS dataset.
+
+    This is a spatial and variable subset of native MPAS output,
+    Furthermore, it has been regridded to a regular lat/lon grid (0.25°)
+    from the original 15-km mesh.
+
+    After regridding, it was spatially subsetted so that
+    lat ranges from -5 to 40°N
+    and lon from 85 to 170°E.
+    This domain relates to the PRECIP field campaign
+    (:func:`load_mpas_precip`).
 
     It has ``tb`` (estimated brightness temperature)
-    and ``precip`` (precipitation, derived by summing the MPAS accumulated
+    and ``precip`` (precipitation rate, derived by summing the MPAS accumulated
     grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
 
+    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
+
+    .. math::
+       E = \sigma T^4
+       \implies T = (E / \sigma)^{1/4}
+
+    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
+    in W m\ :sup:`-2`
+    and :math:`\sigma` is the Stefan--Boltzmann constant.
+
     This dataset contains 127 time steps of hourly data:
-    2006-09-08 00 -- 2006-09-13 18
+    2006-09-08 12 -- 2006-09-13 18.
+
+    See Also
+    --------
+    :func:`tams.data.download_examples`
+    :func:`tams.load_example_mpas_ug`
+
+    :doc:`/examples/tams-run`
+
+    :doc:`/examples/tracking-options`
+
+    :doc:`/examples/sample-mpas-ug-data`
     """
 
     ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
@@ -135,10 +227,69 @@ def load_example_mpas() -> xarray.Dataset:
     # Mask 0 values of T (e.g. at initial time since OLR is zero then)
     ds["tb"] = ds.tb.where(ds.tb > 0)
 
-    # lat has attrs but not lon
-    ds.lon.attrs.update(long_name="Longitude", units="degrees_east")
-    ds.lat.attrs.update(long_name="Latitude")
+    ds.lat.attrs.update(long_name="Latitude", units="degree_north")
+    ds.lon.attrs.update(long_name="Longitude", units="degree_east")
+    ds.tb.attrs.update(long_name="Brightness temperature", units="K")
+    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
 
+    return ds
+
+
+def load_example_mpas_ug() -> xarray.Dataset:
+    r"""Load the example MPAS unstructured grid dataset.
+
+    This is a spatial and variable subset of native 15-km global mesh MPAS output.
+
+    It has been spatially subsetted so that
+    lat ranges from -5 to 20°N
+    and lon from 85 to 170°E,
+    similar to the example regridded MPAS dataset (:func:`load_example_mpas`)
+    except for a smaller lat upper bound.
+
+    Like the regridded MPAS dataset, it has hourly
+    ``tb`` (estimated brightness temperature)
+    and ``precip`` (precipitation rate)
+    for the period
+    2006-09-08 12 -- 2006-09-13 18.
+
+    Like the regridded MPAS dataset,
+    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
+
+    .. math::
+       E = \sigma T^4
+       \implies T = (E / \sigma)^{1/4}
+
+    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
+    in W m\ :sup:`-2`
+    and :math:`\sigma` is the Stefan--Boltzmann constant.
+
+    See Also
+    --------
+    :func:`tams.data.download_examples`
+    :func:`tams.load_example_mpas`
+
+    :doc:`/examples/sample-mpas-ug-data`
+    """
+
+    ds = xr.open_dataset(HERE / "MPAS_unstructured_data.nc").rename(
+        Time="time",
+        nCells="cell",
+        latcell="lat",
+        loncell="lon",
+    )
+
+    # Mask zero values of Tb
+    ds["tb"] = ds.tb.where(ds.tb > 0)
+
+    # Set time (time variable in there just has elapsed hours as int)
+    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1h", periods=ds.sizes["time"])
+
+    # Diff accumulated precip to get mm/h
+    ds["precip"] = ds.precip.diff("time", label="lower")
+
+    # Add variables attrs
+    ds.lat.attrs.update(long_name="Latitude (cell center)", units="degree_north")
+    ds.lon.attrs.update(long_name="Longitude (cell center)", units="degree_east")
     ds.tb.attrs.update(long_name="Brightness temperature", units="K")
     ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
 

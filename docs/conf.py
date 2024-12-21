@@ -6,7 +6,7 @@ sys.path.append("../")
 project = "tams"
 html_title = "TAMS"
 html_logo = "_static/TAMS-logo.png"
-copyright = "2022, K. M. Núñez Ocasio and Z. Moon"
+copyright = "2022\u20132024, K. M. Núñez Ocasio and Z. Moon"
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -19,6 +19,7 @@ extensions = [
     "sphinxext.opengraph",
     "sphinx-prompt",
     "sphinx_copybutton",
+    "sphinx_togglebutton",
 ]
 
 exclude_patterns = [
@@ -26,7 +27,6 @@ exclude_patterns = [
     "**.ipynb_checkpoints",
     # "api/**/*",
     "examples/t2.ipynb",
-    "examples/t3.ipynb",
 ]
 
 html_theme = "sphinx_book_theme"
@@ -73,7 +73,10 @@ napoleon_type_aliases = {
 }
 
 nb_execution_mode = "cache"
-nb_execution_excludepatterns = exclude_patterns
+nb_execution_excludepatterns = exclude_patterns + [
+    "examples/tracking-options.ipynb",
+]
+nb_execution_raise_on_error = True
 
 myst_enable_extensions = [
     "dollarmath",

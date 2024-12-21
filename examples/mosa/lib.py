@@ -5,6 +5,7 @@ This library defines load and run functions
 for the MOSA data
 for the different steps of the TAMS workflow.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -252,7 +253,7 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
     # but for accumulated (during previous time step), 4 is fine(?) (according to Andy)
     n = 4
-    meets_crit_duration = duration >= pd.Timedelta(f"{n}H")
+    meets_crit_duration = duration >= pd.Timedelta(f"{n}h")
     # TODO: ^ not really one of the 4 criteria (though needed for 1 and 2)
 
     # Compute rainfall volume

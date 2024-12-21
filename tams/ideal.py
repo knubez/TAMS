@@ -2,6 +2,7 @@
 WIP: Generate idealized datasets for testing TAMS's
 identification and tracking.
 """
+
 from __future__ import annotations
 
 import numpy as np
