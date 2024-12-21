@@ -3,6 +3,7 @@ DYAMOND -- DYnamics of the Atmospheric general circulation Modeled On Non-hydros
 
 https://www.esiwace.eu/the-project/past-phases/dyamond-initiative
 """
+
 from __future__ import annotations
 
 import datetime

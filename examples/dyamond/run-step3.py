@@ -1,6 +1,7 @@
 """
 Convert from CE gdf output to mask file
 """
+
 from lib import BASE_DIR_OUT, post
 
 parallel = True

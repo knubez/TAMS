@@ -1,6 +1,7 @@
 """
 Pre-process DYAMOND files and save to Parquet files.
 """
+
 from functools import partial
 
 from lib import BASE_DIR_OUT_PRE, iter_input_paths, iter_input_paths2, preproc_file
