@@ -204,13 +204,13 @@ def inspect_input_data():
             if model == "MPAS":
                 ds = ds.rename(xtime="time")
             assert {"time", "lon", "lat"} <= set(ds.dims)  # some also have 'bnds'
-            assert ds.dims["time"] == 1
+            assert ds.sizes["time"] == 1
             print(pad, "t data:", ds.time.values[0])
 
             t_file = get_t_file(fp.stem)
             print(pad, "t path:", t_file)
 
-            assert ds.dims["lon"] == 3600, "0.1 deg"
+            assert ds.sizes["lon"] == 3600, "0.1 deg"
             lona, lonb = -179.95, 179.95
             if model == "OBS" and season.lower() == "summer":
                 lata, latb = -89.95, 89.95
@@ -218,7 +218,7 @@ def inspect_input_data():
             else:
                 lata, latb = -59.95, 59.95
                 nlat = 1200
-            assert ds.dims["lat"] == nlat
+            assert ds.sizes["lat"] == nlat
             lon, lat = ds["lon"], ds["lat"]
             assert lat.dims == ("lat",)
             try:
@@ -955,7 +955,7 @@ def post(fp: Path) -> None:
     assert set(mcs_mask_unique) - set(ds.mcs_id.values) == {0}
 
     # Check for consistency with non-MCS gdfs
-    assert gdf_mcs.mcs_id.nunique() == ds.dims["mcs_id"], "same number of MCS"
+    assert gdf_mcs.mcs_id.nunique() == ds.sizes["mcs_id"], "same number of MCS"
     assert (
         mcs_mask_unique == np.r_[0, gdf_mcs_reid.mcs_id.unique() + 1]
     ).all(), "mask only contains re-IDed MCSs"
