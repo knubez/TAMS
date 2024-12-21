@@ -79,7 +79,6 @@ def run_gdf(fp: Path, *, bench: bool = False) -> None:
 
     # Only CEs associated to MCS (as defined by MOSA)
     df_mcs = df[df.is_mcs].reset_index(drop=True).drop(columns=_classify_cols)
-    df_mcs
 
     # Save df
     df_mcs.to_csv(OUT_DIR / f"{out_stem_simple}.csv.gz", index=False)

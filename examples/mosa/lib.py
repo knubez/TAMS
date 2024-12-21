@@ -23,7 +23,7 @@ import xarray as xr
 BASE_DIR = Path("/glade/campaign/mmm/c3we/prein/SouthAmerica/MCS-Tracking")
 """Base location on NCAR GLADE.
 
-Note that this location is only accessibly on Casper, not Hera!
+Note that this location is only accessible on Casper, not Cheyenne
 
 ├── GPM
 │   ├── 2000
@@ -495,7 +495,6 @@ def gdf_to_df(ce) -> pd.DataFrame:
     assert set(ce_.columns) == set(col_order)
 
     df = pd.DataFrame(ce_)[col_order]
-    df
 
     return df
 

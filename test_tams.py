@@ -1,8 +1,11 @@
 from pathlib import Path
 
 import earthaccess
+import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
+import xarray as xr
 
 import tams
 
@@ -52,6 +55,47 @@ def test_data_in_contours_raises_full_nan():
     assert data.isnull().all()
     with pytest.raises(ValueError, match="all null"):
         tams.data_in_contours(data, cs)
+
+
+def test_data_in_contours_pass_df():
+    data_da = tb
+    contours = tams.identify(tb)[0][0]
+
+    data_ds = data_da.to_dataset()
+    data_df = data_da.to_dataframe().reset_index(drop=True)  # drop (lat, lon) index
+    data_gdf = gpd.GeoDataFrame(
+        data_df,
+        geometry=gpd.points_from_xy(data_df.lon, data_df.lat),
+        crs="EPSG:4326",
+    )
+
+    in_contours_data_da = tams.data_in_contours(data_da, contours)
+    in_contours_data_ds = tams.data_in_contours(data_ds, contours)
+    in_contours_data_df = tams.data_in_contours(data_df, contours)
+    in_contours_data_gdf = tams.data_in_contours(data_gdf, contours)
+
+    results = [
+        in_contours_data_da,
+        in_contours_data_ds,
+        in_contours_data_df,
+        in_contours_data_gdf,
+    ]
+    for res in results:
+        assert isinstance(res, pd.DataFrame), "just df with merge=False"
+    for left, right in zip(results[:-1], results[1:]):
+        assert left is not right
+        pd.testing.assert_frame_equal(left, right)
+
+
+@pytest.mark.parametrize("method", ["sjoin", "regionmask"])
+def test_data_in_contours_pass_ds_multiple_vars(method):
+    # TODO: rename to 'tb' in `tb_from_ir` (and update examples/tests)
+    data = tb.rename("tb").to_dataset().assign(tb_p100=tb + 100)
+    contours = tams.identify(tb)[0][0]
+
+    df = tams.data_in_contours(data, contours, method=method, agg="mean")
+    assert tuple(df.columns) == ("mean_tb", "mean_tb_p100")
+    np.isclose(df["mean_tb_p100"].astype(float), df["mean_tb"].astype(float) + 100).all()
 
 
 def test_load_mpas_sample():
@@ -120,6 +164,43 @@ def test_mpas_precip_loader():
     assert set(ds.data_vars) == {"tb", "precip"}
     assert tuple(ds.dims) == ("time", "lat", "lon")
     assert ds.sizes["time"] == 24
+
+
+def test_classify_empty():
+    cs = gpd.GeoDataFrame(
+        columns=["mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"],
+        crs="EPSG:4326",
+    )
+    with pytest.warns(UserWarning, match="empty input frame"):
+        cs_ = tams.classify(cs)
+        assert "mcs_class" in cs_ and "mcs_class" not in cs
+
+
+def test_classify_cols_check():
+    cs = gpd.GeoDataFrame(
+        columns=["mcs_id", "geometry", "time", "area_km2", "area219_km2"],
+        data=np.full((1, 5), np.nan),
+        crs="EPSG:4326",
+    )
+    with pytest.raises(ValueError, match="missing these columns"):
+        _ = tams.classify(cs)
+
+
+def test_identify_no_ces_warning():
+    tb_p100 = tb + 100
+    with pytest.warns(UserWarning, match="No CEs identified"):
+        _ = tams.identify(tb_p100)
+
+    ctt = xr.concat(
+        [
+            tb,
+            tb_p100.assign_coords(time=tb_p100.time + np.timedelta64(1, "h")),
+            tb_p100.assign_coords(time=tb_p100.time + np.timedelta64(2, "h")),
+        ],
+        dim="time",
+    )
+    with pytest.warns(UserWarning, match=r"No CEs identified for time steps: \[1, 2\]"):
+        _ = tams.identify(ctt)
 
 
 @skipif_no_earthdata

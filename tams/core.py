@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     import geopandas
     import matplotlib
     import numpy
+    import pandas
     import shapely
     import xarray
 
@@ -52,6 +53,11 @@ def contours(
     :
         List of 2-D arrays describing contours.
         The arrays are shape ``(n, 2)``; each row is a coordinate pair.
+
+    Raises
+    ------
+    ValueError
+        If all values in `x` are null.
     """
     if x.isnull().all():
         raise ValueError("Input array `x` is all null (e.g. NaN)")
@@ -89,6 +95,14 @@ def contours(
 def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
     from geopandas import GeoDataFrame
     from shapely.geometry.polygon import LinearRing, LineString, Point, orient
+
+    if isinstance(cs, np.ndarray) and cs.ndim == 2 and cs.shape[1] == 2:
+        # Single array, probably mpl 3.8.0
+        import matplotlib
+
+        mpl_ver = getattr(matplotlib, "__version__", "?")
+
+        logger.debug(f"got single array `cs`; matplotlib version: {mpl_ver}")
 
     polys = []
     for c in cs:
@@ -300,7 +314,8 @@ def identify(
             warnings.warn(
                 "detected unstructured data but not 1-D lat/lon "
                 f"(got lat dims {ctt.lat.dims}, lon dims {ctt.lon.dims}), "
-                "not pre-computing the triangulation"
+                "not pre-computing the triangulation",
+                stacklevel=2,
             )
 
     f = functools.partial(
@@ -345,16 +360,22 @@ def identify(
             "or 1-D (cell) + optional 'time' dim for unstructured grid data."
         )
 
+    inds_empty = [i for i, cs235 in enumerate(css235) if cs235.empty]
+    if len(inds_empty) == len(css235):
+        warnings.warn("No CEs identified", stacklevel=2)
+    elif inds_empty:
+        warnings.warn(f"No CEs identified for time steps: {inds_empty}", stacklevel=2)
+
     return list(css235), list(css219)
 
 
 def _data_in_contours_sjoin(
-    data: xr.DataArray | xr.Dataset,
+    data: xarray.DataArray | xarray.Dataset | pandas.DataFrame | geopandas.GeoDataFrame,
     contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
     agg=("mean", "std", "count"),
-) -> geopandas.GeoDataFrame:
+) -> pandas.DataFrame:
     """Compute stats on `data` within `contours` using :func:`~geopandas.tools.sjoin`.
 
     `data` must have ``'lat'`` and ``'lon'`` variables.
@@ -362,11 +383,17 @@ def _data_in_contours_sjoin(
     import geopandas as gpd
 
     # Convert possibly-2-D data to GeoDataFrame of points
-    data_df = data.to_dataframe().reset_index(drop=set(data.dims) != {"lat", "lon"})
-    lat = data_df["lat"].values
-    lon = data_df["lon"].values
-    geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points
-    points = gpd.GeoDataFrame(data_df, geometry=geom)
+    if isinstance(data, gpd.GeoDataFrame):
+        points = data
+    else:
+        if isinstance(data, pd.DataFrame):
+            data_df = data
+        else:
+            data_df = data.to_dataframe().reset_index(drop=set(data.dims) != {"lat", "lon"})
+        lat = data_df["lat"].values
+        lon = data_df["lon"].values
+        geom = gpd.points_from_xy(lon, lat, crs="EPSG:4326")  # can be slow with many points
+        points = gpd.GeoDataFrame(data_df, geometry=geom)
 
     # Determine which contour (if any) each point is inside
     points = points.sjoin(contours, predicate="within", how="left", rsuffix="contour")
@@ -392,12 +419,12 @@ def _data_in_contours_sjoin(
 
 
 def _data_in_contours_regionmask(
-    data: xr.DataArray | xr.Dataset,
+    data: xarray.DataArray | xarray.Dataset,
     contours: geopandas.GeoDataFrame,
     *,
     varnames: list[str],
     agg=("mean", "std", "count"),
-) -> geopandas.GeoDataFrame:
+) -> pandas.DataFrame:
     import regionmask
 
     # Form regionmask(s)
@@ -425,13 +452,13 @@ def _data_in_contours_regionmask(
 
 
 def data_in_contours(
-    data: xarray.DataArray | xarray.Dataset,
+    data: xarray.DataArray | xarray.Dataset | pandas.DataFrame | geopandas.GeoDataFrame,
     contours: geopandas.GeoDataFrame,
     *,
     agg=("mean", "std", "count"),  # TODO: type
     method: str = "sjoin",
     merge: bool = False,
-) -> geopandas.GeoDataFrame:
+) -> pandas.DataFrame | geopandas.GeoDataFrame:
     """Compute statistics on `data` within the shapes of `contours`.
 
     With the default settings, we calculate,
@@ -445,8 +472,12 @@ def data_in_contours(
     ----------
     data
         It should have ``'lat'`` and ``'lon'`` coordinates.
+        If you pass a :class:`xarray.Dataset`,
+        all :attr:`~xarray.Dataset.data_vars` will be included.
+        If you pass a dataframe (supported for default `method` ``'sjoin'``),
+        all columns except ``{'time', 'lat', 'lon', 'geometry'}`` will be included.
     contours
-        For example, dataframe of CE or MCS shapes, e.g.
+        For example, a dataframe of CE or MCS shapes, e.g.
         from :func:`identify` or :func:`track`.
     agg : sequence of str or callable
         Suitable for passing to :meth:`pandas.DataFrame.aggregate`.
@@ -457,22 +488,38 @@ def data_in_contours(
         and currently often faster.
     merge
         Whether to merge the new data with `contours` or return a separate frame.
+        If false (default), the index of the returned non-geo frame
+        will be the same as that of `contours`
+        (e.g. a row corresponding to an individual CE or MCS at a certain time).
+
+    Raises
+    ------
+    ValueError
+        If the input data is all null or the input frame of shapes is empty.
 
     See Also
     --------
     :ref:`ctt_thresh_data_in_contours`
         A usage example.
     """
+    import geopandas as gpd
+
     if isinstance(data, xr.DataArray):
         varnames = [data.name]
         if data.isnull().all():
             raise ValueError("Input array `data` is all null (e.g. NaN)")
             # TODO: warn instead for this and return cols of NaNs?
     elif isinstance(data, xr.Dataset):
-        # varnames = [vn for vn in field.variables if vn not in {"lat", "lon"}]
-        raise NotImplementedError
+        varnames = list(data.data_vars)
+    elif isinstance(data, (pd.DataFrame, gpd.GeoDataFrame)):
+        if method in {"regionmask"}:
+            raise TypeError(f"method {method!r} requires `data` to be in xarray format")
+        varnames = [vn for vn in data.columns if vn not in {"time", "lat", "lon", "geometry"}]
     else:
-        raise TypeError
+        raise TypeError(f"`data` has invalid type {type(data)!r}")
+
+    if contours.empty:
+        raise ValueError("Input frame `contours` is empty")
 
     if isinstance(agg, str):
         agg = (agg,)
@@ -483,7 +530,7 @@ def data_in_contours(
     if method in {"sjoin", "geopandas", "gpd"}:
         new_data = _data_in_contours_sjoin(*args, **kwargs)
     elif method in {"regionmask"}:
-        new_data = _data_in_contours_regionmask(*args, **kwargs)
+        new_data = _data_in_contours_regionmask(*args, **kwargs)  # type: ignore[arg-type]
     else:
         raise ValueError(f"method {method!r} not recognized")
 
@@ -639,13 +686,13 @@ def track(
         dt = times[1:] - times[:-1]
         assert (dt.astype(np.int64) > 0).all()
         if not dt.unique().size == 1:
-            warnings.warn("unequal time spacing")
+            warnings.warn("unequal time spacing detected", stacklevel=2)
         dt = dt.insert(-1, dt[-1])
 
     # IDEA: even at initial time, could put CEs together in groups based on edge-to-edge distance
 
     if look in {"f", "forward"}:
-        warnings.warn("forward `look` considered experimental")
+        warnings.warn("forward `look` considered experimental", stacklevel=2)
 
     css: list[geopandas.GeoDataFrame] = []
     for i in itimes:
@@ -777,7 +824,7 @@ def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
     success = m.estimate(xy)
 
     if not success:
-        warnings.warn(f"ellipse model failed for {p}")
+        warnings.warn(f"ellipse model failed for {p}", stacklevel=2)
         return np.nan
 
     _, _, xhw, yhw, _ = m.params
@@ -852,16 +899,29 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
 
 
 def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
-    """Classify the CE groups into MCS classes, adding a categorical ``'mcs_class'`` column
-    to the input frame.
-    """
+    """Classify the CE groups into MCS classes
+    (categorical column ``'mcs_class'`` in the result).
 
-    assert {"mcs_id", "time", "dtime"} < set(cs.columns), "needed by the classify algo"
+    Raises
+    ------
+    ValueError
+        If the input frame is missing required columns.
+    """
+    if cs.empty:
+        warnings.warn("empty input frame supplied to `classify`", stacklevel=2)
+        return cs.assign(mcs_class=None)
+
+    cols = set(cs.columns)
+    cols_needed = {"mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"}
+    missing = cols_needed - cols
+    if missing:
+        raise ValueError(
+            f"missing these columns needed by the classify algorithm: {sorted(missing)}"
+        )
 
     classes = cs.groupby("mcs_id").apply(_classify_one)
-    cs["mcs_class"] = cs.mcs_id.map(classes).astype("category")
 
-    return cs
+    return cs.assign(mcs_class=cs.mcs_id.map(classes).astype("category"))
 
 
 def run(
@@ -957,6 +1017,9 @@ def run(
     #
     # 4. Stats (including precip)
     #
+
+    if ce.empty:
+        raise RuntimeError("no MCSs, unable to compute stats")
 
     msg("Starting statistics calculations")
 

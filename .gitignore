@@ -8,9 +8,12 @@ docs/examples/*.pdf
 docs/examples/*.png
 docs/examples/*.txt
 docs/examples/tb.gif
-mosa3.o*
-mosa2.o*
 mosa1.o*
+mosa2.o*
+mosa3.o*
+dyamond1.o*
+dyamond2.o*
+dyamond3.o*
 
 # GitHub Python default gitignore below:
 
