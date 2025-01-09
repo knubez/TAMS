@@ -47,3 +47,8 @@ repos:
     hooks:
       - id: nbstripout
         exclude: ^docs/examples/tracking-options.ipynb
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: "v2.3.0"
+    hooks:
+      - id: codespell
