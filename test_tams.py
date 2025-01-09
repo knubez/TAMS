@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import earthaccess
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -13,6 +14,9 @@ r = tams.data.load_example_ir().isel(time=0)
 tb = tams.data.tb_from_ir(r, ch=9)
 
 glade_avail = Path("/glade").is_dir()
+
+auth = earthaccess.login()
+skipif_no_earthdata = pytest.mark.skipif(not auth.authenticated, reason="need Earthdata auth")
 
 
 def test_ch9_tb_loaded():
@@ -197,3 +201,23 @@ def test_identify_no_ces_warning():
     )
     with pytest.warns(UserWarning, match=r"No CEs identified for time steps: \[1, 2\]"):
         _ = tams.identify(ctt)
+
+
+@skipif_no_earthdata
+@pytest.mark.parametrize(
+    "version,run",
+    [
+        ("06", "early"),
+        ("06", "late"),
+        ("07", "early"),
+        ("07", "late"),
+        ("07", "final"),
+    ],
+)
+def test_get_imerg(version, run):
+    ds = tams.data.get_imerg("2019-06-01", version=version, run=run)
+    assert set(ds.data_vars) == {"pr", "pr_err", "pr_qi"}
+    assert set(ds.coords) == {"time", "lat", "lon"}
+    for vn in ds.data_vars:
+        assert tuple(ds[vn].dims) == ("lat", "lon"), "squeezed"
+    assert ds["pr"].isnull().sum() > 0

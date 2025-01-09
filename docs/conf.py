@@ -40,6 +40,7 @@ intersphinx_mapping = {
     "geopandas": ("https://geopandas.org/en/stable/", None),
     "dask": ("https://docs.dask.org/en/latest/", None),
     "shapely": ("https://shapely.readthedocs.io/en/stable/", None),
+    "earthaccess": ("https://earthaccess.readthedocs.io/en/stable/", None),
 }
 
 napoleon_google_docstring = False
@@ -77,6 +78,7 @@ nb_execution_excludepatterns = exclude_patterns + [
     "examples/tracking-options.ipynb",
 ]
 nb_execution_raise_on_error = True
+nb_execution_timeout = 90
 
 myst_enable_extensions = [
     "dollarmath",

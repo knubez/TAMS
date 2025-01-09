@@ -26,7 +26,7 @@ jobs:
         run: python -c "from tams.data import download_examples; download_examples()"
 
       - name: pytest
-        run: pytest test_tams.py
+        run: pytest -v -ra test_tams.py
 
       - name: Run as script
         run: python -m tams.core

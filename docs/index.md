@@ -29,6 +29,7 @@ examples/tams-run.ipynb
 examples/tracking-options.ipynb
 examples/sample-mpas-ug-data.ipynb
 examples/identify.ipynb
+examples/get.ipynb
 ```
 
 ```{toctree}
