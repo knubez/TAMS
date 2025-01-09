@@ -43,3 +43,4 @@ filterwarnings = [
 
 [tool.codespell]
 skip = '_build,*.pdf,./docs/examples/tracking-options.ipynb'
+exclude-file = '.codespell-exclude'
