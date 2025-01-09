@@ -19,6 +19,7 @@ dependencies:
   - dask-core
   - earthaccess
   - gdown
+  - h5netcdf
   - joblib
   - netcdf4
   - regionmask >=0.9
