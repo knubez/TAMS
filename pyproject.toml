@@ -40,3 +40,7 @@ filterwarnings = [
     'ignore:distutils Version classes are deprecated\. Use packaging\.version instead\.:DeprecationWarning',
     'ignore:np\.find\_common\_type is deprecated\.:DeprecationWarning',
 ]
+
+[tool.codespell]
+skip = '_build,*.pdf,./docs/examples/tracking-options.ipynb'
+exclude-file = '.codespell-exclude'
