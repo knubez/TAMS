@@ -424,7 +424,7 @@ def get_mergir(
     parallel: bool = False,
     **kwargs,
 ) -> xarray.Dataset:
-    """Stream GPM MERGIR bright temperature from NASA Earthdata.
+    """Stream GPM MERGIR brightness temperature from NASA Earthdata.
 
     https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary
 
