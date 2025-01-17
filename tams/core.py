@@ -898,6 +898,110 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
     return class_
 
 
+def _classify_one_moaap(
+    cs: geopandas.GeoDataFrame,
+    *,
+    include_criteria: bool = False,
+    include_stats: bool = False,
+) -> pandas.Series:
+    # Classify whether `cs` is an MCS or not, based on MOAAP criteria.
+    # - 40k km² cloud area (241 K) for more than 4 hours
+    #   (unlike MOSA, it doesn't say they need to be continuous)
+    # - at least once in lifetime:
+    #    - at least overshooting top (i.e. at least one 215 K pixel)
+    #      (for TAMS, we only track overshooting top CEs, so this is always met)
+    #    - max pixel-wise precip rate >= 15 mm/hr
+    #    - precipitating area >= 5k km²
+    #      (maybe just including pixels >= 2 mm/hr, but not clear)
+    #
+    # These CE variables are needed:
+    # - area_km2
+    # - max_pr
+    # - frac_pr (fraction of pixels that are precipitation, i.e. over some threshold)
+
+    if "mcs_id" in cs:
+        assert cs.mcs_id.nunique() == 1
+
+    # Compute duration
+    t = cs.time.unique()
+    tmin = t.min()
+    tmax = t.max()
+    duration = pd.Timedelta(tmax - tmin)
+    # Note that this is off by one dt compared to how we do it above
+
+    # Assuming instantaneous times, we would need 5 h for the 4 h criteria
+    # but for accumulated (during previous time step), 4 is fine (according to Andy)
+    n = 4
+    nh = pd.Timedelta(f"{n}H")
+    meets_crit_duration = duration >= nh
+
+    # CE precip area as area times # of "precipitating pixels"
+    ce_prarea = cs["area_km2"] * cs["frac_pr"]
+
+    # Group by time
+    gb = cs.assign(prarea=ce_prarea).groupby("itime")
+
+    # Sum area over cloud elements
+    area = gb["area_km2"].sum()
+
+    # Agg max precip over cloud elements
+    maxpr = gb["max_pr"].max()
+
+    # Sum precip area over cloud elements
+    prarea = gb["prarea"].sum()
+
+    # 1. Assess area criterion
+    meets_crit_area = (area >= 40_000).sum() / area.size * duration >= nh
+
+    # 2. Overshoot threshold currently met for all due to TAMS approach
+
+    # 3. Assess minimum pixel-peak precip criterion
+    meets_crit_prpeak = (maxpr >= 15).any()
+
+    # 4. Assess minimum precipitating area criterion
+    meets_crit_prarea = (prarea >= 5_000).any()
+
+    # An MCS meets all of the criteria
+    is_mcs = all(
+        [
+            meets_crit_duration,
+            meets_crit_area,
+            meets_crit_prpeak,
+            meets_crit_prarea,
+        ]
+    )
+
+    res = {"is_mcs": is_mcs}
+    if include_criteria:
+        res.update(
+            {
+                "meets_crit_duration": meets_crit_duration,
+                "meets_crit_area": meets_crit_area,
+                "meets_crit_prpeak": meets_crit_prpeak,
+                "meets_crit_prarea": meets_crit_prarea,
+            }
+        )
+
+    # Sanity checks
+    max_area = area.max()
+    if meets_crit_area:
+        assert max_area >= 40_000
+    max_maxpr = maxpr.max()
+    if meets_crit_prpeak:
+        assert max_maxpr >= 15
+
+    if include_stats:
+        res.update(
+            {
+                "duration": duration,
+                "max_area": max_area,
+                "max_maxpr": max_maxpr,
+            }
+        )
+
+    return pd.Series(res)
+
+
 def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
     """Classify the CE groups into MCS classes
     (categorical column ``'mcs_class'`` in the result).
