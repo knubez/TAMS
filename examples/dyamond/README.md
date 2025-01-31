@@ -29,7 +29,7 @@ Compared to normal TAMS usage, there are a few differences:
 
 - In the identification stage, we use `ctt_threshold=241, ctt_core_threshold=225`
   for consistency with the MOSA cold-core temperature threshold criterion.
-  These are higher than the TAMS defaults (235 and 219 K, respectively).
+  These are higher than the TAMS defaults (235 and 219 K, respectively) [^threshs].
   CE precip stats are also computed in this step, to later be used in classification
   (the standard TAMS classification routine does not need precip stats).
 
@@ -41,3 +41,10 @@ Compared to normal TAMS usage, there are a few differences:
   Some information is lost in this conversion.
 
 [^dyamond]: https://www.esiwace.eu/the-project/past-phases/dyamond-initiative
+
+[^threshs]:
+    In general, a higher `ctt_core_threshold` leads to more CEs being identified,
+    while a higher `ctt_threshold` leads to larger CE areas.
+    However, since contouring is used (instead of watershedding or spread-and-grow or such),
+    a higher `ctt_threshold` can also merge regions
+    that might be considered separate CEs with a lower threshold.
