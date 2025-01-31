@@ -25,4 +25,19 @@ This directory includes Python and PBS job scripts (for NCAR Casper) for three s
 
 3. Convert to mask representation (requires dissolving constituent CEs into single shape per time per track) and drop tracks that are not MCS under the MOSA criteria, saving to netCDF
 
+Compared to normal TAMS usage, there are a few differences:
+
+- In the identification stage, we use `ctt_threshold=241, ctt_core_threshold=225`
+  for consistency with the MOSA cold-core temperature threshold criterion.
+  These are higher than the TAMS defaults (235 and 219 K, respectively).
+  CE precip stats are also computed in this step, to later be used in classification
+  (the standard TAMS classification routine does not need precip stats).
+
+- After tracking, a custom classification routine computes whether a CE group is an MCS or not.
+  In normal TAMS, `tams.classify()` assigns CE groups to one of four MCS classes.
+
+- Conversion to a gridded mask representation is not needed in order to work with TAMS outputs.
+  It was done in order to compare to other trackers.
+  Some information is lost in this conversion.
+
 [^dyamond]: https://www.esiwace.eu/the-project/past-phases/dyamond-initiative
