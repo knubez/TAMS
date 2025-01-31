@@ -6,6 +6,8 @@ Similar to [the MOSA runs](../mosa/README.md), the observations consist of [GPM_
 
 Publication: [Feng et al., submitted](https://doi.org/10.22541/essoar.172405876.67413040/v1).
 
+See also: <https://mcsmip.github.io>
+
 > [!IMPORTANT]
 > This used TAMS v0.1.x.
 > The scripts may not work with future versions of TAMS.
