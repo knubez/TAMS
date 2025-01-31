@@ -11,3 +11,6 @@ build:
 
 conda:
   environment: environment-dev.yml
+
+sphinx:
+  configuration: docs/conf.py
