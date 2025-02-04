@@ -400,7 +400,7 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
 
 
 def _time_input_to_pandas(
-    time_or_range: Any | tuple[Any, Any]
+    time_or_range: Any | tuple[Any, Any],
 ) -> tuple[pd.Timestamp | None, pd.Timestamp | None]:
     if isinstance(time_or_range, tuple):
         t0_, t1_ = time_or_range
