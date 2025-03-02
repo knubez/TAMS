@@ -101,6 +101,8 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
     # And drop leap day data from obs, which seems to have it
     # OR interp leap day for the model
 
+    return ds
+
 
 def load_path(p: Path) -> xr.Dataset:
     return preprocess(xr.open_dataset(p))
