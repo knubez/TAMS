@@ -45,6 +45,11 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
         raise ValueError(f"Unrecognized path name: {p.name!r}")
     is_obs = not is_mod
 
+    # For obs, need to flip y (ERA5)
+    if is_obs:
+        ds = ds.sel(yc=slice(None, None, -1))
+
+    # Select vars we want and spatial region
     ds = (
         ds[["BT", "PR"]]
         .sel(yc=slice(-70, 75) if is_mod else slice(-60, 60))
@@ -55,10 +60,6 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
             }
         )
     )
-
-    # For obs, need to flip y (ERA5)
-    if is_obs:
-        ds = ds.sel(yc=slice(None, None, -1))
 
     # lat/lon are really 1-d
     lon0, lat0 = ds.lon.isel(yc=0), ds.lat.isel(xc=0)
