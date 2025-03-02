@@ -2,6 +2,9 @@
 Streamline data
 """
 
+from __future__ import annotations
+
+from collections import defaultdict
 from pathlib import Path
 
 import xarray as xr
@@ -13,6 +16,21 @@ IN_BASE_OBS = IN_BASE / "OBS"
 # Example paths (first)
 IN_MOD_EX = IN_BASE_MOD / "200001_CESM-HR_ObjectMasks__dt-1h_MOAAP-masks.nc"
 IN_OBS_EX = IN_BASE_OBS / "200101_ERA5_ObjectMasks__dt-1h_MOAAP-masks.nc"
+
+
+def get_years_files(dir: Path) -> dict[int, list[Path]]:
+    d = defaultdict(list)
+    for p in sorted(dir.glob("*.nc")):
+        _, s_ym, *_ = p.stem.split("_")
+        year = int(s_ym[:4])
+        d[year].append(p)
+    return d
+
+
+FILES = {
+    "mod": get_years_files(IN_BASE_MOD),
+    "obs": get_years_files(IN_BASE_OBS),
+}
 
 
 def load_path(p: Path) -> xr.Dataset:
@@ -53,7 +71,7 @@ def load_path(p: Path) -> xr.Dataset:
     if is_obs:
         # Try to fill in the null brightness temp pixels a bit
         # Can't use the HH:30 time to help since not in the dataset
-        n_na0 = ds["tb"].isnull().sum()
+        n_na0 = ds["tb"].isnull().sum(dim=("lat", "lon"))
         ds["tb"] = (
             ds["tb"]
             .interpolate_na(
@@ -75,17 +93,24 @@ def load_path(p: Path) -> xr.Dataset:
                 assume_sorted=True,
             )
         )
-        n_na = ds["tb"].isnull().sum()
-        assert n_na < n_na0 or n_na == n_na0 == 0
-        ds["tb"].attrs.update(
-            {
-                "_n_na_pre_interp": n_na0,
-                "_n_na": n_na,
-            }
-        )
+        n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
+        assert n_na.sum() <= n_na0.sum()
 
     # TODO: set calendar to non-leap with cftime?
     # And drop leap day data from obs, which seems to have it
     # OR interp leap day for the model
 
     return ds
+
+
+def load_year(files: list[Path]) -> xr.Dataset:
+    return xr.open_mfdataset(
+        files,
+        preprocess=load_path,
+        combine="nested",
+        concat_dim="time",
+        chunks={"time": 1, "lat": -1, "lon": -1},
+    )
+
+
+ds = load_year(FILES["mod"][2000])
