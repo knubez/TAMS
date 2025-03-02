@@ -49,18 +49,6 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
     if is_obs:
         ds = ds.sel(yc=slice(None, None, -1))
 
-    # Select vars we want and spatial region
-    ds = (
-        ds[["BT", "PR"]]
-        .sel(yc=slice(-70, 75) if is_mod else slice(-60, 60))
-        .rename(
-            {
-                "BT": "tb",
-                "PR": "pr",
-            }
-        )
-    )
-
     # lat/lon are really 1-d
     lon0, lat0 = ds.lon.isel(yc=0), ds.lat.isel(xc=0)
     assert (lon0.diff("xc") == 0.25).all()
@@ -68,6 +56,18 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
     assert (ds.lon == lon0).all()
     assert (ds.lat == lat0).all()
     ds = ds.assign(lat=lat0, lon=lon0).swap_dims(xc="lon", yc="lat")
+
+    # Select vars we want and spatial region
+    ds = (
+        ds[["BT", "PR"]]
+        .sel(lat=slice(-70, 75) if is_mod else slice(-60, 60))
+        .rename(
+            {
+                "BT": "tb",
+                "PR": "pr",
+            }
+        )
+    )
 
     if is_obs:
         # Try to fill in the null brightness temp pixels a bit
