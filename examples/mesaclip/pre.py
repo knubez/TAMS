@@ -21,7 +21,7 @@ IN_OBS_EX = IN_BASE_OBS / "200101_ERA5_ObjectMasks__dt-1h_MOAAP-masks.nc"
 def get_years_files(dir: Path) -> dict[int, list[Path]]:
     d = defaultdict(list)
     for p in sorted(dir.glob("*.nc")):
-        _, s_ym, *_ = p.stem.split("_")
+        s_ym, *_ = p.stem.split("_")
         year = int(s_ym[:4])
         d[year].append(p)
     return d
@@ -33,7 +33,9 @@ FILES = {
 }
 
 
-def load_path(p: Path) -> xr.Dataset:
+def preprocess(ds: xr.Dataset) -> xr.Dataset:
+    p = Path(ds.encoding["source"])
+
     which = p.stem.split("_")
     if which == "CESM-HR":
         is_mod = True
@@ -42,8 +44,6 @@ def load_path(p: Path) -> xr.Dataset:
     else:
         raise ValueError(f"Unrecognized path name: {p.name!r}")
     is_obs = not is_mod
-
-    ds = xr.open_dataset(p)
 
     ds = (
         ds[["BT", "PR"]]
@@ -100,13 +100,15 @@ def load_path(p: Path) -> xr.Dataset:
     # And drop leap day data from obs, which seems to have it
     # OR interp leap day for the model
 
-    return ds
+
+def load_path(p: Path) -> xr.Dataset:
+    return preprocess(xr.open_dataset(p))
 
 
 def load_year(files: list[Path]) -> xr.Dataset:
     return xr.open_mfdataset(
         files,
-        preprocess=load_path,
+        preprocess=preprocess,
         combine="nested",
         concat_dim="time",
         chunks={"time": 1, "lat": -1, "lon": -1},
