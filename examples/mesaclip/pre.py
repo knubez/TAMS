@@ -115,4 +115,5 @@ def load_year(files: list[Path]) -> xr.Dataset:
     )
 
 
-ds = load_year(FILES["mod"][2000])
+m = load_year(FILES["mod"][2000])
+o = load_year(FILES["obs"][2001])
