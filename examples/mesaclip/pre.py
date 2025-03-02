@@ -36,7 +36,7 @@ FILES = {
 def preprocess(ds: xr.Dataset) -> xr.Dataset:
     p = Path(ds.encoding["source"])
 
-    which = p.stem.split("_")
+    _, which, *_ = p.stem.split("_")
     if which == "CESM-HR":
         is_mod = True
     elif which == "ERA5":
