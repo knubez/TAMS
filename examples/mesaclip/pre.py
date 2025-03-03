@@ -69,10 +69,20 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
         )
     )
 
+    # Variable attrs
+    ds["tb"].attrs = {
+        "long_name": "brightness temperature",
+        "units": "K",
+    }
+    ds["pr"].attrs = {
+        "long_name": "precipitation rate",
+        "units": "mm/hr",
+    }
+
     if is_obs:
         # Try to fill in the null brightness temp pixels a bit
         # Can't use the HH:30 time to help since not in the dataset
-        n_na0 = ds["tb"].isnull().sum(dim=("lat", "lon"))
+        # n_na0 = ds["tb"].isnull().sum(dim=("lat", "lon"))
         ds["tb"] = (
             ds["tb"]
             .interpolate_na(
@@ -87,19 +97,19 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
                 fill_value="extrapolate",
                 assume_sorted=True,
             )
-            .interpolate_na(
-                dim="time",
-                method="linear",
-                max_gap="1h",
-                assume_sorted=True,
-            )
+            # .interpolate_na(
+            #     dim="time",
+            #     method="linear",
+            #     max_gap="1h",
+            #     assume_sorted=True,
+            # )
         )
-        n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
-        assert n_na.sum() <= n_na0.sum()
+        # n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
+        # assert n_na.sum() <= n_na0.sum()
 
-    # TODO: set calendar to non-leap with cftime?
-    # And drop leap day data from obs, which seems to have it
-    # OR interp leap day for the model
+    ds.attrs = {
+        "case": "mod" if is_mod else "obs",
+    }
 
     return ds
 
@@ -109,7 +119,7 @@ def load_path(p: Path) -> xr.Dataset:
 
 
 def load_year(files: list[Path]) -> xr.Dataset:
-    return xr.open_mfdataset(
+    ds = xr.open_mfdataset(
         files,
         preprocess=preprocess,
         combine="nested",
@@ -117,6 +127,32 @@ def load_year(files: list[Path]) -> xr.Dataset:
         chunks={"time": 1, "lat": -1, "lon": -1},
     )
 
+    # Model is no-leap, so normalize to that
+    if ds.attrs["case"] == "mod":
+        assert ds.sizes["time"] == 365 * 24  # always
+    elif ds.attrs["case"] == "obs":
+        if ds.time.isel(time=slice(None, 1)).dt.is_leap.any():
+            assert ds.sizes["time"] == 366 * 24
+            # Feb 29 will be dropped automatically
+        else:
+            assert ds.sizes["time"] == 365 * 24
+    else:
+        raise AssertionError
+    ds = ds.convert_calendar("365_day")
+
+    return ds
+
 
 m = load_year(FILES["mod"][2000])
 o = load_year(FILES["obs"][2001])
+
+
+from dask.diagnostics import ProgressBar
+
+print("mod")
+with ProgressBar():
+    m.to_netcdf("mod.nc")
+
+print("obs")
+with ProgressBar():
+    o.to_netcdf("obs.nc")
