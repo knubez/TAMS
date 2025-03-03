@@ -13,6 +13,8 @@ IN_BASE = Path("/glade/derecho/scratch/fudan/MOAAP/results")
 IN_BASE_MOD = IN_BASE / "CESM-HR"
 IN_BASE_OBS = IN_BASE / "OBS"
 
+OUT = Path("/glade/derecho/scratch/zmoon/mesaclip")
+
 # Example paths (first)
 IN_MOD_EX = IN_BASE_MOD / "200001_CESM-HR_ObjectMasks__dt-1h_MOAAP-masks.nc"
 IN_OBS_EX = IN_BASE_OBS / "200101_ERA5_ObjectMasks__dt-1h_MOAAP-masks.nc"
@@ -149,10 +151,15 @@ o = load_year(FILES["obs"][2001])
 
 from dask.diagnostics import ProgressBar
 
+encoding = {
+    "tb": {"zlib": True, "complevel": 3},
+    "pr": {"zlib": True, "complevel": 3},
+}
+
 print("mod")
 with ProgressBar():
-    m.to_netcdf("mod.nc")
+    m.to_netcdf(OUT / "mod.nc", encoding=encoding)
 
 print("obs")
 with ProgressBar():
-    o.to_netcdf("obs.nc")
+    o.to_netcdf(OUT / "obs.nc", encoding=encoding)
