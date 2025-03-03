@@ -131,7 +131,7 @@ def load_year(files: list[Path]) -> xr.Dataset:
     if ds.attrs["case"] == "mod":
         assert ds.sizes["time"] == 365 * 24  # always
     elif ds.attrs["case"] == "obs":
-        if ds.time.isel(time=slice(None, 1)).dt.is_leap.any():
+        if ds.time.isel(time=0).dt.is_leap_year:
             assert ds.sizes["time"] == 366 * 24
             # Feb 29 will be dropped automatically
         else:
