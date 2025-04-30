@@ -26,6 +26,7 @@ REPO = HERE.parent.parent
 assert REPO.name == "TAMS"
 OUT = Path("/glade/derecho/scratch/zmoon/mesaclip")
 
+# Note GeoPandas v1 required to use these options
 GP_ENCODING = "geoarrow"
 GP_SCHEMA_VERSION = "1.1.0"
 
