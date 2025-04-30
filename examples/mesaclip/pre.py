@@ -227,7 +227,7 @@ JOB_TPL_PRE = r"""
 #PBS -N mesaclip1
 #PBS -q casper
 #PBS -l walltime=2:00:00
-#PBS -l select=1:ncpus=21:mem=100gb
+#PBS -l select=1:ncpus=21:mem=80gb
 #PBS -j oe
 
 cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
