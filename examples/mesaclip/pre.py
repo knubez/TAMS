@@ -208,8 +208,11 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
             ces = [add_ce_stats(g.pr.isel(time=i), ce0) for i, ce0 in enumerate(ces0)]
 
         gdf = pd.concat(ces, ignore_index=True)
+        gdf.attrs = {
+            "case": ds.attrs["case"],
+        }
         gdf.to_parquet(
-            OUT / "ce" / f"{ym}.parquet",
+            OUT / "ce" / f"{ds.attrs['case'][0]}{ym}.parquet",
             geometry_encoding=GP_ENCODING,
             schema_version=GP_SCHEMA_VERSION,
         )
