@@ -236,7 +236,7 @@ cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
-$py -c "from pre import FILES, load_year, preprocess_year_ds;
+$py -c "from mesaclip import FILES, load_year, preprocess_year_ds;
 preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
 """.lstrip()
 
@@ -337,7 +337,7 @@ cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
-$py -c "from pre import Case, get_pre_files, track;
+$py -c "from mesaclip import Case, get_pre_files, track;
 track(get_pre_files[{case!r}])"
 """.lstrip()
 
