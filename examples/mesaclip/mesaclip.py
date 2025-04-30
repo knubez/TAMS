@@ -374,7 +374,7 @@ cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
 $py -c "from mesaclip import Case, get_pre_files, track;
-track(get_pre_files[{case!r}])"
+track(get_pre_files()[{case!r}])"
 """.lstrip()
 
 
