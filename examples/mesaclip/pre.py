@@ -196,7 +196,8 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
     year = ds.time.dt.year.values[0]
 
     for month, g in ds.groupby("time.month"):
-        ym = f"{year:04d}-{month:02d}"
+        ym = f"{year:04d}{month:02d}"
+        w = ds.attrs["case"][0]  # which
 
         ces0, _ = tams.identify(g.tb, parallel=parallel)
 
@@ -213,7 +214,7 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
             "case": ds.attrs["case"],
         }
         gdf.to_parquet(
-            OUT / "ce" / f"{ds.attrs['case'][0]}{ym}.parquet",
+            OUT / "ce" / f"{w}{ym}.parquet",
             geometry_encoding=GP_ENCODING,
             schema_version=GP_SCHEMA_VERSION,
         )
