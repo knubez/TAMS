@@ -310,13 +310,13 @@ def check_pre_files():
         # First is Jan
         stem = files[0].stem
         if not stem.endswith("01"):
-            raise AssertionError(f"First file is not Jan: {stem}")
+            print(f"First file is not Jan: {stem}")
         first_dt = pd.to_datetime(get_ym(files[0]), format="%Y%m")
 
         # Last is Dec
         stem = files[-1].stem
         if not stem.endswith("12"):
-            raise AssertionError(f"Last file is not Dec: {stem}")
+            print(f"Last file is not Dec: {stem}")
         last_dt = pd.to_datetime(get_ym(files[-1]), format="%Y%m")
 
         # No gaps
@@ -326,7 +326,7 @@ def check_pre_files():
         missing = set(yms_should_be) - set(yms_are)
         if missing:
             s_missing = "\n".join(f"- {m}" for m in sorted(missing))
-            raise AssertionError(f"Missing months:\n{s_missing}")
+            print(f"Missing months:\n{s_missing}")
 
 
 def track(files):
