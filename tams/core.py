@@ -681,6 +681,7 @@ def track(
 
     if durations is not None:
         assert len(durations) == len(times)
+        dt = pd.TimedeltaIndex(durations)
     else:
         # Estimate dt values
         dt = times[1:] - times[:-1]
