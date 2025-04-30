@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Literal, NamedTuple, Self
@@ -301,6 +302,7 @@ def get_pre_files():
 
 def track(files):
     case = Case.from_path(files[0])
+    print(f"Tracking {case!r}")
 
     ces = []
     times = []
@@ -313,7 +315,12 @@ def track(files):
     print(len(times), "times")
     durations = [pd.Timedelta("1h")] * len(times)
 
+    tic = time.perf_counter_ns()
     ce = tams.track(ces, times, durations=durations)
+
+    toc = time.perf_counter_ns()
+    dt = pd.Timedelta(toc - tic, unit="ns")
+    print(f"Tracking completed in {dt}")
 
     ce.to_parquet(
         OUT / f"{case.to_id()}.parquet",
