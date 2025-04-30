@@ -191,7 +191,7 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
     """Preprocess a year of data by month, saving CE GeoParquet files."""
-    assert ds.time.dt.year.to_series().is_unique
+    assert ds.time.dt.year.to_series().nunique() == 1
     year = ds.time.dt.year.values[0]
 
     for month, g in ds.groupby("time.month"):
@@ -243,7 +243,7 @@ def submit_pres():
     for which, years in FILES.items():
         for year, _ in years.items():
             job = JOB_TPL_PRE.format(which=which, year=year)
-            job_file = REPO / f"job_{which}_{year}.sh"
+            job_file = REPO / f"mesaclip1_{which}_{year}.sh"
             with open(job_file, "w") as f:
                 f.write(job)
             print(f"Submitting {job_file}")

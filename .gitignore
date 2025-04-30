@@ -14,6 +14,8 @@ mosa3.o*
 dyamond1.o*
 dyamond2.o*
 dyamond3.o*
+mesaclip1_*.sh
+mesaclip1.o*
 
 # GitHub Python default gitignore below:
 
