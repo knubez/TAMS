@@ -9,6 +9,7 @@ import os
 import subprocess
 import time
 from collections import defaultdict
+from io import StringIO
 from pathlib import Path
 from typing import Literal, NamedTuple, Self
 
@@ -304,19 +305,23 @@ def check_pre_files():
     def get_ym(p: Path) -> str:
         return p.stem[1:7]
 
+    ok = True
+    s = StringIO()
     for case, files in get_pre_files().items():
-        print(f"Checking {case!r}")
+        s.write(f"{case!r}\n")
 
         # First is Jan
         stem = files[0].stem
         if not stem.endswith("01"):
-            print(f"First file is not Jan: {stem}")
+            s.write(f"First file is not Jan: {stem}\n")
+            ok = False
         first_dt = pd.to_datetime(get_ym(files[0]), format="%Y%m")
 
         # Last is Dec
         stem = files[-1].stem
         if not stem.endswith("12"):
-            print(f"Last file is not Dec: {stem}")
+            s.write(f"Last file is not Dec: {stem}\n")
+            ok = False
         last_dt = pd.to_datetime(get_ym(files[-1]), format="%Y%m")
 
         # No gaps
@@ -326,7 +331,11 @@ def check_pre_files():
         missing = set(yms_should_be) - set(yms_are)
         if missing:
             s_missing = "\n".join(f"- {m}" for m in sorted(missing))
-            print(f"Missing months:\n{s_missing}")
+            s.write(f"Missing months:\n{s_missing}\n")
+            ok = False
+
+    if not ok:
+        raise AssertionError(s.getvalue())
 
 
 def track(files):
