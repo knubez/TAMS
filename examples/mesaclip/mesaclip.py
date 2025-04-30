@@ -311,13 +311,13 @@ def check_pre_files():
         stem = files[0].stem
         if not stem.endswith("01"):
             raise AssertionError(f"First file is not Jan: {stem}")
-        first_dt = pd.Timestamp(get_ym(files[0]), format="%Y%m")
+        first_dt = pd.to_datetime(get_ym(files[0]), format="%Y%m")
 
         # Last is Dec
         stem = files[-1].stem
         if not stem.endswith("12"):
             raise AssertionError(f"Last file is not Dec: {stem}")
-        last_dt = pd.Timestamp(get_ym(files[-1]), format="%Y%m")
+        last_dt = pd.to_datetime(get_ym(files[-1]), format="%Y%m")
 
         # No gaps
         dt_range = pd.date_range(first_dt, last_dt, freq="MS")
