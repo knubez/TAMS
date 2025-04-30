@@ -4,15 +4,24 @@ Streamline data
 
 from __future__ import annotations
 
+import subprocess
 from collections import defaultdict
 from pathlib import Path
 
+import geopandas as gpd
+import pandas as pd
 import xarray as xr
+from joblib import Parallel, delayed
+
+import tams
 
 IN_BASE = Path("/glade/derecho/scratch/fudan/MOAAP/results")
 IN_BASE_MOD = IN_BASE / "CESM-HR"
 IN_BASE_OBS = IN_BASE / "OBS"
 
+HERE = Path(__file__).parent
+REPO = HERE.parent.parent
+assert REPO.name == "TAMS"
 OUT = Path("/glade/derecho/scratch/zmoon/mesaclip")
 
 # Example paths (first)
@@ -141,25 +150,92 @@ def load_year(files: list[Path]) -> xr.Dataset:
     else:
         raise AssertionError
     ds = ds.convert_calendar("365_day")
+    assert ds.sizes["time"] == 365 * 24
 
     return ds
 
 
-# m = load_year(FILES["mod"][2000])
-# o = load_year(FILES["obs"][2001])
-
-
-# from dask.diagnostics import ProgressBar
-
-encoding = {
+NC_ENCODING = {
     "tb": {"zlib": True, "complevel": 3},
     "pr": {"zlib": True, "complevel": 3},
 }
 
-# print("mod")
-# with ProgressBar():
-#    m.to_netcdf(OUT / "mod.nc", encoding=encoding)
 
-# print("obs")
-# with ProgressBar():
-#    o.to_netcdf(OUT / "obs.nc", encoding=encoding)
+def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Add time and precip stats to CE frame."""
+    t = pr.time.item()
+    ts = pd.to_datetime(str(t))  # pretend it's normal, instead of 365-day
+    ce = ce.drop(columns=["inds219", "area219_km2", "cs219"]).assign(time=ts)
+
+    # Add precip stats needed for the special classify
+    ce = tams.data_in_contours(
+        pr,
+        ce,
+        agg=("count", "mean"),
+        merge=True,
+    )
+    ce = tams.data_in_contours(
+        pr.where(pr >= 2).rename("pr_ge_2"),
+        ce,
+        agg=("count", "mean"),
+        merge=True,
+    )
+
+    return ce
+
+
+def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
+    """Preprocess a year of data by month, saving CE GeoParquet files."""
+    assert ds.time.dt.year.to_series().is_unique
+    year = ds.time.dt.year.values[0]
+
+    for month, g in ds.groupby("time.month"):
+        ym = f"{year:04d}-{month:02d}"
+
+        ces0, _ = tams.identify(g.tb, parallel=parallel)
+
+        if parallel:
+            ces = Parallel(n_jobs=-2, verbose=10)(
+                delayed(add_ce_stats)(g.pr.isel(time=i).copy(deep=False), ce0.copy())
+                for i, ce0 in enumerate(ces0)
+            )
+        else:
+            ces = [add_ce_stats(g.pr.isel(time=i), ce0) for i, ce0 in enumerate(ces0)]
+
+        gdf = pd.concat(ces)
+        gdf.to_parquet(OUT / "ce" / f"{ym}.parquet")
+
+    return ces0
+
+
+JOB_TPL_PRE = r"""\
+#/bin/bash
+## Submit with `qsub -A <account>`
+#PBS -N mesaclip1
+#PBS -q casper
+#PBS -l walltime=2:00:00
+#PBS -l select=1:ncpus=21:mem=100gb
+#PBS -j oe
+
+cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+
+py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
+
+$py -c "from pre import FILES, load_year, preprocess_year_ds;
+    preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
+"""
+
+
+def submit_pres():
+    for which, years in FILES.items():
+        for year, _ in years.items():
+            job = JOB_TPL_PRE.format(which=which, year=year)
+            job_file = REPO / f"job_{which}_{year}.sh"
+            with open(job_file, "w") as f:
+                f.write(job)
+            print(f"Submitting {job_file}")
+            subprocess.run(["qsub", "-A", "$A", str(job_file)], check=True)
+
+
+if __name__ == "__main__":
+    submit_pres()
