@@ -252,7 +252,6 @@ def submit_pres():
                 f.write(job)
             print(f"Submitting {job_file}")
             subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
-            break
 
 
 if __name__ == "__main__":
