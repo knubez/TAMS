@@ -4,6 +4,7 @@ Streamline data
 
 from __future__ import annotations
 
+import os
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -215,7 +216,7 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
     return ces0
 
 
-JOB_TPL_PRE = r"""\
+JOB_TPL_PRE = r"""
 #/bin/bash
 ## Submit with `qsub -A <account>`
 #PBS -N mesaclip1
@@ -230,10 +231,14 @@ py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
 $py -c "from pre import FILES, load_year, preprocess_year_ds;
     preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
-"""
+""".lstrip()
 
 
 def submit_pres():
+    A = os.getenv("A")
+    if A is None:
+        print("set $A to desired account")
+        raise SystemExit(2)
     for which, years in FILES.items():
         for year, _ in years.items():
             job = JOB_TPL_PRE.format(which=which, year=year)
@@ -241,7 +246,8 @@ def submit_pres():
             with open(job_file, "w") as f:
                 f.write(job)
             print(f"Submitting {job_file}")
-            subprocess.run(["qsub", "-A", "$A", str(job_file)], check=True)
+            subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
+            break
 
 
 if __name__ == "__main__":
