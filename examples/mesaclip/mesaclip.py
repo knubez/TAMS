@@ -300,6 +300,35 @@ def get_pre_files():
     return out
 
 
+def check_pre_files():
+    def get_ym(p: Path) -> str:
+        return p.stem[1:7]
+
+    for case, files in get_pre_files().items():
+        print(f"Checking {case!r}")
+
+        # First is Jan
+        stem = files[0].stem
+        if not stem.endswith("01"):
+            raise AssertionError(f"First file is not Jan: {stem}")
+        first_dt = pd.Timestamp(get_ym(files[0]), format="%Y%m")
+
+        # Last is Dec
+        stem = files[-1].stem
+        if not stem.endswith("12"):
+            raise AssertionError(f"Last file is not Dec: {stem}")
+        last_dt = pd.Timestamp(get_ym(files[-1]), format="%Y%m")
+
+        # No gaps
+        dt_range = pd.date_range(first_dt, last_dt, freq="MS")
+        yms_should_be = [f"{d.year:04d}{d.month:02d}" for d in dt_range]
+        yms_are = [get_ym(p) for p in files]
+        missing = set(yms_should_be) - set(yms_are)
+        if missing:
+            s_missing = "\n".join(f"- {m}" for m in sorted(missing))
+            raise AssertionError(f"Missing months:\n{s_missing}")
+
+
 def track(files):
     case = Case.from_path(files[0])
     print(f"Tracking {case!r}")
