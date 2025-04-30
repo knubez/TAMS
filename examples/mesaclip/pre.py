@@ -24,6 +24,9 @@ REPO = HERE.parent.parent
 assert REPO.name == "TAMS"
 OUT = Path("/glade/derecho/scratch/zmoon/mesaclip")
 
+GP_ENCODING = "geoarrow"
+GP_SCHEMA_VERSION = "1.1.0"
+
 # Example paths (first)
 IN_MOD_EX = IN_BASE_MOD / "200001_CESM-HR_ObjectMasks__dt-1h_MOAAP-masks.nc"
 IN_OBS_EX = IN_BASE_OBS / "200101_ERA5_ObjectMasks__dt-1h_MOAAP-masks.nc"
@@ -202,8 +205,12 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
         else:
             ces = [add_ce_stats(g.pr.isel(time=i), ce0) for i, ce0 in enumerate(ces0)]
 
-        gdf = pd.concat(ces)
-        gdf.to_parquet(OUT / "ce" / f"{ym}.parquet")
+        gdf = pd.concat(ces, ignore_index=True)
+        gdf.to_parquet(
+            OUT / "ce" / f"{ym}.parquet",
+            geometry_encoding=GP_ENCODING,
+            schema_version=GP_SCHEMA_VERSION,
+        )
 
     return ces0
 
