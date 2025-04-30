@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Streamline data
 """
@@ -230,7 +231,7 @@ cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
 $py -c "from pre import FILES, load_year, preprocess_year_ds;
-    preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
+preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
 """.lstrip()
 
 
