@@ -145,21 +145,21 @@ def load_year(files: list[Path]) -> xr.Dataset:
     return ds
 
 
-m = load_year(FILES["mod"][2000])
-o = load_year(FILES["obs"][2001])
+# m = load_year(FILES["mod"][2000])
+# o = load_year(FILES["obs"][2001])
 
 
-from dask.diagnostics import ProgressBar
+# from dask.diagnostics import ProgressBar
 
 encoding = {
     "tb": {"zlib": True, "complevel": 3},
     "pr": {"zlib": True, "complevel": 3},
 }
 
-print("mod")
-with ProgressBar():
-    m.to_netcdf(OUT / "mod.nc", encoding=encoding)
+# print("mod")
+# with ProgressBar():
+#    m.to_netcdf(OUT / "mod.nc", encoding=encoding)
 
-print("obs")
-with ProgressBar():
-    o.to_netcdf(OUT / "obs.nc", encoding=encoding)
+# print("obs")
+# with ProgressBar():
+#    o.to_netcdf(OUT / "obs.nc", encoding=encoding)
