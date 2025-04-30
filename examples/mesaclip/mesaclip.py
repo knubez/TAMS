@@ -9,6 +9,7 @@ import os
 import subprocess
 from collections import defaultdict
 from pathlib import Path
+from typing import Literal, NamedTuple, Self
 
 import geopandas as gpd
 import pandas as pd
@@ -199,7 +200,7 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
         ym = f"{year:04d}{month:02d}"
         w = ds.attrs["case"][0]  # which
 
-        ces0, _ = tams.identify(g.tb, parallel=parallel)
+        ces0, _ = tams.identify(g.tb, parallel=parallel)  # FIXME: thresholds
 
         if parallel:
             ces = Parallel(n_jobs=-2, verbose=10)(
@@ -255,5 +256,123 @@ def submit_pres():
             subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
 
 
+class Case(NamedTuple):
+    """Case to track."""
+
+    which: Literal["mod", "obs"]
+    period: Literal["present", "future"]
+
+    def from_path(p: Path) -> Self:
+        """Get case from path."""
+        if p.name.startswith("m"):
+            which = "mod"
+        elif p.name.startswith("o"):
+            which = "obs"
+        else:
+            raise ValueError(f"Unrecognized path name: {p.name!r}")
+
+        year = int(p.stem[1:5])
+        if year < 2030:
+            period = "present"
+        else:
+            period = "future"
+
+        return Case(which, period)
+
+    def to_id(self, *, concise: bool = True) -> str:
+        """A string case ID."""
+        if concise:
+            return f"{self.which[0]}{self.period[0]}"
+        else:
+            return f"{self.which}_{self.period}"
+
+
+def get_pre_files():
+    """Get and sort the files to track."""
+
+    out = defaultdict(list)
+    files = sorted((OUT / "ce").glob("*.parquet"))
+    for p in files:
+        case = Case.from_path(p)
+        out[case].append(p)
+
+    return out
+
+
+def track(files):
+    case = Case.from_path(files[0])
+
+    ces = []
+    times = []
+    for p in files:
+        gdf = gpd.read_parquet(p)
+        for t, ce in gdf.groupby("time"):
+            ces.append(ce)
+            times.append(t)
+
+    print(len(times), "times")
+    durations = [pd.Timedelta("1h")] * len(times)
+
+    ce = tams.track(ces, times, durations=durations)
+
+    ce.to_parquet(
+        OUT / f"{case.to_id()}.parquet",
+        geometry_encoding=GP_ENCODING,
+        schema_version=GP_SCHEMA_VERSION,
+    )
+
+    return ce
+
+
+JOB_TPL_TRACK = r"""
+#/bin/bash
+## Submit with `qsub -A <account>`
+#PBS -N mesaclip2
+#PBS -q casper
+#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=2:mem=16gb
+#PBS -j oe
+
+cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+
+py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
+
+$py -c "from pre import Case, get_pre_files, track;
+track(get_pre_files[{case!r}])"
+""".lstrip()
+
+
+def submit_tracks():
+    A = os.getenv("A")
+    if A is None:
+        print("set $A to desired account")
+        raise SystemExit(2)
+    pre_files = get_pre_files()
+    for case, _ in pre_files.items():
+        job = JOB_TPL_TRACK.format(case=case)
+        job_file = REPO / f"mesaclip2_{case.to_id(concise=False)}.sh"
+        with open(job_file, "w") as f:
+            f.write(job)
+        print(f"Submitting {job_file}")
+        subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
+
+
 if __name__ == "__main__":
-    submit_pres()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pre", action="store_true")
+    parser.add_argument("--track", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.pre and args.track:
+        print("Only one step at a time")
+        raise SystemExit(2)
+
+    if args.pre:
+        submit_pres()
+    elif args.track:
+        submit_tracks()
+    else:
+        print("Nothing to do")
