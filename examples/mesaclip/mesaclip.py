@@ -272,7 +272,8 @@ JOB_TPL_NULL_TB = r"""
 #PBS -l walltime=2:00:00
 #PBS -l select=1:ncpus=21:mem=80gb
 #PBS -j oe
-#PBS -d /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+
+cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
@@ -302,7 +303,11 @@ def submit_job(job: str, *, stem: str = "job") -> None:
     with open(job_file, "w") as f:
         f.write(job)
     print(f"Submitting {job_file}")
-    subprocess.run(["qsub", "-A", get_account(), str(job_file)], check=True)
+    subprocess.run(
+        ["qsub", "-A", get_account(), str(job_file)],
+        cwd=HERE,
+        check=True,
+    )
 
 
 def submit_null_tb():
@@ -351,7 +356,7 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return ce
 
 
-def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
+def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> None:
     """Preprocess a year of data by month, saving CE GeoParquet files."""
     assert ds.time.dt.year.to_series().nunique() == 1
     year = ds.time.dt.year.values[0]
@@ -385,8 +390,6 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
             schema_version=GP_SCHEMA_VERSION,
         )
 
-    return ces0
-
 
 JOB_TPL_PRE = r"""
 #!/bin/bash
@@ -395,7 +398,8 @@ JOB_TPL_PRE = r"""
 #PBS -l walltime=2:00:00
 #PBS -l select=1:ncpus=21:mem=80gb
 #PBS -j oe
-#PBS -d /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+
+cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
@@ -541,7 +545,8 @@ JOB_TPL_TRACK = r"""
 #PBS -l walltime=12:00:00
 #PBS -l select=1:ncpus=2:mem=16gb
 #PBS -j oe
-#PBS -d /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+
+cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
