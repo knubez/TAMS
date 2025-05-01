@@ -260,15 +260,13 @@ def find_null_tb(ds: xr.Dataset) -> xr.Dataset:
 
 
 JOB_TPL_NULL_TB = r"""
-#/bin/bash
-## Submit with `qsub -A <account>`
+#!/bin/bash
 #PBS -N null-tb
 #PBS -q casper
 #PBS -l walltime=2:00:00
 #PBS -l select=1:ncpus=21:mem=80gb
 #PBS -j oe
-
-cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+#PBS -d /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
@@ -363,15 +361,13 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
 
 
 JOB_TPL_PRE = r"""
-#/bin/bash
-## Submit with `qsub -A <account>`
+#!/bin/bash
 #PBS -N mesaclip1
 #PBS -q casper
 #PBS -l walltime=2:00:00
 #PBS -l select=1:ncpus=21:mem=80gb
 #PBS -j oe
-
-cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+#PBS -d /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
@@ -515,15 +511,13 @@ def track(files):
 
 
 JOB_TPL_TRACK = r"""
-#/bin/bash
-## Submit with `qsub -A <account>`
+#!/bin/bash
 #PBS -N mesaclip2
 #PBS -q casper
 #PBS -l walltime=12:00:00
 #PBS -l select=1:ncpus=2:mem=16gb
 #PBS -j oe
-
-cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+#PBS -d /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
 py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
 
