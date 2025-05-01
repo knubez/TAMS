@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Literal, NamedTuple, Self
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import xarray as xr
 from joblib import Parallel, delayed
@@ -320,6 +321,18 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     t = pr.time.item()
     ts = pd.to_datetime(str(t))  # pretend it's normal, instead of 365-day
     ce = ce.drop(columns=["inds219", "area219_km2", "cs219"]).assign(time=ts)
+
+    # Some obs times don't yield CEs even though they have Tb, e.g.
+    # - 2003-09-19 14:00 (i=446)
+    if ce.empty:
+        for vn in [
+            "pr_count",
+            "pr_mean",
+            "pr_ge_2_count",
+            "pr_ge_2_mean",
+        ]:
+            ce[vn] = np.nan
+        return ce
 
     # Add precip stats needed for the special classify
     ce = tams.data_in_contours(
