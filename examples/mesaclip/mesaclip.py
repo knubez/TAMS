@@ -238,13 +238,13 @@ NC_ENCODING = {
 }
 
 
-def find_null_tb(ds: xr.Dataset) -> xr.Dataset:
-    """Find times of all-null Tb."""
+def find_null(ds: xr.Dataset, *, vn="tb") -> xr.Dataset:
+    """Find times of all-null `vn`."""
 
     assert ds.time.dt.year.to_series().nunique() == 1
     year = ds.time.dt.year.values[0]
     case = ds.attrs["case"]
-    print(f"Searching for null Tb in {case} {year}")
+    print(f"Searching for null {vn} in {case} {year}")
 
     def fun(da):
         assert da.dims == ("lat", "lon")
@@ -252,36 +252,19 @@ def find_null_tb(ds: xr.Dataset) -> xr.Dataset:
 
     # Use joblib (single-time chunks)
     is_nulls = Parallel(n_jobs=-2, verbose=10)(
-        delayed(fun)(ds["tb"].isel(time=i)) for i in range(ds.sizes["time"])
+        delayed(fun)(ds[vn].isel(time=i)) for i in range(ds.sizes["time"])
     )
 
     if not any(is_nulls):
         return
 
     # Save data
-    with open(HERE / f"null_tb_{case}_{year}.txt", "w") as f:
+    with open(HERE / f"null_{vn}_{case}_{year}.txt", "w") as f:
         for i, is_null in enumerate(is_nulls):
             if is_null:
                 ts = str(ds.time.values[i])
-                print(f"Null Tb at time step {i} ({ts})")
+                print(f"Null {vn} at time step {i} ({ts})")
                 f.write(f"{i},{ts}\n")
-
-
-JOB_TPL_NULL_TB = r"""
-#!/bin/bash
-#PBS -N null-tb
-#PBS -q casper
-#PBS -l walltime=2:00:00
-#PBS -l select=1:ncpus=21:mem=80gb
-#PBS -j oe
-
-cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
-
-py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
-
-$py -c "from mesaclip import FILES, load_year, find_null_tb
-find_null_tb(load_year(FILES[{which!r}][{year}]))"
-""".lstrip()
 
 
 def get_account() -> str:
@@ -312,14 +295,42 @@ def submit_job(job: str, *, stem: str = "job") -> None:
     )
 
 
+JOB_TPL_NULL = r"""
+#!/bin/bash
+#PBS -N null-{vn}
+#PBS -q casper
+#PBS -l walltime=2:00:00
+#PBS -l select=1:ncpus=21:mem=80gb
+#PBS -j oe
+
+cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+
+py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
+
+$py -c "from mesaclip import FILES, load_year, find_null;
+find_null(load_year(FILES[{which!r}][{year}]), vn={vn!r})"
+""".lstrip()
+
+
 def submit_null_tb():
     """Find null Tb times in the obs input files."""
     for which, years in FILES.items():
         if which == "mod":
             continue
         for year, _ in years.items():
-            job = JOB_TPL_NULL_TB.format(which=which, year=year)
+            job = JOB_TPL_NULL.format(which=which, year=year, vn="tb")
             stem = f"null_tb_{which}_{year}"
+            submit_job(job, stem=stem)
+
+
+def submit_null_pr():
+    """Find null precip times in the obs input files."""
+    for which, years in FILES.items():
+        if which == "mod":
+            continue
+        for year, _ in years.items():
+            job = JOB_TPL_NULL.format(which=which, year=year, vn="pr")
+            stem = f"null_pr_{which}_{year}"
             submit_job(job, stem=stem)
 
 
@@ -598,6 +609,7 @@ if __name__ == "__main__":
 
     pre_parser = subparsers.add_parser("pre", help="Submit preprocessing jobs")
     null_tb_parser = subparsers.add_parser("null-tb", help="Submit jobs to find null Tb times")
+    null_pr_parser = subparsers.add_parser("null-pr", help="Submit jobs to find null precip times")
     check_pre_parser = subparsers.add_parser(
         "check-pre", help="Check that all preprocessed files are present"
     )
@@ -609,6 +621,8 @@ if __name__ == "__main__":
         submit_pres()
     elif args.command == "null-tb":
         submit_null_tb()
+    elif args.command == "null-pr":
+        submit_null_pr()
     elif args.command == "check-pre":
         check_pre_files()
     elif args.command == "track":
