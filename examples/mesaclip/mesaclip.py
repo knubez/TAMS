@@ -477,19 +477,20 @@ def submit_tracks():
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--pre", action="store_true")
-    parser.add_argument("--track", action="store_true")
+    parser = argparse.ArgumentParser(prog="mesaclip")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    pre_parser = subparsers.add_parser("pre", help="Submit preprocessing jobs")
+    check_pre_parser = subparsers.add_parser(
+        "check-pre", help="Check that all preprocessed files are present"
+    )
+    track_parser = subparsers.add_parser("track", help="Submit tracking jobs")
 
     args = parser.parse_args()
 
-    if args.pre and args.track:
-        print("Only one step at a time")
-        raise SystemExit(2)
-
-    if args.pre:
+    if args.command == "pre":
         submit_pres()
-    elif args.track:
+    elif args.command == "check-pre":
+        check_pre_files()
+    elif args.command == "track":
         submit_tracks()
-    else:
-        print("Nothing to do")
