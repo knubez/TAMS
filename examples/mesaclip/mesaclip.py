@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 """
 Run TAMS for MESACLIP, using the MOAAP output files.
+
+Required conda-forge dependencies:
+
+- tams
+- pyarrow (for saving GeoParquet)
+- bottleneck (for the time interp)
 """
 
 from __future__ import annotations
