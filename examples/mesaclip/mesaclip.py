@@ -449,6 +449,26 @@ class Case(NamedTuple):
         else:
             return f"{self.which}_{self.period}"
 
+    def period_y(self) -> tuple[int, int]:
+        """Express the period as first and last year."""
+        if self.period == "present":
+            if self.which == "mod":
+                return 2000, 2020
+            elif self.which == "obs":
+                return 2001, 2023
+            else:
+                raise AssertionError
+        elif self.period == "future":
+            assert self.which == "mod"
+            return 2080, 2100
+        else:
+            raise AssertionError
+
+    def period_ym(self) -> tuple[str, str]:
+        """Express the period as first and last YYYYMM."""
+        a, b = self.period_y()
+        return f"{a:04d}01", f"{b:04d}12"
+
 
 def get_pre_files():
     """Get and sort the files to track, using :class:`Case` instances as keys."""
@@ -480,19 +500,21 @@ def check_pre_files():
     for case, files in get_pre_files().items():
         s.write(f"{case!r}\n")
 
+        first_ym_should_be, last_ym_should_be = case.period_ym()
+
         # First is Jan
-        stem = files[0].stem
-        if not stem.endswith("01"):
-            s.write(f"First file is not Jan: {stem}\n")
+        first_ym = get_ym(files[0])
+        if first_ym != first_ym_should_be:
+            s.write(f"First file is not {first_ym_should_be}: {first_ym}\n")
             ok = False
-        first_dt = pd.to_datetime(get_ym(files[0]), format="%Y%m")
+        first_dt = pd.to_datetime(first_ym, format="%Y%m")
 
         # Last is Dec
-        stem = files[-1].stem
-        if not stem.endswith("12"):
-            s.write(f"Last file is not Dec: {stem}\n")
+        last_ym = get_ym(files[-1])
+        if last_ym != last_ym_should_be:
+            s.write(f"Last file is not {last_ym_should_be}: {last_ym}\n")
             ok = False
-        last_dt = pd.to_datetime(get_ym(files[-1]), format="%Y%m")
+        last_dt = pd.to_datetime(last_ym, format="%Y%m")
 
         # No gaps
         dt_range = pd.date_range(first_dt, last_dt, freq="MS")
