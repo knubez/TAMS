@@ -185,13 +185,15 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
         )
         # n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
         # assert n_na.sum() <= n_na0.sum()
-    else:
-        inds_to_fill = FILL_TB["mod"].get(year, [])
-        for i in inds_to_fill:
-            ds = fill_time(ds, i, vn="tb", method="linear")
+
+    which = "mod" if is_mod else "obs"
+
+    inds_to_fill = FILL_TB[which].get(year, [])
+    for i in inds_to_fill:
+        ds = fill_time(ds, i, vn="tb", method="linear")
 
     ds.attrs = {
-        "case": "mod" if is_mod else "obs",
+        "case": which,
     }
 
     return ds
