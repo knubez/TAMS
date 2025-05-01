@@ -79,7 +79,7 @@ def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset
 
     da = ds[vn].isel(time=slice(a, b + 1))
     assert da.sizes["time"] == 3
-    da = da.where(da > 0)  # mask 0
+    da = da.where(da > 0)
 
     new = (
         da.chunk({"time": -1})
@@ -228,6 +228,71 @@ NC_ENCODING = {
     "tb": {"zlib": True, "complevel": 3},
     "pr": {"zlib": True, "complevel": 3},
 }
+
+
+def find_null_tb(ds: xr.Dataset) -> xr.Dataset:
+    """Find times of all-null Tb."""
+
+    assert ds.time.dt.year.to_series().nunique() == 1
+    year = ds.time.dt.year.values[0]
+    case = ds.attrs["case"]
+    print(f"Searching for null Tb in {case} {year}")
+
+    def fun(da):
+        assert da.dims == ("lat", "lon")
+        return da.isnull().all().compute().item()
+
+    # Use joblib (single-time chunks)
+    is_nulls = Parallel(n_jobs=-2, verbose=10)(
+        delayed(fun)(ds["tb"].isel(time=i)) for i in range(ds.sizes["time"])
+    )
+
+    if not any(is_nulls):
+        return
+
+    # Save data
+    with open(HERE / f"null_tb_{case}_{year}.txt", "w") as f:
+        for i, is_null in enumerate(is_nulls):
+            if is_null:
+                ts = str(ds.time.values[i])
+                print(f"Null Tb at time step {i} ({ts})")
+                f.write(f"{i},{ts}\n")
+
+
+JOB_TPL_NULL_TB = r"""
+#/bin/bash
+## Submit with `qsub -A <account>`
+#PBS -N mesaclip1
+#PBS -q casper
+#PBS -l walltime=2:00:00
+#PBS -l select=1:ncpus=21:mem=80gb
+#PBS -j oe
+
+cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
+
+py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
+
+$py -c "from mesaclip import FILES, load_year, find_null_tb
+find_null_tb(load_year(FILES[{which!r}][{year}]))"
+""".lstrip()
+
+
+def submit_null_tb():
+    """Find null Tb times in the obs input files."""
+    A = os.getenv("A")
+    if A is None:
+        print("set $A to desired account")
+        raise SystemExit(2)
+    for which, years in FILES.items():
+        if which == "mod":
+            continue
+        for year, _ in years.items():
+            job = JOB_TPL_NULL_TB.format(which=which, year=year)
+            job_file = REPO / f"null_tb_{which}_{year}.sh"
+            with open(job_file, "w") as f:
+                f.write(job)
+            print(f"Submitting {job_file}")
+            subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
 
 
 def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -481,6 +546,7 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     pre_parser = subparsers.add_parser("pre", help="Submit preprocessing jobs")
+    null_tb_parser = subparsers.add_parser("null-tb", help="Submit jobs to find null Tb times")
     check_pre_parser = subparsers.add_parser(
         "check-pre", help="Check that all preprocessed files are present"
     )
@@ -490,6 +556,8 @@ if __name__ == "__main__":
 
     if args.command == "pre":
         submit_pres()
+    elif args.command == "null-tb":
+        submit_null_tb()
     elif args.command == "check-pre":
         check_pre_files()
     elif args.command == "track":
