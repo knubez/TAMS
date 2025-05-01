@@ -290,19 +290,24 @@ def get_account() -> str:
     return A
 
 
+def submit_job(job: str, *, stem: str = "job") -> None:
+    """Submit a job to PBS."""
+    job_file = HERE / f"{stem}.sh"
+    with open(job_file, "w") as f:
+        f.write(job)
+    print(f"Submitting {job_file}")
+    subprocess.run(["qsub", "-A", get_account(), str(job_file)], check=True)
+
+
 def submit_null_tb():
     """Find null Tb times in the obs input files."""
-    A = get_account()
     for which, years in FILES.items():
         if which == "mod":
             continue
         for year, _ in years.items():
             job = JOB_TPL_NULL_TB.format(which=which, year=year)
-            job_file = HERE / f"null_tb_{which}_{year}.sh"
-            with open(job_file, "w") as f:
-                f.write(job)
-            print(f"Submitting {job_file}")
-            subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
+            stem = f"null_tb_{which}_{year}"
+            submit_job(job, stem=stem)
 
 
 def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -378,15 +383,11 @@ preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
 
 def submit_pres():
     """Submit jobs to preprocess the mod/obs input files."""
-    A = get_account()
     for which, years in FILES.items():
         for year, _ in years.items():
             job = JOB_TPL_PRE.format(which=which, year=year)
-            job_file = HERE / f"mesaclip1_{which}_{year}.sh"
-            with open(job_file, "w") as f:
-                f.write(job)
-            print(f"Submitting {job_file}")
-            subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
+            stem = f"mesaclip1_{which}_{year}"
+            submit_job(job, stem=stem)
 
 
 class Case(NamedTuple):
@@ -528,15 +529,11 @@ track(get_pre_files()[{case!r}])"
 
 def submit_tracks():
     """Submit jobs to track."""
-    A = get_account()
     pre_files = get_pre_files()
     for case, _ in pre_files.items():
         job = JOB_TPL_TRACK.format(case=case)
-        job_file = HERE / f"mesaclip2_{case.to_id(concise=False)}.sh"
-        with open(job_file, "w") as f:
-            f.write(job)
-        print(f"Submitting {job_file}")
-        subprocess.run(["qsub", "-A", A, str(job_file)], check=True)
+        stem = f"mesaclip2_{case.to_id(concise=False)}"
+        submit_job(job, stem=stem)
 
 
 if __name__ == "__main__":
