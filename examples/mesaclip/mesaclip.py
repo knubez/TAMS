@@ -262,7 +262,7 @@ def find_null_tb(ds: xr.Dataset) -> xr.Dataset:
 JOB_TPL_NULL_TB = r"""
 #/bin/bash
 ## Submit with `qsub -A <account>`
-#PBS -N mesaclip1
+#PBS -N null-tb
 #PBS -q casper
 #PBS -l walltime=2:00:00
 #PBS -l select=1:ncpus=21:mem=80gb
