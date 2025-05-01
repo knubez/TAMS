@@ -85,7 +85,7 @@ def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset
         .interpolate_na(
             dim="time",
             method=method,
-            max_gap="1h",  # not working with cftime?
+            # max_gap="1h",  # not working with cftime?
             fill_value="extrapolate",
             keep_attrs=True,
         )
