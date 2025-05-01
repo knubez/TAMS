@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Streamline data
+Run TAMS for MESACLIP, using the MOAAP output files.
 """
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ IN_OBS_EX = IN_BASE_OBS / "200101_ERA5_ObjectMasks__dt-1h_MOAAP-masks.nc"
 
 
 def get_years_files(dir: Path) -> dict[int, list[Path]]:
+    """Find and sort the mod/obs input files."""
     d = defaultdict(list)
     for p in sorted(dir.glob("*.nc")):
         s_ym, *_ = p.stem.split("_")
@@ -61,7 +62,7 @@ FILL_TB = {
 
 
 def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset:
-    """Fill variable at time `i`."""
+    """Fill variable `vn` at time `i` in-place but lazily."""
     n = ds.sizes["time"]
     assert n >= 3
     assert 0 <= i < n
@@ -99,6 +100,7 @@ def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset
 
 
 def preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """Select tb and pr and clean up things."""
     p = Path(ds.encoding["source"])
 
     _, which, *_ = p.stem.split("_")
@@ -190,10 +192,13 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
 
 
 def load_path(p: Path) -> xr.Dataset:
+    """Load a single mod/obs input file, invoking the preprocess routine."""
     return preprocess(xr.open_dataset(p))
 
 
 def load_year(files: list[Path]) -> xr.Dataset:
+    """Load a year of mod/obs input files with Dask, invoking the preprocess routine
+    for each one and converting calendar to 365-day, for obs consistency with mod."""
     ds = xr.open_mfdataset(
         files,
         preprocess=preprocess,
@@ -299,6 +304,7 @@ preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
 
 
 def submit_pres():
+    """Submit jobs to preprocess the mod/obs input files."""
     A = os.getenv("A")
     if A is None:
         print("set $A to desired account")
@@ -345,7 +351,7 @@ class Case(NamedTuple):
 
 
 def get_pre_files():
-    """Get and sort the files to track."""
+    """Get and sort the files to track, using :class:`Case` instances as keys."""
 
     out = defaultdict(list)
     files = sorted((OUT / "ce").glob("*.parquet"))
@@ -357,6 +363,15 @@ def get_pre_files():
 
 
 def check_pre_files():
+    """Check that we have a preprocessed CE file for each of the expected YYYYMMs.
+
+    Raises
+    ------
+    AssertionError
+        If any of the expected YYYYMMs are missing.
+        Info included in the exception message.
+    """
+
     def get_ym(p: Path) -> str:
         return p.stem[1:7]
 
@@ -394,6 +409,7 @@ def check_pre_files():
 
 
 def track(files):
+    """Track a mod/obs period case, saving CE GeoParquet file."""
     case = Case.from_path(files[0])
     print(f"Tracking {case!r}")
 
@@ -443,6 +459,7 @@ track(get_pre_files()[{case!r}])"
 
 
 def submit_tracks():
+    """Submit jobs to track."""
     A = os.getenv("A")
     if A is None:
         print("set $A to desired account")
