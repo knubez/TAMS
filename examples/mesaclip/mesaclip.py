@@ -52,6 +52,51 @@ FILES = {
     "obs": get_years_files(IN_BASE_OBS),
 }
 
+FILL_TB = {
+    "mod": {
+        2006: [0],  # 2006-01-01 00:00
+        2090: [1],  # 2090-01-01 01:00
+    },
+}
+
+
+def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset:
+    """Fill variable at time `i`."""
+    n = ds.sizes["time"]
+    assert n >= 3
+    assert 0 <= i < n
+
+    if i == 0:
+        a, b = i, i + 2
+        j = 0
+    elif i == n - 1:
+        a, b = i - 2, i
+        j = 2
+    else:
+        a, b = i - 1, i + 1
+        j = 1
+
+    da = ds[vn].isel(time=slice(a, b + 1))
+    assert da.sizes["time"] == 3
+    da = da.where(da > 0)  # mask 0
+
+    new = (
+        da.chunk({"time": -1})
+        .interpolate_na(
+            dim="time",
+            method=method,
+            max_gap="1h",  # not working with cftime?
+            fill_value="extrapolate",
+            keep_attrs=True,
+        )
+        .isel(time=j)
+        .assign_attrs(i=i)
+    )
+
+    ds[vn][{"time": i}] = new
+
+    return ds
+
 
 def preprocess(ds: xr.Dataset) -> xr.Dataset:
     p = Path(ds.encoding["source"])
@@ -76,6 +121,9 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
     assert (ds.lon == lon0).all()
     assert (ds.lat == lat0).all()
     ds = ds.assign(lat=lat0, lon=lon0).swap_dims(xc="lon", yc="lat")
+
+    assert ds.time.dt.year.to_series().nunique() == 1
+    year = ds.time.dt.year.values[0]
 
     # Select vars we want and spatial region
     ds = (
@@ -110,22 +158,29 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
                 method="nearest",
                 fill_value="extrapolate",
                 assume_sorted=True,
+                keep_attrs=True,
             )
             .interpolate_na(
                 dim="lon",
                 method="nearest",
                 fill_value="extrapolate",
                 assume_sorted=True,
+                keep_attrs=True,
             )
             # .interpolate_na(
             #     dim="time",
             #     method="linear",
             #     max_gap="1h",
             #     assume_sorted=True,
+            #     keep_attrs=True,
             # )
         )
         # n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
         # assert n_na.sum() <= n_na0.sum()
+    else:
+        inds_to_fill = FILL_TB["mod"].get(year, [])
+        for i in inds_to_fill:
+            ds = fill_time(ds, i, vn="tb", method="linear")
 
     ds.attrs = {
         "case": "mod" if is_mod else "obs",
