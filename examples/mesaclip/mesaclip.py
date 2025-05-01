@@ -277,12 +277,24 @@ find_null_tb(load_year(FILES[{which!r}][{year}]))"
 """.lstrip()
 
 
-def submit_null_tb():
-    """Find null Tb times in the obs input files."""
+def get_account() -> str:
+    """Get the account name for qsub from environment variable A.
+
+    Raises
+    ------
+    SystemExit
+        If A is not set in the environment, we exit with error code 2.
+    """
     A = os.getenv("A")
     if A is None:
         print("set $A to desired account")
         raise SystemExit(2)
+    return A
+
+
+def submit_null_tb():
+    """Find null Tb times in the obs input files."""
+    A = get_account()
     for which, years in FILES.items():
         if which == "mod":
             continue
@@ -370,10 +382,7 @@ preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
 
 def submit_pres():
     """Submit jobs to preprocess the mod/obs input files."""
-    A = os.getenv("A")
-    if A is None:
-        print("set $A to desired account")
-        raise SystemExit(2)
+    A = get_account()
     for which, years in FILES.items():
         for year, _ in years.items():
             job = JOB_TPL_PRE.format(which=which, year=year)
@@ -525,10 +534,7 @@ track(get_pre_files()[{case!r}])"
 
 def submit_tracks():
     """Submit jobs to track."""
-    A = os.getenv("A")
-    if A is None:
-        print("set $A to desired account")
-        raise SystemExit(2)
+    A = get_account()
     pre_files = get_pre_files()
     for case, _ in pre_files.items():
         job = JOB_TPL_TRACK.format(case=case)
