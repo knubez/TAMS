@@ -331,7 +331,9 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     # Some obs times don't yield CEs even though they have Tb, e.g.
     # - 2003-09-19 14:00 (i=446)
-    if ce.empty:
+    # Some obs times have all null pr, e.g.
+    # - some time in 2018-09
+    if ce.empty or pr.isnull().all():
         for vn in [
             "pr_count",
             "pr_mean",
