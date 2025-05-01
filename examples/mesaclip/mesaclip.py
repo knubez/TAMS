@@ -360,6 +360,11 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
         ym = f"{year:04d}{month:02d}"
         w = ds.attrs["case"][0]  # which
 
+        p = OUT / "ce" / f"{w}{ym}.parquet"
+        if p.exists():
+            print(f"Already exists, skipping: {p}")
+            continue
+
         ces0, _ = tams.identify(g.tb, parallel=parallel)  # FIXME: thresholds
 
         if parallel:
@@ -375,7 +380,7 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> xr.Dataset:
             "case": ds.attrs["case"],
         }
         gdf.to_parquet(
-            OUT / "ce" / f"{w}{ym}.parquet",
+            p,
             geometry_encoding=GP_ENCODING,
             schema_version=GP_SCHEMA_VERSION,
         )
