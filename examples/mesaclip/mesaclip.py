@@ -298,7 +298,7 @@ def submit_null_tb():
             continue
         for year, _ in years.items():
             job = JOB_TPL_NULL_TB.format(which=which, year=year)
-            job_file = REPO / f"null_tb_{which}_{year}.sh"
+            job_file = HERE / f"null_tb_{which}_{year}.sh"
             with open(job_file, "w") as f:
                 f.write(job)
             print(f"Submitting {job_file}")
@@ -382,7 +382,7 @@ def submit_pres():
     for which, years in FILES.items():
         for year, _ in years.items():
             job = JOB_TPL_PRE.format(which=which, year=year)
-            job_file = REPO / f"mesaclip1_{which}_{year}.sh"
+            job_file = HERE / f"mesaclip1_{which}_{year}.sh"
             with open(job_file, "w") as f:
                 f.write(job)
             print(f"Submitting {job_file}")
@@ -532,7 +532,7 @@ def submit_tracks():
     pre_files = get_pre_files()
     for case, _ in pre_files.items():
         job = JOB_TPL_TRACK.format(case=case)
-        job_file = REPO / f"mesaclip2_{case.to_id(concise=False)}.sh"
+        job_file = HERE / f"mesaclip2_{case.to_id(concise=False)}.sh"
         with open(job_file, "w") as f:
             f.write(job)
         print(f"Submitting {job_file}")
