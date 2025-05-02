@@ -265,7 +265,9 @@ def find_null(ds: xr.Dataset, *, vn="tb") -> xr.Dataset:
         delayed(fun)(ds[vn].isel(time=i)) for i in range(ds.sizes["time"])
     )
 
-    if not any(is_nulls):
+    n = sum(is_nulls)
+    print(f"Found {n} null {vn} times")
+    if n == 0:
         return
 
     # Save data
