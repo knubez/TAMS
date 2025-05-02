@@ -18,6 +18,12 @@ mesaclip1_*.sh
 mesaclip1.o*
 mesaclip2_*.sh
 mesaclip2.o*
+null-tb.o*
+null_tb_*.sh
+null_tb_*.txt
+null-pr.o*
+null_pr_*.sh
+null_pr_*.txt
 
 # GitHub Python default gitignore below:
 
