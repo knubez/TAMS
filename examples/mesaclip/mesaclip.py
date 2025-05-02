@@ -175,7 +175,7 @@ def load_path(p: Path) -> xr.Dataset:
     return preprocess(xr.open_dataset(p))
 
 
-def load_year(files: list[Path]) -> xr.Dataset:
+def load_year(files: list[Path], *, interp: bool = True) -> xr.Dataset:
     """Load a year of mod/obs input files with Dask, invoking the preprocess routine
     for each one, converting calendar to 365-day (for obs consistency with mod),
     and interpolating to fill in Tb nulls.
@@ -206,41 +206,42 @@ def load_year(files: list[Path]) -> xr.Dataset:
     ds = ds.convert_calendar("365_day")
     assert ds.sizes["time"] == 365 * 24
 
-    if which == "obs":
-        # Try to fill in the null brightness temp pixels a bit
-        # Can't use the HH:30 time to help since not in the dataset
-        # n_na0 = ds["tb"].isnull().sum(dim=("lat", "lon"))
-        ds["tb"] = (
-            ds["tb"]
-            .interpolate_na(
-                dim="lat",
-                method="nearest",
-                fill_value="extrapolate",
-                assume_sorted=True,
-                keep_attrs=True,
+    if interp:
+        if which == "obs":
+            # Try to fill in the null brightness temp pixels a bit
+            # Can't use the HH:30 time to help since not in the dataset
+            # n_na0 = ds["tb"].isnull().sum(dim=("lat", "lon"))
+            ds["tb"] = (
+                ds["tb"]
+                .interpolate_na(
+                    dim="lat",
+                    method="nearest",
+                    fill_value="extrapolate",
+                    assume_sorted=True,
+                    keep_attrs=True,
+                )
+                .interpolate_na(
+                    dim="lon",
+                    method="nearest",
+                    fill_value="extrapolate",
+                    assume_sorted=True,
+                    keep_attrs=True,
+                )
+                # .interpolate_na(
+                #     dim="time",
+                #     method="linear",
+                #     max_gap="1h",
+                #     assume_sorted=True,
+                #     keep_attrs=True,
+                # )
             )
-            .interpolate_na(
-                dim="lon",
-                method="nearest",
-                fill_value="extrapolate",
-                assume_sorted=True,
-                keep_attrs=True,
-            )
-            # .interpolate_na(
-            #     dim="time",
-            #     method="linear",
-            #     max_gap="1h",
-            #     assume_sorted=True,
-            #     keep_attrs=True,
-            # )
-        )
-        # n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
-        # assert n_na.sum() <= n_na0.sum()
+            # n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
+            # assert n_na.sum() <= n_na0.sum()
 
-    # Fill in null Tb times
-    inds_to_fill = FILL_TB[which].get(year, [])
-    for i in inds_to_fill:
-        ds = fill_time(ds, i, vn="tb", method="linear")
+        # Fill in null Tb times
+        inds_to_fill = FILL_TB[which].get(year, [])
+        for i in inds_to_fill:
+            ds = fill_time(ds, i, vn="tb", method="linear")
 
     return ds
 
@@ -323,7 +324,7 @@ cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 py=/glade/u/home/zmoon/mambaforge/envs/tams-py311/bin/python
 
 $py -c "from mesaclip import FILES, load_year, find_null;
-find_null(load_year(FILES[{which!r}][{year}]), vn={vn!r})"
+find_null(load_year(FILES[{which!r}][{year}], interp=False), vn={vn!r})"
 """.lstrip()
 
 
