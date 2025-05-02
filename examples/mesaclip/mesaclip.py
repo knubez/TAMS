@@ -17,7 +17,7 @@ import time
 from collections import defaultdict
 from io import StringIO
 from pathlib import Path
-from typing import Literal, NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple
 
 import geopandas as gpd
 import numpy as np
@@ -26,6 +26,10 @@ import xarray as xr
 from joblib import Parallel, delayed
 
 import tams
+
+if TYPE_CHECKING:
+    # Python 3.11+
+    from typing import Literal, Self
 
 IN_BASE = Path("/glade/derecho/scratch/fudan/MOAAP/results")
 IN_BASE_MOD = IN_BASE / "CESM-HR"
@@ -311,7 +315,7 @@ JOB_TPL_NULL = r"""
 
 cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
-py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
+py=/glade/u/home/zmoon/mambaforge/envs/tams-py311/bin/python
 
 $py -c "from mesaclip import FILES, load_year, find_null;
 find_null(load_year(FILES[{which!r}][{year}]), vn={vn!r})"
@@ -422,7 +426,7 @@ JOB_TPL_PRE = r"""
 
 cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
 
-py=/glade/u/home/zmoon/mambaforge/envs/tams/bin/python
+py=/glade/u/home/zmoon/mambaforge/envs/tams-py311/bin/python
 
 $py -c "from mesaclip import FILES, load_year, preprocess_year_ds;
 preprocess_year_ds(load_year(FILES[{which!r}][{year}]))"
