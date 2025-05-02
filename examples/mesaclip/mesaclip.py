@@ -406,25 +406,34 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> None:
     """Preprocess a year of data by month, saving CE GeoParquet files."""
 
     year = get_year(ds)
+    w = ds.attrs["case"][0]  # which
+
+    print(f"Preprocessing {w} {year}")
 
     for month, g in ds.groupby("time.month"):
         ym = f"{year:04d}{month:02d}"
-        w = ds.attrs["case"][0]  # which
+        print(f"Starting {ym}")
 
         p = OUT / "ce" / f"{w}{ym}.parquet"
         if p.exists():
             print(f"Already exists, skipping: {p}")
             continue
 
-        ces0, _ = tams.identify(g.tb, parallel=parallel)  # FIXME: thresholds
+        try:
+            ces0, _ = tams.identify(g.tb, parallel=parallel)  # FIXME: thresholds
 
-        if parallel:
-            ces = Parallel(n_jobs=-2, verbose=10)(
-                delayed(add_ce_stats)(g.pr.isel(time=i).copy(deep=False), ce0.copy())
-                for i, ce0 in enumerate(ces0)
-            )
+            if parallel:
+                ces = Parallel(n_jobs=-2, verbose=10)(
+                    delayed(add_ce_stats)(g.pr.isel(time=i).copy(deep=False), ce0.copy())
+                    for i, ce0 in enumerate(ces0)
+                )
+            else:
+                ces = [add_ce_stats(g.pr.isel(time=i), ce0) for i, ce0 in enumerate(ces0)]
+        except Exception as e:
+            print(f"Error processing {ym}: {e}")
+            continue
         else:
-            ces = [add_ce_stats(g.pr.isel(time=i), ce0) for i, ce0 in enumerate(ces0)]
+            print(f"Processed {ym}")
 
         gdf = pd.concat(ces, ignore_index=True)
         gdf.attrs = {
@@ -435,6 +444,7 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> None:
             geometry_encoding=GP_ENCODING,
             schema_version=GP_SCHEMA_VERSION,
         )
+        print(f"Saved {ym} to {p}")
 
 
 JOB_TPL_PRE = r"""
