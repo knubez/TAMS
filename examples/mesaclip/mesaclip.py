@@ -588,6 +588,8 @@ def track(files):
             times.append(t)
 
     print(len(times), "times")
+
+    # TODO: adjust (increase) duration for missing times
     durations = [pd.Timedelta("1h")] * len(times)
 
     tic = time.perf_counter_ns()
