@@ -328,25 +328,14 @@ find_null(load_year(FILES[{which!r}][{year}], interp=False), vn={vn!r})"
 """.lstrip()
 
 
-def submit_null_tb():
-    """Find null Tb times in the obs input files."""
+def submit_null(vn):
+    """Find null Tb or precip times in the obs input files."""
     for which, years in FILES.items():
         if which == "mod":
             continue
         for year, _ in years.items():
-            job = JOB_TPL_NULL.format(which=which, year=year, vn="tb")
-            stem = f"null_tb_{which}_{year}"
-            submit_job(job, stem=stem)
-
-
-def submit_null_pr():
-    """Find null precip times in the obs input files."""
-    for which, years in FILES.items():
-        if which == "mod":
-            continue
-        for year, _ in years.items():
-            job = JOB_TPL_NULL.format(which=which, year=year, vn="pr")
-            stem = f"null_pr_{which}_{year}"
+            job = JOB_TPL_NULL.format(which=which, year=year, vn=vn)
+            stem = f"null_{vn}_{which}_{year}"
             submit_job(job, stem=stem)
 
 
@@ -652,9 +641,9 @@ if __name__ == "__main__":
     if args.command == "pre":
         submit_pres()
     elif args.command == "null-tb":
-        submit_null_tb()
+        submit_null("tb")
     elif args.command == "null-pr":
-        submit_null_pr()
+        submit_null("pr")
     elif args.command == "check-pre":
         check_pre_files()
     elif args.command == "track":
