@@ -140,9 +140,6 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
     assert (ds.lat == lat0).all()
     ds = ds.assign(lat=lat0, lon=lon0).swap_dims(xc="lon", yc="lat")
 
-    assert ds.time.dt.year.to_series().nunique() == 1
-    year = ds.time.dt.year.values[0]
-
     # Select vars we want and spatial region
     ds = (
         ds[["BT", "PR"]]
@@ -165,7 +162,51 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
         "units": "mm/hr",
     }
 
-    if is_obs:
+    # Dataset attrs
+    ds.attrs = {
+        "case": "mod" if is_mod else "obs",
+    }
+
+    return ds
+
+
+def load_path(p: Path) -> xr.Dataset:
+    """Load a single mod/obs input file, invoking the preprocess routine."""
+    return preprocess(xr.open_dataset(p))
+
+
+def load_year(files: list[Path]) -> xr.Dataset:
+    """Load a year of mod/obs input files with Dask, invoking the preprocess routine
+    for each one, converting calendar to 365-day (for obs consistency with mod),
+    and interpolating to fill in Tb nulls.
+    """
+    ds = xr.open_mfdataset(
+        files,
+        preprocess=preprocess,
+        combine="nested",
+        concat_dim="time",
+        chunks={"time": 1, "lat": -1, "lon": -1},
+    )
+
+    assert ds.time.dt.year.to_series().nunique() == 1
+    year = ds.time.dt.year.values[0]
+    which = ds.attrs["case"]
+
+    # Model is no-leap, so normalize to that
+    if which == "mod":
+        assert ds.sizes["time"] == 365 * 24  # always
+    elif which == "obs":
+        if ds.time.isel(time=0).dt.is_leap_year:
+            assert ds.sizes["time"] == 366 * 24
+            # Feb 29 will be dropped automatically
+        else:
+            assert ds.sizes["time"] == 365 * 24
+    else:
+        raise AssertionError
+    ds = ds.convert_calendar("365_day")
+    assert ds.sizes["time"] == 365 * 24
+
+    if which == "obs":
         # Try to fill in the null brightness temp pixels a bit
         # Can't use the HH:30 time to help since not in the dataset
         # n_na0 = ds["tb"].isnull().sum(dim=("lat", "lon"))
@@ -196,48 +237,10 @@ def preprocess(ds: xr.Dataset) -> xr.Dataset:
         # n_na = ds["tb"].isnull().sum(dim=("lat", "lon"))
         # assert n_na.sum() <= n_na0.sum()
 
-    which = "mod" if is_mod else "obs"
-
+    # Fill in null Tb times
     inds_to_fill = FILL_TB[which].get(year, [])
     for i in inds_to_fill:
         ds = fill_time(ds, i, vn="tb", method="linear")
-
-    ds.attrs = {
-        "case": which,
-    }
-
-    return ds
-
-
-def load_path(p: Path) -> xr.Dataset:
-    """Load a single mod/obs input file, invoking the preprocess routine."""
-    return preprocess(xr.open_dataset(p))
-
-
-def load_year(files: list[Path]) -> xr.Dataset:
-    """Load a year of mod/obs input files with Dask, invoking the preprocess routine
-    for each one and converting calendar to 365-day, for obs consistency with mod."""
-    ds = xr.open_mfdataset(
-        files,
-        preprocess=preprocess,
-        combine="nested",
-        concat_dim="time",
-        chunks={"time": 1, "lat": -1, "lon": -1},
-    )
-
-    # Model is no-leap, so normalize to that
-    if ds.attrs["case"] == "mod":
-        assert ds.sizes["time"] == 365 * 24  # always
-    elif ds.attrs["case"] == "obs":
-        if ds.time.isel(time=0).dt.is_leap_year:
-            assert ds.sizes["time"] == 366 * 24
-            # Feb 29 will be dropped automatically
-        else:
-            assert ds.sizes["time"] == 365 * 24
-    else:
-        raise AssertionError
-    ds = ds.convert_calendar("365_day")
-    assert ds.sizes["time"] == 365 * 24
 
     return ds
 
