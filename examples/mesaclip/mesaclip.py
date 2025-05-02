@@ -106,7 +106,7 @@ def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset
         j = 1
 
     da = ds[vn].isel(time=slice(a, b + 1))
-    assert da.sizes["time"] == 3
+    assert da.sizes["time"] >= 3
     da = da.where(da > 0)
 
     new = (
@@ -441,7 +441,7 @@ JOB_TPL_PRE = r"""
 #!/bin/bash
 #PBS -N mesaclip1
 #PBS -q casper
-#PBS -l walltime=2:00:00
+#PBS -l walltime=3:00:00
 #PBS -l select=1:ncpus=21:mem=80gb
 #PBS -j oe
 
