@@ -83,6 +83,11 @@ def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset
     assert n >= 3
     assert 0 <= i < n
 
+    assert ds.time.dt.year.to_series().nunique() == 1
+    year = ds.time.dt.year.values[0]
+    which = ds.attrs["case"]
+    bad_inds = FILL_TB[which].get(year, [])
+
     if i == 0:
         a, b = i, i + 2
         j = 0
@@ -91,6 +96,8 @@ def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset
         j = 2
     else:
         a, b = i - 1, i + 1
+        while b in bad_inds:
+            b += 1
         j = 1
 
     da = ds[vn].isel(time=slice(a, b + 1))
@@ -394,6 +401,7 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> None:
     """Preprocess a year of data by month, saving CE GeoParquet files."""
+
     assert ds.time.dt.year.to_series().nunique() == 1
     year = ds.time.dt.year.values[0]
 
