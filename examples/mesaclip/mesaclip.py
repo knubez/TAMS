@@ -77,14 +77,19 @@ FILL_TB = {
 }
 
 
+def get_year(ds: xr.Dataset) -> int:
+    """Get the (unique) year from the input dataset."""
+    assert ds.time.dt.year.to_series().nunique() == 1
+    return ds.time.dt.year.values[0]
+
+
 def fill_time(ds: xr.Dataset, i: int, *, vn="tb", method="linear") -> xr.Dataset:
     """Fill variable `vn` at time `i` in-place but lazily."""
     n = ds.sizes["time"]
     assert n >= 3
     assert 0 <= i < n
 
-    assert ds.time.dt.year.to_series().nunique() == 1
-    year = ds.time.dt.year.values[0]
+    year = get_year(ds)
     which = ds.attrs["case"]
     bad_inds = FILL_TB[which].get(year, [])
 
@@ -195,8 +200,7 @@ def load_year(files: list[Path], *, interp: bool = True) -> xr.Dataset:
         chunks={"time": 1, "lat": -1, "lon": -1},
     )
 
-    assert ds.time.dt.year.to_series().nunique() == 1
-    year = ds.time.dt.year.values[0]
+    year = get_year(ds)
     which = ds.attrs["case"]
 
     # Model is no-leap, so normalize to that
@@ -262,8 +266,7 @@ NC_ENCODING = {
 def find_null(ds: xr.Dataset, *, vn="tb") -> xr.Dataset:
     """Find times of all-null `vn`."""
 
-    assert ds.time.dt.year.to_series().nunique() == 1
-    year = ds.time.dt.year.values[0]
+    year = get_year(ds)
     case = ds.attrs["case"]
     print(f"Searching for null {vn} in {case} {year}")
 
@@ -402,8 +405,7 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> None:
     """Preprocess a year of data by month, saving CE GeoParquet files."""
 
-    assert ds.time.dt.year.to_series().nunique() == 1
-    year = ds.time.dt.year.values[0]
+    year = get_year(ds)
 
     for month, g in ds.groupby("time.month"):
         ym = f"{year:04d}{month:02d}"
