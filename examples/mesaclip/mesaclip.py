@@ -355,11 +355,12 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     ts = pd.to_datetime(str(t))  # pretend it's normal, instead of 365-day
     ce = ce.drop(columns=["inds219", "area219_km2", "cs219"]).assign(time=ts)
 
+    # Add precip stats needed for the special classify
     # Some obs times don't yield CEs even though they have Tb, e.g.
     # - 2003-09-19 14:00 (i=446)
-    # Some obs times have all null pr, e.g.
+    # Some obs times have all null pr (or all null >= 2 pr), e.g.
     # - some time in 2018-09
-    if ce.empty or pr.isnull().all():
+    if ce.empty:
         for vn in [
             "pr_count",
             "pr_mean",
@@ -369,19 +370,34 @@ def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
             ce[vn] = np.nan
         return ce
 
-    # Add precip stats needed for the special classify
-    ce = tams.data_in_contours(
-        pr,
-        ce,
-        agg=("count", "mean"),
-        merge=True,
-    )
-    ce = tams.data_in_contours(
-        pr.where(pr >= 2).rename("pr_ge_2"),
-        ce,
-        agg=("count", "mean"),
-        merge=True,
-    )
+    if pr.isnull().all():
+        for vn in [
+            "pr_count",
+            "pr_mean",
+        ]:
+            ce[vn] = np.nan
+    else:
+        ce = tams.data_in_contours(
+            pr,
+            ce,
+            agg=("count", "mean"),
+            merge=True,
+        )
+
+    pr_ge_2 = pr.where(pr >= 2).rename("pr_ge_2")
+    if pr_ge_2.isnull().all():
+        for vn in [
+            "pr_ge_2_count",
+            "pr_ge_2_mean",
+        ]:
+            ce[vn] = np.nan
+    else:
+        ce = tams.data_in_contours(
+            pr_ge_2,
+            ce,
+            agg=("count", "mean"),
+            merge=True,
+        )
 
     return ce
 
