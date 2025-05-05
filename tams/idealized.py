@@ -337,8 +337,8 @@ class Field:
             name="ctt",
             attrs={"long_name": "cloud-top temperature", "units": "K"},
             coords={
-                "lat": (("lat"), self.lat),
-                "lon": (("lon"), self.lon),
+                "lat": (("lat",), self.lat),
+                "lon": (("lon",), self.lon),
             },
         )
 
