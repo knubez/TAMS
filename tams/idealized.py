@@ -54,12 +54,14 @@ class Blob:
         else:
             self.b = a
         self.theta = theta
+        self.depth = depth
 
         self._tendency = {
             "c": np.zeros(2),
             "a": 0.0,
             "b": 0.0,
             "theta": 0.0,
+            "depth": 0.0,
         }
 
     def __repr__(self) -> str:
@@ -108,3 +110,10 @@ class Blob:
         for k, v in self._tendency.items():
             setattr(self, k, getattr(self, k) + v * hours)
         return self
+
+    def z(self, x: float, y: float, z0: float = 0, /) -> float:
+        """Compute the depth at point (x, y) in the blob."""
+        p = Point(x, y)
+        if not self.polygon.contains(p):
+            return z0
+        return z0 - self.depth * self.polygon.distance(p)
