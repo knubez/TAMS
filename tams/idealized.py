@@ -47,7 +47,8 @@ class Blob:
             Angle of rotation (degrees).
             When `theta` is 0, `a` is along the x-axis.
         depth : float
-            Relative to the environment/background, the depth of the center of the blob.
+            Relative to the environment/background, the well depth of the center of the blob.
+            Higher depth means a larger negative anomaly.
             In TAMS, 235 K cloud-top temperature is used to define cloud elements,
             while 219 K areas are assumed to represent embedded overshooting tops.
         """
@@ -148,7 +149,7 @@ class Blob:
     def well(self, x, y):
         """Parabolic well function in the `a` and `b` directions.
 
-        It reaches `depth` at the center and 0 at the edge, then continues.
+        It reaches `depth` (negative) at the center and 0 at the edge, then continues.
 
         Parameters
         ----------
@@ -169,6 +170,7 @@ class Blob:
             return -self.depth * (1 - ((dx / a) ** 2 + (dy / b) ** 2))
 
     def merge(self, other: Blob) -> Blob:
+        """Merge into a new blob."""
         if not isinstance(other, Blob):
             raise TypeError(f"Cannot merge {type(other)} with {type(self)}")
         if not self.polygon.intersects(other.polygon):
@@ -263,7 +265,7 @@ class Field:
         blobs: Blob | list[Blob] | None = None,
         lat=(-10, 10, 41),
         lon=(-20, 20, 81),
-        ctt0: float = 270,
+        ctt_background: float = 270,
     ) -> None:
         """
         Parameters
@@ -271,8 +273,8 @@ class Field:
         blobs
         lat, lon
             Grid points.
-        ctt0
-            Background cloud-top temperature.
+        ctt_background
+            Background/environmental/clear-sky infrared brightness temperature.
         """
         if blobs is None:
             blobs = []
@@ -281,7 +283,7 @@ class Field:
         self.blobs = blobs
         self.lat = _to_arr(lat)
         self.lon = _to_arr(lon)
-        self.ctt0 = ctt0
+        self.ctt_background = ctt_background
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(blobs={self.blobs})"
@@ -292,19 +294,42 @@ class Field:
             blob.evolve(hours)
         return self
 
-    def to_xarray(self) -> xr.DataArray:
-        """Convert the field to an xarray DataArray."""
+    def to_xarray(self, *, ctt_threshold: float = 235) -> xr.DataArray:
+        """Convert the field to an xarray DataArray.
+
+        Parameters
+        ----------
+        ctt_threshold
+            The threshold to be targeted with :func:`tams.identify`.
+        """
         import xarray as xr
 
-        nx, ny = len(self.lon), len(self.lat)
-        xs, ys = np.meshgrid(self.lon, self.lat)
-        delta = np.zeros((ny, nx), dtype=float)
-        blend = self.ctt0 - 235  # blend region, between blob edge and background
-        for blob in self.blobs:
-            well = blob.well(xs, ys)
-            delta += np.clip(well, None, blend) - blend
+        # The blend region, between blob edge and background
+        blend = self.ctt_background - ctt_threshold
+        if blend < 0:
+            amin, amax = blend, None
+        elif blend > 0:
+            amin, amax = None, blend
+        else:
+            raise ValueError(
+                "Blend region must be present. "
+                "Set ctt_threshold to a value different from ctt_background."
+            )
 
-        ctt = self.ctt0 + delta
+        nx, ny = len(self.lon), len(self.lat)
+        x, y = np.meshgrid(self.lon, self.lat)
+        delta = np.zeros((ny, nx), dtype=float)
+        for blob in self.blobs:
+            if not ((blend > 0 and blob.depth > 0) or (blend < 0 and blob.depth < 0)):
+                raise ValueError(
+                    "Blob depth and the blend region must have the same sign. "
+                    f"Got {blob.depth=} and {blend=}. "
+                    "Consider ctt_background and ctt_threshold."
+                )
+            well = blob.well(x, y)
+            delta += np.clip(well, amin, amax) - blend
+
+        ctt = self.ctt_background + delta
 
         da = xr.DataArray(
             data=ctt,
