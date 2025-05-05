@@ -130,20 +130,43 @@ class Blob:
             setattr(self, k, getattr(self, k) + v * hours)
         return self
 
-    def dz(self, x: float, y: float, /, *, buffer: float = 1) -> float:
-        """Compute the relative depth at point (x, y) in the blob.
-        Buffer is relative to the semi-major axis `a`.
+    # def dz(self, x: float, y: float, /, *, buffer: float = 1) -> float:
+    #     """Compute the relative depth at point (x, y) in the blob.
+    #     Buffer is relative to the semi-major axis `a`.
+    #     """
+    #     p = Point(x, y)
+    #     poly = self.polygon
+    #     buff = poly.buffer(distance=self.a * buffer)
+    #     if not poly.contains(p):
+    #         if buff.contains(p):
+    #             return self.depth * (1 - (self.a - poly.distance(p)))
+    #         else:
+    #             return 0
+    #     else:
+    #         return -self.depth * (1 - (self.a - poly.distance(p)))
+
+    def well(self, x, y):
+        """Parabolic well function in the `a` and `b` directions.
+
+        It reaches `depth` at the center and 0 at the edge, then continues.
+
+        Parameters
+        ----------
+        x, y : array-like
         """
-        p = Point(x, y)
-        poly = self.polygon
-        buff = poly.buffer(distance=self.a * buffer)
-        if not poly.contains(p):
-            if buff.contains(p):
-                return self.depth * (1 - (self.a - poly.distance(p)))
-            else:
-                return 0
+        cx, cy = self.c
+        t = np.deg2rad(self.theta)
+        dx = x - cx
+        dy = y - cy
+        r = np.sqrt(dx**2 + dy**2)
+        if self.a == self.b:
+            # Circular blob
+            return -self.depth * (1 - (r / self.a) ** 2)
         else:
-            return -self.depth * (1 - (self.a - poly.distance(p)))
+            # Elliptical blob
+            a = self.a * np.cos(t) + self.b * np.sin(t)
+            b = self.a * np.sin(t) + self.b * np.cos(t)
+            return -self.depth * (1 - ((dx / a) ** 2 + (dy / b) ** 2))
 
     def merge(self, other: Blob) -> Blob:
         if not isinstance(other, Blob):
@@ -237,9 +260,9 @@ class Field:
 
     def __init__(
         self,
-        blobs: list[Blob] | None = None,
-        lat=(-10, 10, 42),
-        lon=(-20, 20, 82),
+        blobs: Blob | list[Blob] | None = None,
+        lat=(-10, 10, 41),
+        lon=(-20, 20, 81),
         ctt0: float = 270,
     ) -> None:
         """
@@ -253,6 +276,8 @@ class Field:
         """
         if blobs is None:
             blobs = []
+        elif isinstance(blobs, Blob):
+            blobs = [blobs]
         self.blobs = blobs
         self.lat = _to_arr(lat)
         self.lon = _to_arr(lon)
@@ -272,30 +297,27 @@ class Field:
         import xarray as xr
 
         nx, ny = len(self.lon), len(self.lat)
-        ys, xs = np.meshgrid(self.lon, self.lat)
-        dz = np.zeros((ny, nx), dtype=float)
-        # TODO: a more efficient way to do this, with GeoPandas?
-        for i in range(ny):
-            for j in range(nx):
-                x, y = xs[i, j], ys[i, j]
-                for blob in self.blobs:
-                    this_dz = blob.dz(x, y)
-                    dz[i, j] += this_dz
-                    # TODO: optionally only the max dz here, in overlapping blob case
+        xs, ys = np.meshgrid(self.lon, self.lat)
+        delta = np.zeros((ny, nx), dtype=float)
+        blend = self.ctt0 - 235  # blend region, between blob edge and background
+        for blob in self.blobs:
+            well = blob.well(xs, ys)
+            delta += np.clip(well, None, blend) - blend
 
-        ctt = self.ctt0 + dz
+        ctt = self.ctt0 + delta
 
-        ds = xr.Dataset(
-            {
-                "ctt": (("lat", "lon"), ctt, {"long_name": "cloud-top temperature", "units": "K"}),
-            },
+        da = xr.DataArray(
+            data=ctt,
+            dims=("lat", "lon"),
+            name="ctt",
+            attrs={"long_name": "cloud-top temperature", "units": "K"},
             coords={
                 "lat": (("lat"), self.lat),
                 "lon": (("lon"), self.lon),
             },
         )
 
-        return ds
+        return da
 
     def to_geopandas(self, *, crs="EPSG:4326") -> gpd.GeoDataFrame:
         """Convert the field to a GeoPandas GeoDataFrame."""
