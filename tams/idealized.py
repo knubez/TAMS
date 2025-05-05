@@ -117,6 +117,8 @@ class Blob:
         for k, v in kwargs.items():
             if k not in self._tendency:
                 raise ValueError(f"Invalid key: {k!r}")
+            if k == "c":
+                v = np.asarray(v, dtype=float)
             self._tendency[k] = v
         return self
 
@@ -159,7 +161,7 @@ class Blob:
             return -self.depth * (1 - ((dx / a) ** 2 + (dy / b) ** 2))
 
     def merge(self, other: Blob) -> Blob:
-        """Merge with another blob, creating a new blob with averaged characteristics."""
+        """Merge with another blob, creating a new blob with area-weighted-average characteristics."""
         if not isinstance(other, Blob):
             raise TypeError(f"Cannot merge {type(other)} with {type(self)}")
         if not self.polygon.intersects(other.polygon):
@@ -194,13 +196,21 @@ class Blob:
         # Area-weighted average depth
         depth = f_self * self.depth + f_other * other.depth
 
-        return Blob(
+        # Area-weighted average tendency
+        tendency = {}
+        for (k, v_self), (_, v_other) in zip(self._tendency.items(), other._tendency.items()):
+            tendency[k] = f_self * v_self + f_other * v_other
+
+        blob = Blob(
             c=c,
             a=a,
             b=b,
             theta=theta,
             depth=depth,
         )
+        blob.set_tendency(**tendency)
+
+        return blob
 
     def split(self, n: int = 2) -> list[Blob]:
         """Split the blob into `n` smaller blobs that line up along the semi-minor axis.
@@ -217,15 +227,15 @@ class Blob:
         for i in range(n):
             r = 2 * b * (i - (n - 1) / 2)
             c = o + r * np.r_[np.cos(t), np.sin(t)]
-            blobs.append(
-                Blob(
-                    c=c,
-                    a=a,
-                    b=b,
-                    theta=self.theta,
-                    depth=self.depth,
-                )
+            blob = Blob(
+                c=c,
+                a=a,
+                b=b,
+                theta=self.theta,
+                depth=self.depth,
             )
+            blob.set_tendency(**self._tendency)
+            blobs.append(blob)
 
         return blobs
 
@@ -242,7 +252,7 @@ class Blob:
         return b
 
 
-def _to_arr(x, *, default_num: int = 100, copy: bool = False) -> np.ndarray:
+def _to_arr(x, *, default_num: int = 100) -> np.ndarray:
     if np.isscalar(x):
         return np.array([x])
     elif isinstance(x, tuple):
@@ -255,7 +265,7 @@ def _to_arr(x, *, default_num: int = 100, copy: bool = False) -> np.ndarray:
             raise ValueError("tuple must have 2 or 3 elements")
     else:
         # Assume array-like
-        return np.asarray(x, copy=copy)
+        return np.asarray(x)
 
 
 class Field:
@@ -368,7 +378,7 @@ class Field:
         return Field(
             blobs=[blob.copy() for blob in self.blobs],
             lat=self.lat,
-            lon=self.lot,
+            lon=self.lon,
             ctt_background=self.ctt_background,
         )
 
