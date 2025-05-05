@@ -13,7 +13,15 @@ from shapely.geometry import LinearRing, Point, Polygon
 
 class Blob:
 
-    def __init__(self, c, a: float, *, b: float | None = None, theta: float = 0) -> None:
+    def __init__(
+        self,
+        c,
+        a: float,
+        *,
+        b: float | None = None,
+        theta: float = 0,
+        depth: float = 17,
+    ) -> None:
         """
         Create a blob with center `c` and semi-axes `a` and `b`.
 
@@ -27,9 +35,12 @@ class Blob:
         b : float, optional
             Semi-minor axis of the blob. If not provided, `b` is set to `a` (circle).
             In this case, `a` is the radius of the circle.
-        theta : float, optional
+        theta : float
             Angle of rotation (degrees).
             When `theta` is 0, `a` is along the x-axis.
+        depth : float
+            Relative to the environment/background, the depth of the center of the blob.
+            The default is 235 - 219 - 1 = 17.
         """
         self.c = np.asarray(c, dtype=float)
         if not a > 0:
