@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import xarray as xr
 from shapely import affinity
 from shapely.geometry import Point
@@ -240,8 +241,20 @@ class Blob:
 
         return blobs
 
+    def copy(self) -> Blob:
+        """Return a copy of the blob."""
+        b = Blob(
+            c=self.c.copy(),
+            a=self.a,
+            b=self.b,
+            theta=self.theta,
+            depth=self.depth,
+        )
+        b.set_tendency(**self._tendency)
+        return b
 
-def _to_arr(x, *, default_num: int = 100) -> np.ndarray:
+
+def _to_arr(x, *, default_num: int = 100, copy: bool = False) -> np.ndarray:
     if np.isscalar(x):
         return np.array([x])
     elif isinstance(x, tuple):
@@ -254,7 +267,7 @@ def _to_arr(x, *, default_num: int = 100) -> np.ndarray:
             raise ValueError("tuple must have 2 or 3 elements")
     else:
         # Assume array-like
-        return np.asarray(x)
+        return np.asarray(x, copy=copy)
 
 
 class Field:
@@ -361,3 +374,63 @@ class Field:
         gdf = gpd.GeoDataFrame(geometry=polygons, crs=crs)
 
         return gdf
+
+    def copy(self) -> Field:
+        """Return a copy of the field."""
+        return Field(
+            blobs=[blob.copy() for blob in self.blobs],
+            lat=self.lat,
+            lon=self.lot,
+            ctt_background=self.ctt_background,
+        )
+
+
+class Sim:
+    """Simulate a field of blobs."""
+
+    def __init__(self, field: Field | None = None, dt: float = 1) -> None:
+        """
+        Parameters
+        ----------
+        field
+            The field (initial state) to start from.
+        dt
+            Time step (hours).
+        """
+        if field is None:
+            field = Field()
+        self.field = field
+        if not dt > 0:
+            raise ValueError(f"Invalid time step: {dt!r}")
+        self.dt = dt
+        self._history: list[Field] = []
+
+    def __repr__(self) -> str:
+        steps = len(self._history)
+        return f"{type(self).__name__}(field={self.field}, steps={steps})"
+
+    def advance(self, steps: int, /) -> Self:
+        for _ in range(steps):
+            self._history.append(self.field.copy())
+            self.field.evolve(self.dt)
+        return self
+
+    def to_xarray(self, *, start="2006-09-08 12:00", **kwargs) -> xr.DataArray:
+        """Convert the history and current field to an xarray DataArray.
+
+        Parameters
+        ----------
+        start : datetime-like
+            The starting time to use when defining the time coordinate.
+        **kwargs
+            Additional keyword arguments to pass to :meth:`Field.to_xarray`.
+        """
+        das = [field.to_xarray(**kwargs) for field in self._history] + [
+            self.field.to_xarray(**kwargs)
+        ]
+        da = xr.concat(das, dim="time")
+
+        freq = pd.Timedelta(self.dt, unit="h")
+        da["time"] = pd.date_range(start=start, freq=freq, periods=len(das))
+
+        return da
