@@ -15,12 +15,12 @@ class Blob:
 
     def __init__(
         self,
-        c,
-        a: float,
+        c=(0, 0),
+        a: float = 0.5,
         *,
         b: float | None = None,
         theta: float = 0,
-        depth: float = 17,
+        depth: float = 20,
     ) -> None:
         """
         Create a blob with center `c` and semi-axes `a` and `b`.
@@ -40,7 +40,8 @@ class Blob:
             When `theta` is 0, `a` is along the x-axis.
         depth : float
             Relative to the environment/background, the depth of the center of the blob.
-            The default is 235 - 219 - 1 = 17.
+            In TAMS, 235 K cloud-top temperature is used to define cloud elements,
+            while 219 K areas are assumed to represent embedded overshooting tops.
         """
         self.c = np.asarray(c, dtype=float)
         if not a > 0:
