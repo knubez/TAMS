@@ -120,9 +120,17 @@ class Blob:
             setattr(self, k, getattr(self, k) + v * hours)
         return self
 
-    def z(self, x: float, y: float, z0: float = 0, /) -> float:
-        """Compute the depth at point (x, y) in the blob."""
+    def z(self, x: float, y: float, z0: float = 0, /, *, buffer: float = 1) -> float:
+        """Compute the depth at point (x, y) in the blob.
+        Buffer is relative to the semi-major axis `a`.
+        """
         p = Point(x, y)
+        poly = self.polygon
+        buff = poly.buffer(distance=self.a * buffer)
         if not self.polygon.contains(p):
-            return z0
-        return z0 - self.depth * self.polygon.distance(p)
+            if buff.contains(p):
+                return z0 + self.depth * self.polygon.distance(p)
+            else:
+                return z0
+        else:
+            return z0 - self.depth * self.polygon.distance(p)
