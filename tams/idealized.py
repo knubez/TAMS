@@ -51,7 +51,7 @@ class Blob:
         }
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(c={self.c}, a={self.a}, b={self.b})"
+        return f"{type(self).__name__}(c={self.c}, a={self.a}, b={self.b}, theta={self.theta})"
 
     @property
     def center(self) -> Point:
