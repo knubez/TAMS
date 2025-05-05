@@ -294,13 +294,16 @@ class Field:
             blob.evolve(hours)
         return self
 
-    def to_xarray(self, *, ctt_threshold: float = 235) -> xr.DataArray:
+    def to_xarray(self, *, ctt_threshold: float = 235, additive: bool = False) -> xr.DataArray:
         """Convert the field to an xarray DataArray.
 
         Parameters
         ----------
         ctt_threshold
             The threshold to be targeted with :func:`tams.identify`.
+        additive
+            Do the wells add or min/max?
+            The latter (and default) is more consistent with real cloud element merging behavior.
         """
         import xarray as xr
 
@@ -308,8 +311,10 @@ class Field:
         blend = self.ctt_background - ctt_threshold
         if blend < 0:
             amin, amax = blend, None
+            restrict = np.maximum
         elif blend > 0:
             amin, amax = None, blend
+            restrict = np.minimum
         else:
             raise ValueError(
                 "Blend region must be present. "
@@ -327,7 +332,11 @@ class Field:
                     "Consider ctt_background and ctt_threshold."
                 )
             well = blob.well(x, y)
-            delta += np.clip(well, amin, amax) - blend
+            this_delta = np.clip(well, amin, amax) - blend
+            if additive:
+                delta += this_delta
+            else:
+                delta = restrict(delta, this_delta)
 
         ctt = self.ctt_background + delta
 
