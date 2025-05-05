@@ -4,12 +4,19 @@ Create and evolve systems of ellipsoidal blobs for demonstrating and testing TAM
 
 from __future__ import annotations
 
-from typing import Self
+import warnings
+from typing import TYPE_CHECKING
 
+import geopandas as gpd
 import numpy as np
 import xarray as xr
 from shapely import affinity
-from shapely.geometry import LinearRing, Point, Polygon
+from shapely.geometry import Point
+
+if TYPE_CHECKING:
+    from typing import Self
+
+    from shapely.geometry import LinearRing, Polygon
 
 
 class Blob:
@@ -54,6 +61,8 @@ class Blob:
             self.b = b
         else:
             self.b = a
+        if self.a == self.b and theta != 0:
+            warnings.warn("theta has no effect for circular blobs", stacklevel=2)
         self.theta = theta
         self.depth = depth
 
@@ -153,8 +162,9 @@ class Blob:
         c = f_self * self.c + f_other * other.c
 
         # Area-weighted average semi axes
-        a = f_self * self.a + f_other * other.a
-        b = f_self * self.a + f_other * other.b
+        brel = f_self * self.b / self.a + f_other * other.b / other.a
+        a = np.sqrt(ab_sum / brel)
+        b = a * brel
         assert np.isclose(ab_sum, a * b), "area conservation"
 
         # Area-weighted circular average theta
@@ -179,17 +189,19 @@ class Blob:
         )
 
     def split(self, n: int = 2) -> list[Blob]:
-        """Split the blob into `n` smaller blobs that line up along the semi-minor axis."""
+        """Split the blob into `n` smaller blobs that line up along the semi-minor axis.
+        Or the y-axis if the ellipse is a circle.
+        """
         if n < 2:
             raise ValueError(f"n must be at least 1, got {n!r}")
 
         f = 1 / n
         a, b = f * self.a, f * self.b
         o = self.c
-        t = np.deg2rad(self.theta)
+        t = np.deg2rad(self.theta) + np.pi / 2
         blobs = []
         for i in range(n):
-            r = b * (i - (n - 1) / 2)
+            r = 2 * b * (i - (n - 1) / 2)
             c = o + r * np.r_[np.cos(t), np.sin(t)]
             blobs.append(
                 Blob(
@@ -225,7 +237,7 @@ class Field:
 
     def __init__(
         self,
-        blobs: list[Blob],
+        blobs: list[Blob] | None = None,
         lat=(-10, 10, 42),
         lon=(-20, 20, 82),
         ctt0: float = 270,
@@ -239,6 +251,8 @@ class Field:
         ctt0
             Background cloud-top temperature.
         """
+        if blobs is None:
+            blobs = []
         self.blobs = blobs
         self.lat = _to_arr(lat)
         self.lon = _to_arr(lon)
@@ -282,3 +296,12 @@ class Field:
         )
 
         return ds
+
+    def to_geopandas(self, *, crs="EPSG:4326") -> gpd.GeoDataFrame:
+        """Convert the field to a GeoPandas GeoDataFrame."""
+        polygons = [blob.polygon for blob in self.blobs]
+
+        # Create a GeoDataFrame from the polygons
+        gdf = gpd.GeoDataFrame(geometry=polygons, crs=crs)
+
+        return gdf
