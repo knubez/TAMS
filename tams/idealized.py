@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 
 
 class Blob:
+    """An elliptical blob that can be used to represent a cloud element
+    (or part of one, if blobs are overlapping).
+    """
 
     def __init__(
         self,
@@ -32,7 +35,7 @@ class Blob:
         depth: float = 20,
     ) -> None:
         """
-        Create a blob with center `c` and semi-axes `a` and `b`.
+        Create an elliptical blob with center `c` and semi-axes `a` and `b`.
 
         Parameters
         ----------
@@ -132,21 +135,6 @@ class Blob:
             setattr(self, k, getattr(self, k) + v * hours)
         return self
 
-    # def dz(self, x: float, y: float, /, *, buffer: float = 1) -> float:
-    #     """Compute the relative depth at point (x, y) in the blob.
-    #     Buffer is relative to the semi-major axis `a`.
-    #     """
-    #     p = Point(x, y)
-    #     poly = self.polygon
-    #     buff = poly.buffer(distance=self.a * buffer)
-    #     if not poly.contains(p):
-    #         if buff.contains(p):
-    #             return self.depth * (1 - (self.a - poly.distance(p)))
-    #         else:
-    #             return 0
-    #     else:
-    #         return -self.depth * (1 - (self.a - poly.distance(p)))
-
     def well(self, x, y):
         """Parabolic well function in the `a` and `b` directions.
 
@@ -171,7 +159,7 @@ class Blob:
             return -self.depth * (1 - ((dx / a) ** 2 + (dy / b) ** 2))
 
     def merge(self, other: Blob) -> Blob:
-        """Merge into a new blob."""
+        """Merge with another blob, creating a new blob with averaged characteristics."""
         if not isinstance(other, Blob):
             raise TypeError(f"Cannot merge {type(other)} with {type(self)}")
         if not self.polygon.intersects(other.polygon):
