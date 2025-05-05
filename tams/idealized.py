@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Self
 
 import numpy as np
+import xarray as xr
 from shapely import affinity
 from shapely.geometry import LinearRing, Point, Polygon
 
@@ -120,17 +121,84 @@ class Blob:
             setattr(self, k, getattr(self, k) + v * hours)
         return self
 
-    def z(self, x: float, y: float, z0: float = 0, /, *, buffer: float = 1) -> float:
-        """Compute the depth at point (x, y) in the blob.
+    def dz(self, x: float, y: float, /, *, buffer: float = 1) -> float:
+        """Compute the relative depth at point (x, y) in the blob.
         Buffer is relative to the semi-major axis `a`.
         """
         p = Point(x, y)
         poly = self.polygon
         buff = poly.buffer(distance=self.a * buffer)
-        if not self.polygon.contains(p):
+        if not poly.contains(p):
             if buff.contains(p):
-                return z0 + self.depth * self.polygon.distance(p)
+                return self.depth * (1 - (self.a - poly.distance(p)))
             else:
-                return z0
+                return 0
         else:
-            return z0 - self.depth * self.polygon.distance(p)
+            return -self.depth * (1 - (self.a - poly.distance(p)))
+
+
+def _to_arr(x, *, default_num: int = 100) -> np.ndarray:
+    if np.isscalar(x):
+        return np.array([x])
+    elif isinstance(x, tuple):
+        # Assume range spec
+        if len(x) == 3:
+            return np.linspace(*x)
+        elif len(x) == 2:
+            return np.linspace(*x, default_num)
+        else:
+            raise ValueError("tuple must have 2 or 3 elements")
+    else:
+        # Assume array-like
+        return np.asarray(x)
+
+
+class Field:
+    """A field of blobs."""
+
+    def __init__(
+        self, blobs: list[Blob], lat=(-10, 10, 42), lon=(-20, 20, 82), z0: float = 270
+    ) -> None:
+        self.blobs = blobs
+        self.lat = _to_arr(lat)
+        self.lon = _to_arr(lon)
+        self.z0 = z0
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(blobs={self.blobs})"
+
+    def evolve(self, hours: float, /) -> Self:
+        """Evolve the field in place by the given number of hours."""
+        for blob in self.blobs:
+            blob.evolve(hours)
+        return self
+
+    def to_xarray(self) -> xr.DataArray:
+        """Convert the field to an xarray DataArray."""
+        import xarray as xr
+
+        nx, ny = len(self.lon), len(self.lat)
+        ys, xs = np.meshgrid(self.lon, self.lat)
+        dz = np.zeros((ny, nx), dtype=float)
+        # TODO: a more efficient way to do this, with GeoPandas?
+        for i in range(ny):
+            for j in range(nx):
+                x, y = xs[i, j], ys[i, j]
+                for blob in self.blobs:
+                    this_dz = blob.dz(x, y)
+                    dz[i, j] += this_dz
+                    # TODO: optionally only the max dz here, in overlapping blob case
+
+        z = self.z0 + dz
+
+        ds = xr.Dataset(
+            {
+                "ctt": (("lat", "lon"), z, {"long_name": "cloud-top temperature", "units": "K"}),
+            },
+            coords={
+                "lat": (("lat"), self.lat),
+                "lon": (("lon"), self.lon),
+            },
+        )
+
+        return ds
