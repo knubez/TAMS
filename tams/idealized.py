@@ -101,9 +101,18 @@ class Blob:
         """
         for k, v in kwargs.items():
             if k not in self._tendency:
-                raise ValueError(f"Invalid tendency: {k}")
+                raise ValueError(f"Invalid key: {k!r}")
             self._tendency[k] = v
         return self
+
+    def get_tendency(self, key: str | None = None) -> float | dict[str, float]:
+        """Get the current tendency of one or all of the ellipse parameters."""
+        if key is not None:
+            if key not in self._tendency:
+                raise ValueError(f"Invalid key: {key!r}")
+            return self._tendency[key]
+        else:
+            return self._tendency.copy()
 
     def evolve(self, hours: float, /) -> Self:
         """Evolve the blob in place by the given number of hours."""
