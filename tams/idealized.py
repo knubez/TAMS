@@ -136,6 +136,73 @@ class Blob:
         else:
             return -self.depth * (1 - (self.a - poly.distance(p)))
 
+    def merge(self, other: Blob) -> Blob:
+        if not isinstance(other, Blob):
+            raise TypeError(f"Cannot merge {type(other)} with {type(self)}")
+        if not self.polygon.intersects(other.polygon):
+            raise ValueError("Blobs do not intersect")
+
+        ab_self = self.a * self.b
+        ab_other = other.a * other.b
+        ab_sum = ab_self + ab_other
+
+        f_self = ab_self / ab_sum
+        f_other = ab_other / ab_sum
+
+        # Area-weighted average center
+        c = f_self * self.c + f_other * other.c
+
+        # Area-weighted average semi axes
+        a = f_self * self.a + f_other * other.a
+        b = f_self * self.a + f_other * other.b
+        assert np.isclose(ab_sum, a * b), "area conservation"
+
+        # Area-weighted circular average theta
+        rad_self = np.deg2rad(self.theta)
+        rad_other = np.deg2rad(other.theta)
+        theta = np.rad2deg(
+            np.arctan2(
+                f_self * np.sin(rad_self) + f_other * np.sin(rad_other),
+                f_self * np.cos(rad_self) + f_other * np.cos(rad_other),
+            )
+        )
+
+        # Area-weighted average depth
+        depth = f_self * self.depth + f_other * other.depth
+
+        return Blob(
+            c=c,
+            a=a,
+            b=b,
+            theta=theta,
+            depth=depth,
+        )
+
+    def split(self, n: int = 2) -> list[Blob]:
+        """Split the blob into `n` smaller blobs that line up along the semi-minor axis."""
+        if n < 2:
+            raise ValueError(f"n must be at least 1, got {n!r}")
+
+        f = 1 / n
+        a, b = f * self.a, f * self.b
+        o = self.c
+        t = np.deg2rad(self.theta)
+        blobs = []
+        for i in range(n):
+            r = b * (i - (n - 1) / 2)
+            c = o + r * np.r_[np.cos(t), np.sin(t)]
+            blobs.append(
+                Blob(
+                    c=c,
+                    a=a,
+                    b=b,
+                    theta=self.theta,
+                    depth=self.depth,
+                )
+            )
+
+        return blobs
+
 
 def _to_arr(x, *, default_num: int = 100) -> np.ndarray:
     if np.isscalar(x):
