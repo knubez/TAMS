@@ -81,7 +81,7 @@ class Blob:
         return self.polygon.exterior
 
     def set_tendency(self, **kwargs) -> Self:
-        """Set the tendency of one or more of the ellipse parameters in per hour units.
+        """Set in place the tendency of one or more of the ellipse parameters in per hour units.
         (A typical TAMS time step is 1 or 2 hours.)
         For example, 10 m/s ~ 10 m/s * 3600 s/h / (111000 m/deg) = 0.324 deg/h.
         """
@@ -89,9 +89,10 @@ class Blob:
             if k not in self._tendency:
                 raise ValueError(f"Invalid tendency: {k}")
             self._tendency[k] = v
+        return self
 
     def evolve(self, hours: float, /) -> Self:
-        """Evolve the blob by the given number of hours."""
+        """Evolve the blob in place by the given number of hours."""
         for k, v in self._tendency.items():
             setattr(self, k, getattr(self, k) + v * hours)
         return self
