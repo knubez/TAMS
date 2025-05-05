@@ -157,12 +157,25 @@ class Field:
     """A field of blobs."""
 
     def __init__(
-        self, blobs: list[Blob], lat=(-10, 10, 42), lon=(-20, 20, 82), z0: float = 270
+        self,
+        blobs: list[Blob],
+        lat=(-10, 10, 42),
+        lon=(-20, 20, 82),
+        ctt0: float = 270,
     ) -> None:
+        """
+        Parameters
+        ----------
+        blobs
+        lat, lon
+            Grid points.
+        ctt0
+            Background cloud-top temperature.
+        """
         self.blobs = blobs
         self.lat = _to_arr(lat)
         self.lon = _to_arr(lon)
-        self.z0 = z0
+        self.ctt0 = ctt0
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(blobs={self.blobs})"
@@ -189,11 +202,11 @@ class Field:
                     dz[i, j] += this_dz
                     # TODO: optionally only the max dz here, in overlapping blob case
 
-        z = self.z0 + dz
+        ctt = self.ctt0 + dz
 
         ds = xr.Dataset(
             {
-                "ctt": (("lat", "lon"), z, {"long_name": "cloud-top temperature", "units": "K"}),
+                "ctt": (("lat", "lon"), ctt, {"long_name": "cloud-top temperature", "units": "K"}),
             },
             coords={
                 "lat": (("lat"), self.lat),
