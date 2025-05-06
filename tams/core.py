@@ -867,7 +867,7 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
 
     # Sum areas over cloud elements
     time_groups = cs.groupby("time")
-    area = time_groups[["area_km2", "area219_km2"]].apply(sum)
+    area = time_groups[["area_km2", "area219_km2"]].sum()
 
     # Get duration (time resolution of our CE data)
     dt = time_groups["dtime"].apply(_the_unique)
