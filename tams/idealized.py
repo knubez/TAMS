@@ -118,6 +118,10 @@ class Blob:
         """Return the ellipse perimeter as a shapely LinearRing."""
         return self.polygon.exterior
 
+    def to_geopandas(self, *, crs="EPSG:4326") -> gpd.GeoSeries:
+        """Convert the blob to a GeoPandas GeoSeries, using the polygon."""
+        return gpd.GeoSeries([self.polygon], crs=crs)
+
     def set_tendency(self, **kwargs) -> Self:
         """Set in place the tendency of one or more of the ellipse parameters in per hour units.
         (A typical TAMS time step is 1 or 2 hours.)
