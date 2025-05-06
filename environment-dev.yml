@@ -35,10 +35,10 @@ dependencies:
   - rich
   #
   # Docs
-  - docutils <0.18
+  - docutils
   - myst-nb
   - myst-parser
-  - sphinx =5.*
+  - sphinx =8.*
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinx-copybutton
