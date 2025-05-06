@@ -30,6 +30,7 @@ examples/tracking-options.ipynb
 examples/sample-mpas-ug-data.ipynb
 examples/identify.ipynb
 examples/get.ipynb
+examples/idealized.ipynb
 ```
 
 ```{toctree}

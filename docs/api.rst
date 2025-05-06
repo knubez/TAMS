@@ -60,3 +60,63 @@ Utilities
    :toctree: api/
 
    tams.plot_tracked
+
+
+Idealized
+---------
+
+.. automodule:: tams.idealized
+
+.. autosummary::
+   :toctree: api/
+
+   Blob
+   Field
+   Sim
+
+Blob properties:
+
+.. autosummary::
+   :toctree: api/
+
+   Blob.center
+   Blob.ring
+   Blob.polygon
+
+Transform blobs:
+
+.. autosummary::
+   :toctree: api/
+
+   Blob.set_tendency
+   Blob.get_tendency
+   Blob.evolve
+   Blob.merge
+   Blob.split
+   Blob.copy
+   Blob.to_geopandas
+
+Compute the blob's impact on the field:
+
+.. autosummary::
+   :toctree: api/
+
+   Blob.well
+
+Transform a collection of blobs:
+
+.. autosummary::
+   :toctree: api/
+
+   Field.evolve
+   Field.to_xarray
+   Field.to_geopandas
+   Field.copy
+
+Simulate a collection of blobs:
+
+.. autosummary::
+   :toctree: api/
+
+   Sim.advance
+   Sim.to_xarray

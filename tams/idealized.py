@@ -1,5 +1,7 @@
 """
 Create and evolve systems of ellipsoidal blobs for demonstrating and testing TAMS.
+
+See :doc:`the example notebook <examples/idealized>` for some demonstrations.
 """
 
 from __future__ import annotations
@@ -44,16 +46,16 @@ class Blob:
         ----------
         c : array-like of float, shape (2,)
             Center of the blob. (x, y) (lon, lat) degrees.
-        a : float
+        a
             Semi-major axis of the blob.
             When `theta` is 0, this is along the x-axis.
-        b : float, optional
+        b
             Semi-minor axis of the blob. If not provided, `b` is set to `a` (circle).
             In this case, `a` is the radius of the circle.
-        theta : float
+        theta
             Angle of rotation (degrees).
             When `theta` is 0, `a` is along the x-axis.
-        depth : float
+        depth
             Relative to the environment/background, the well depth of the center of the blob.
             Higher depth means a larger negative anomaly.
             In TAMS, 235 K cloud-top temperature is used to define cloud elements,
@@ -94,12 +96,12 @@ class Blob:
 
     @property
     def center(self) -> Point:
-        """Return the defined center as a shapely Point."""
+        """The defined center :attr:`c` as a :class:`shapely.Point`."""
         return Point(self.c)
 
     @property
     def polygon(self) -> Polygon:
-        """Return the ellipse as a shapely Polygon."""
+        """The ellipse as a :class:`shapely.Polygon`."""
         c = self.center
         r = min(self.a, self.b)
         circle = c.buffer(r)
@@ -116,7 +118,7 @@ class Blob:
 
     @property
     def ring(self) -> LinearRing:
-        """Return the ellipse perimeter as a shapely LinearRing."""
+        """The ellipse perimeter as a :class:`shapely.LinearRing`."""
         return self.polygon.exterior
 
     def to_geopandas(self, *, crs="EPSG:4326") -> gpd.GeoSeries:
@@ -157,7 +159,7 @@ class Blob:
     def well(self, x, y):
         """Parabolic well function in the `a` and `b` directions.
 
-        It reaches `depth` (negative) at the center and 0 at the edge, then continues.
+        It reaches `depth` (negative) at the center and 0 at the ellipse edge, then continues.
 
         Parameters
         ----------
@@ -302,7 +304,7 @@ class Field:
         ----------
         blobs
         lat, lon
-            Grid points.
+            One-dimensional grid coordinate definitions (degrees).
         ctt_background
             Background/environmental/clear-sky infrared brightness temperature.
         """
@@ -332,7 +334,7 @@ class Field:
         ctt_threshold
             The threshold to be targeted with :func:`tams.identify`.
         additive
-            Do the wells add or min/max?
+            Do the wells (:meth:`Blob.well`) add or min/max?
             The latter (and default) is more consistent with real cloud element merging behavior.
         """
         import xarray as xr
@@ -427,6 +429,7 @@ class Sim:
         return f"{type(self).__name__}(field={self.field}, steps={steps})"
 
     def advance(self, steps: int, /) -> Self:
+        """Advance the simulation by the given number of time steps."""
         for _ in range(steps):
             self._history.append(self.field.copy())
             self.field.evolve(self.dt)
@@ -439,6 +442,7 @@ class Sim:
         ----------
         start : datetime-like
             The starting time to use when defining the time coordinate.
+            Passed to :func:`pandas.date_range`.
         **kwargs
             Additional keyword arguments to pass to :meth:`Field.to_xarray`.
         """
