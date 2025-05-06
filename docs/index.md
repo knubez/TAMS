@@ -56,7 +56,8 @@ includes the core dependencies and some extras, but you may also wish to install
   with {abbr}`CE (cloud element)` or MCS shapes
   in {class}`~geopandas.GeoDataFrame` format
   to disk as Parquet files with {meth}`~geopandas.GeoDataFrame.to_parquet`
-- `ipykernel` -- to use your Conda env in another env's Jupyter
+- `ipykernel` -- to use your conda environment in another environment's Jupyter
+  (for example, [NCAR JupyterHub](https://jupyterhub.hpc.ucar.edu/))
 
 ```{attention}
 Current {func}`tams.identify` [doesn't work](https://github.com/knubez/TAMS/issues/13)
@@ -76,7 +77,7 @@ and doesn't need to be installed separately.
 GeoPandas dropped support for Shapely v1 and PyGEOS in
 [their v1 release](https://github.com/geopandas/geopandas/releases/tag/v1.0.0) (late Jun 2024).
 [PyGEOS on conda-forge](https://github.com/conda-forge/pygeos-feedstock) has been retired,
-so you likely won't be able to install it in new Conda environments in any case.
+so you likely won't be able to install it in new conda environments in any case.
 ```
 
 ### Development install
