@@ -5,6 +5,7 @@ Create and evolve systems of ellipsoidal blobs for demonstrating and testing TAM
 from __future__ import annotations
 
 import warnings
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import geopandas as gpd
@@ -15,7 +16,7 @@ from shapely import affinity
 from shapely.geometry import Point
 
 if TYPE_CHECKING:
-    from typing import Self
+    from typing import Any, Self
 
     from shapely.geometry import LinearRing, Polygon
 
@@ -33,13 +34,14 @@ class Blob:
         b: float | None = None,
         theta: float = 0,
         depth: float = 20,
+        tendency: dict[str, Any] | None = None,
     ) -> None:
         """
         Create an elliptical blob with center `c` and semi-axes `a` and `b`.
 
         Parameters
         ----------
-        c : array-like, shape (2,)
+        c : array-like of float, shape (2,)
             Center of the blob. (x, y) (lon, lat) degrees.
         a : float
             Semi-major axis of the blob.
@@ -55,6 +57,11 @@ class Blob:
             Higher depth means a larger negative anomaly.
             In TAMS, 235 K cloud-top temperature is used to define cloud elements,
             while 219 K areas are assumed to represent embedded overshooting tops.
+        tendency : dict, optional
+            Tendency in any of the blob parameters above (`c`, `a`, `b`, `theta`, `depth`).
+            Units: per hour.
+            You can also use :meth:`set_tendency` to set the tendency after creating the blob.
+            The default tendency is 0 for all parameters.
         """
         self.c = np.asarray(c, dtype=float)
         if not a > 0:
@@ -78,6 +85,8 @@ class Blob:
             "theta": 0.0,
             "depth": 0.0,
         }
+        if tendency is not None:
+            self._tendency.update(tendency)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(c={self.c}, a={self.a}, b={self.b}, theta={self.theta})"
@@ -122,18 +131,23 @@ class Blob:
             self._tendency[k] = v
         return self
 
-    def get_tendency(self, key: str | None = None) -> float | dict[str, float]:
-        """Get the current tendency of one or all of the ellipse parameters."""
+    def get_tendency(
+        self, key: str | None = None, *, copy: bool = False
+    ) -> float | dict[str, float]:
+        """Get the current tendency of one or all (default) of the ellipse parameters."""
         if key is not None:
             if key not in self._tendency:
                 raise ValueError(f"Invalid key: {key!r}")
             return self._tendency[key]
         else:
-            return self._tendency.copy()
+            if copy:
+                return deepcopy(self._tendency)
+            else:
+                return self._tendency
 
     def evolve(self, hours: float, /) -> Self:
         """Evolve the blob in place by the given number of hours."""
-        for k, v in self._tendency.items():
+        for k, v in self.get_tendency().items():
             setattr(self, k, getattr(self, k) + v * hours)
         return self
 
@@ -198,7 +212,9 @@ class Blob:
 
         # Area-weighted average tendency
         tendency = {}
-        for (k, v_self), (_, v_other) in zip(self._tendency.items(), other._tendency.items()):
+        for (k, v_self), (_, v_other) in zip(
+            self.get_tendency().items(), other.get_tendency().items()
+        ):
             tendency[k] = f_self * v_self + f_other * v_other
 
         blob = Blob(
@@ -234,7 +250,7 @@ class Blob:
                 theta=self.theta,
                 depth=self.depth,
             )
-            blob.set_tendency(**self._tendency)
+            blob.set_tendency(**self.get_tendency(copy=True))
             blobs.append(blob)
 
         return blobs
@@ -248,7 +264,7 @@ class Blob:
             theta=self.theta,
             depth=self.depth,
         )
-        b.set_tendency(**self._tendency)
+        b.set_tendency(**self.get_tendency(copy=True))
         return b
 
 
