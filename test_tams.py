@@ -32,10 +32,15 @@ def test_data_in_contours_methods_same_result():
     varnames = ["ch9"]
     x1 = tams.core._data_in_contours_sjoin(tb, cs235, varnames=varnames)
     x2 = tams.core._data_in_contours_regionmask(tb, cs235, varnames=varnames)
+    assert len(x1) == len(x2)
     assert (x1.count_ch9 > 0).all()
     assert x1.count_ch9.equals(x2.count_ch9)
-    assert x1.std_ch9.equals(x2.std_ch9)
-    # TODO: mean values aren't exactly the same
+    # Note: With pandas v1, std's were all the same exactly, but not mean
+    # With pandas v2, the opposite
+    assert x1.mean_ch9.equals(x2.mean_ch9)
+    dstd = x1.std_ch9 - x2.std_ch9
+    assert len(x1) - dstd.eq(0).sum() == 3
+    assert dstd.abs().max() < 2e-6
 
 
 def test_data_in_contours_non_xy():
