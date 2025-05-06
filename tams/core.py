@@ -933,7 +933,7 @@ def _classify_one_moaap(
     # Assuming instantaneous times, we would need 5 h for the 4 h criteria
     # but for accumulated (during previous time step), 4 is fine (according to Andy)
     n = 4
-    nh = pd.Timedelta(f"{n}H")
+    nh = pd.Timedelta(f"{n}h")
     meets_crit_duration = duration >= nh
 
     # CE precip area as area times # of "precipitating pixels"
