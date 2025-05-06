@@ -265,7 +265,7 @@ def iter_input_paths():
         time_range = pd.date_range(
             start=start + pd.Timedelta("1D"),
             periods=(40 - 1) * 24,
-            freq="1H",
+            freq="1h",
         )
 
         for model in VN_MAP[season]:
@@ -302,7 +302,7 @@ def iter_input_paths2(include_models: str | list[str] | None = None):
         time_range = pd.date_range(
             start=start + pd.Timedelta("1D"),
             periods=(40 - 1) * 24,
-            freq="1H",
+            freq="1h",
         )
 
         for model_dir in sorted(season_dir.glob("*")):
@@ -529,7 +529,7 @@ def classify_one(g: gpd.GeoDataFrame, *, pre: str = "", include_stats: bool = Fa
     # Assuming instantaneous times, need 5 h for the 4 continuous h criteria
     # but for accumulated (during previous time step), 4 is fine(?) (according to Andy)
     n = 4
-    meets_crit_duration = duration >= pd.Timedelta(f"{n}H")
+    meets_crit_duration = duration >= pd.Timedelta(f"{n}h")
     # TODO: ^ not really one of the 4 criteria (though needed for 1 and 2)
 
     # Compute rainfall volume
