@@ -1088,11 +1088,15 @@ def run(
 
     def _agg_one(ds_t, g):
         df1 = data_in_contours(ds_t.pr, g, merge=True)
-        df2 = data_in_contours(ds_t.pr, g.set_geometry("cs219", drop=True), merge=False).add_suffix(
-            "219"
-        )
+        df2 = data_in_contours(
+            ds_t.pr,
+            g.set_geometry("cs219").drop(columns=["cs235"]),
+            merge=False,
+        ).add_suffix("219")
         df3 = data_in_contours(
-            ds_t.ctt, g.set_geometry("cs219", drop=True), merge=False
+            ds_t.ctt,
+            g.set_geometry("cs219").drop(columns=["cs235"]),
+            merge=False,
         ).add_suffix("219")
         df = (
             df1.join(df2)
