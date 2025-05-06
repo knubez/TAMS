@@ -15,7 +15,7 @@ tb = tams.data.tb_from_ir(r, ch=9)
 
 glade_avail = Path("/glade").is_dir()
 
-auth = earthaccess.login()
+auth = earthaccess.login(strategy="netrc")
 skipif_no_earthdata = pytest.mark.skipif(not auth.authenticated, reason="need Earthdata auth")
 
 
