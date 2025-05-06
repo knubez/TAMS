@@ -104,3 +104,9 @@ you can additionally cite the specific version of TAMS that you used
 ```{bibliography}
 :all:
 ```
+
+## Example notebook timings
+
+```{nb-exec-table}
+
+```
