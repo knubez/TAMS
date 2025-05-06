@@ -4,7 +4,7 @@ DYAMOND: DYnamics of the Atmospheric general circulation Modeled On Non-hydrosta
 
 Similar to [the MOSA runs](../mosa/README.md), the observations consist of [GPM_MERGIR](https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary) brightness temperature and [IMERG](https://gpm.nasa.gov/data/imerg) precip (v07 instead of v06). In addition to the obs, we ran TAMS for multiple high-resolution global models, for one winter and one summer period, each a bit more than a month long.
 
-Publication: [Feng et al., submitted](https://doi.org/10.22541/essoar.172405876.67413040/v1).
+Publication: [Feng et al. (2025)](https://doi.org/10.1029/2024JD042204).
 
 See also: <https://mcsmip.github.io>
 
