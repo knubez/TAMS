@@ -446,9 +446,7 @@ class Sim:
         **kwargs
             Additional keyword arguments to pass to :meth:`Field.to_xarray`.
         """
-        das = [field.to_xarray(**kwargs) for field in self._history] + [
-            self.field.to_xarray(**kwargs)
-        ]
+        das = [field.to_xarray(**kwargs) for field in self._history + [self.field]]
         da = xr.concat(das, dim="time")
 
         freq = pd.Timedelta(self.dt, unit="h")
