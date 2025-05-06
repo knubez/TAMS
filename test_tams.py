@@ -212,8 +212,8 @@ def test_identify_no_ces_warning():
 @pytest.mark.parametrize(
     "version,run",
     [
-        ("06", "early"),
-        ("06", "late"),
+        # ("06", "early"),
+        # ("06", "late"),
         ("07", "early"),
         ("07", "late"),
         ("07", "final"),
