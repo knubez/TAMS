@@ -16,9 +16,10 @@ from shapely import affinity
 from shapely.geometry import Point
 
 if TYPE_CHECKING:
-    from typing import Any, Self
+    from typing import Any
 
     from shapely.geometry import LinearRing, Polygon
+    from typing_extensions import Self
 
 
 class Blob:
@@ -135,9 +136,7 @@ class Blob:
             self._tendency[k] = v
         return self
 
-    def get_tendency(
-        self, key: str | None = None, *, copy: bool = False
-    ) -> float | dict[str, float]:
+    def get_tendency(self, key: str | None = None, *, copy: bool = False) -> Any | dict[str, Any]:
         """Get the current tendency of one or all (default) of the ellipse parameters."""
         if key is not None:
             if key not in self._tendency:
@@ -345,7 +344,7 @@ class Field:
             restrict = np.maximum
         elif blend > 0:
             amin, amax = None, blend
-            restrict = np.minimum
+            restrict = np.minimum  # type: ignore[assignment]
         else:
             raise ValueError(
                 "Blend region must be present. "
