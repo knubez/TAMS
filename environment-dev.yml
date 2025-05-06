@@ -46,6 +46,6 @@ dependencies:
   - sphinxcontrib-bibtex
   - watermark
   - pip:
-      - sphinx-prompt <1.6
+      - sphinx-prompt
       - sphinxext-opengraph
       - xrframes >=0.0.4
