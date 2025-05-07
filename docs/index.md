@@ -103,7 +103,14 @@ you can additionally cite the specific version of TAMS that you used
 ## References
 
 ```{bibliography}
-:all:
+:filter: key % "TAMS[0-9]"
+```
+
+## Papers using TAMS
+
+```{bibliography}
+:filter: not key % "TAMS[0-9]"
+:labelprefix: U
 ```
 
 ## Example notebook timings
