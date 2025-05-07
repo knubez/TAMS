@@ -5,8 +5,8 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "tams"
 authors = [
-    {name = "knubez", email = "knocasio@ucar.edu"},
-    {name = "zmoon", email = "zmoon92@gmail.com"},
+    {name = "knubez", email = "knunez.ocasio@tamu.edu"},
+    {name = "zmoon", email = "zmoon@tamu.edu"},
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
