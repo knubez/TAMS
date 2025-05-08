@@ -598,8 +598,11 @@ def track(files):
         for t, ce in gdf.groupby("time"):
             if case.which == "obs":
                 # Drop unphysical contours which span most of the domain
-                # (bad MERGIR times, issues in SH)
-                ce = ce[ce.area_km2 < 2e8]
+                # (bad MERGIR times, issues in SH) computed area >= 2e8
+                # And other large simple-shape contours also associated
+                # with bad MERGIR data, a lot of them in the NH with
+                # large extent in x
+                ce = ce[ce.area_km2 < 3e7]
             ces.append(ce)
             times.append(t)
 
