@@ -632,7 +632,7 @@ JOB_TPL_TRACK = r"""
 #PBS -N mesaclip2
 #PBS -q casper
 #PBS -l walltime=12:00:00
-#PBS -l select=1:ncpus=2:mem=16gb
+#PBS -l select=1:ncpus=1:mem=16gb
 #PBS -j oe
 
 cd /glade/u/home/zmoon/git/TAMS/examples/mesaclip
