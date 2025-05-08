@@ -400,7 +400,7 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
 
 
 def _time_input_to_pandas(
-    time_or_range: Any | tuple[Any, Any]
+    time_or_range: Any | tuple[Any, Any],
 ) -> tuple[pd.Timestamp | None, pd.Timestamp | None]:
     if isinstance(time_or_range, tuple):
         t0_, t1_ = time_or_range
@@ -610,7 +610,13 @@ def get_imerg(
     # Convert to normal datetime
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-        ds["time"] = ds.indexes["time"].to_datetimeindex()  # type: ignore[attr-defined]
+        # `time_unit` is new in v2025.01.2 (2025-01-31)
+        # https://docs.xarray.dev/en/stable/whats-new.html#v2025-01-2-jan-31-2025
+        # The future default will be us instead of ns
+        try:
+            ds["time"] = ds.indexes["time"].to_datetimeindex(time_unit="ns")  # type: ignore[attr-defined]
+        except TypeError:
+            ds["time"] = ds.indexes["time"].to_datetimeindex()  # type: ignore[attr-defined]
 
     if "precipitationCal" in ds:
         ds = ds.rename_vars({"precipitationCal": "precipitation"})

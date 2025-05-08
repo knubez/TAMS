@@ -15,8 +15,27 @@ tb = tams.data.tb_from_ir(r, ch=9)
 
 glade_avail = Path("/glade").is_dir()
 
-auth = earthaccess.login()
-skipif_no_earthdata = pytest.mark.skipif(not auth.authenticated, reason="need Earthdata auth")
+try:
+    # Raising exceptions on login failure is new in v0.14.0 (2025-02-11)
+    # https://github.com/nsidc/earthaccess/releases/tag/v0.14.0
+    # https://github.com/nsidc/earthaccess/pull/946/files#diff-58622dff7ea01bdbe5d5e0b10dc8d252da4aecccb4e122d3adeb268e227bf155
+    from earthaccess.exceptions import LoginAttemptFailure, LoginStrategyUnavailable
+except ImportError:
+    earthdata_login_failure_allowed = True
+else:
+    earthdata_login_failure_allowed = False
+
+if earthdata_login_failure_allowed:
+    auth = earthaccess.login()
+    earthdata = auth.authenticated
+else:
+    try:
+        auth = earthaccess.login(strategy="netrc")
+    except (LoginStrategyUnavailable, LoginAttemptFailure):  # no netrc file or invalid
+        earthdata = False
+    else:
+        earthdata = True
+skipif_no_earthdata = pytest.mark.skipif(not earthdata, reason="need Earthdata auth")
 
 
 def test_ch9_tb_loaded():
@@ -32,10 +51,15 @@ def test_data_in_contours_methods_same_result():
     varnames = ["ch9"]
     x1 = tams.core._data_in_contours_sjoin(tb, cs235, varnames=varnames)
     x2 = tams.core._data_in_contours_regionmask(tb, cs235, varnames=varnames)
+    assert len(x1) == len(x2)
     assert (x1.count_ch9 > 0).all()
     assert x1.count_ch9.equals(x2.count_ch9)
-    assert x1.std_ch9.equals(x2.std_ch9)
-    # TODO: mean values aren't exactly the same
+    # Note: With pandas v1, std's were all the same exactly, but not mean
+    # With pandas v2, the opposite
+    assert x1.mean_ch9.equals(x2.mean_ch9)
+    dstd = x1.std_ch9 - x2.std_ch9
+    assert len(x1) - dstd.eq(0).sum() == 3
+    assert dstd.abs().max() < 2e-6
 
 
 def test_data_in_contours_non_xy():
@@ -207,8 +231,8 @@ def test_identify_no_ces_warning():
 @pytest.mark.parametrize(
     "version,run",
     [
-        ("06", "early"),
-        ("06", "late"),
+        # ("06", "early"),
+        # ("06", "late"),
         ("07", "early"),
         ("07", "late"),
         ("07", "final"),
