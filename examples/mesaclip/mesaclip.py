@@ -217,6 +217,8 @@ def load_year(files: list[Path], *, interp: bool = True) -> xr.Dataset:
     ds = ds.convert_calendar("365_day")
     assert ds.sizes["time"] == 365 * 24
 
+    # TODO: for obs, set too-high and too-low Tb values to NaN (after deciding bounds to use)
+
     if interp:
         if which == "obs":
             # Try to fill in the null brightness temp pixels a bit
@@ -349,11 +351,11 @@ def submit_null(vn):
             submit_job(job, stem=stem)
 
 
-def add_ce_stats(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def preprocess_ce(pr: xr.DataArray, ce: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Add time and precip stats to CE frame."""
     t = pr.time.item()
     ts = pd.to_datetime(str(t))  # pretend it's normal, instead of 365-day
-    ce = ce.drop(columns=["inds219", "area219_km2", "cs219"]).assign(time=ts)
+    ce = ce.drop(columns=["inds219", "cs219"]).assign(time=ts)
 
     # Add precip stats needed for the special classify
     # Some obs times don't yield CEs even though they have Tb, e.g.
@@ -424,11 +426,11 @@ def preprocess_year_ds(ds: xr.Dataset, *, parallel: bool = True) -> None:
 
             if parallel:
                 ces = Parallel(n_jobs=-2, verbose=10)(
-                    delayed(add_ce_stats)(g.pr.isel(time=i).copy(deep=False), ce0.copy())
+                    delayed(preprocess_ce)(g.pr.isel(time=i).copy(deep=False), ce0.copy())
                     for i, ce0 in enumerate(ces0)
                 )
             else:
-                ces = [add_ce_stats(g.pr.isel(time=i), ce0) for i, ce0 in enumerate(ces0)]
+                ces = [preprocess_ce(g.pr.isel(time=i), ce0) for i, ce0 in enumerate(ces0)]
         except Exception as e:
             print(f"Error processing {ym}: {e}")
             continue
@@ -594,12 +596,19 @@ def track(files):
     for p in files:
         gdf = gpd.read_parquet(p)
         for t, ce in gdf.groupby("time"):
+            if case.which == "obs":
+                # Drop unphysical contours which span most of the domain
+                # (bad MERGIR times, issues in SH)
+                ce = ce[ce.area_km2 < 2e8]
             ces.append(ce)
             times.append(t)
 
     print(len(times), "times")
 
     # TODO: adjust (increase) duration for missing times
+    # For tracking this only affects projection,
+    # which we are not using currently
+    # More important to get this right for classify
     durations = [pd.Timedelta("1h")] * len(times)
 
     tic = time.perf_counter_ns()
