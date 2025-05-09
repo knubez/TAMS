@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+import pybtex.plugin
+from pybtex.database import Entry, Person
+from pybtex.style.sorting import BaseSortingStyle
+
 project = "tams"
 html_title = "TAMS"
 html_logo = "_static/TAMS-logo.png"
@@ -89,3 +97,46 @@ bibtex_bibfiles = ["refs.bib"]
 bibtex_default_style = "plain"
 
 ogp_image = "_static/TAMS-logo.png"
+
+
+class SortingStyle(BaseSortingStyle):
+    """Sort by date descending, then by author name, then title.
+    Each entry in our bib should have `year` to set a `%b %Y` format date
+    (e.g. 'Jan 2023').
+    """
+
+    # https://bitbucket.org/pybtex-devs/pybtex/src/9b97822f5517fc7893456b9827589a003ea7076a/pybtex/style/sorting/author_year_title.py?at=master
+
+    def persons_key(self, persons: list[Person]) -> str:
+        return "   ".join(self.person_key(person) for person in persons)
+
+    def person_key(self, person: Person) -> str:
+        return "  ".join(
+            (
+                " ".join(person.prelast_names + person.last_names),
+                " ".join(person.first_names + person.middle_names),
+                " ".join(person.lineage_names),
+            )
+        ).lower()
+
+    def sorting_key(self, entry: Entry) -> tuple:
+        author_key = self.persons_key(entry.persons["author"])
+        year_entry = entry.fields["year"]
+        date = datetime.strptime(year_entry, r"%b %Y").date()
+        title_key = entry.fields["title"].replace("{", "")
+        key = (date, author_key, title_key)
+        return key
+
+    def sort(self, entries: list[Entry]) -> list[Entry]:
+        return sorted(entries, key=self.sorting_key, reverse=True)
+
+
+pybtex.plugin.register_plugin("pybtex.style.sorting", bibtex_default_style, SortingStyle)
+
+# Override class default of 'author_year_title'
+# Since sphinxcontrib-bibtex doesn't give us a way to set `sorting_style`
+# used for the formatting class init
+# https://bitbucket.org/pybtex-devs/pybtex/src/9b97822f5517fc7893456b9827589a003ea7076a/pybtex/style/formatting/__init__.py?at=master#lines-47
+from pybtex.style.formatting.plain import Style
+
+Style.default_sorting_style = bibtex_default_style
