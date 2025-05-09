@@ -1,8 +1,3 @@
-import sys
-
-sys.path.append("../")
-
-
 project = "tams"
 html_title = "TAMS"
 html_logo = "_static/TAMS-logo.png"
