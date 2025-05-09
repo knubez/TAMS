@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Generator
 
 import pybtex.plugin
 from pybtex.database import Entry, Person
+from pybtex.style.labels import BaseLabelStyle
 from pybtex.style.sorting import BaseSortingStyle
 
 project = "tams"
@@ -131,12 +133,29 @@ class SortingStyle(BaseSortingStyle):
         return sorted(entries, key=self.sorting_key, reverse=True)
 
 
-pybtex.plugin.register_plugin("pybtex.style.sorting", bibtex_default_style, SortingStyle)
+class LabelStyle(BaseLabelStyle):
+    """Use the sorting as given but label in reverse."""
 
-# Override class default of 'author_year_title'
-# Since sphinxcontrib-bibtex doesn't give us a way to set `sorting_style`
-# used for the formatting class init
+    # https://github.com/mcmtroffaes/sphinxcontrib-bibtex/blob/a455b0e07f81d6448356a446443a97101486778e/test/roots/test-bibliography_style_label_1/conf.py
+    # https://bitbucket.org/pybtex-devs/pybtex/src/9b97822f5517fc7893456b9827589a003ea7076a/pybtex/style/labels/number.py?at=master#lines-33
+
+    def format_labels(self, sorted_entries: list[Entry]) -> Generator[str]:
+        n = len(sorted_entries)
+        for i, _ in enumerate(sorted_entries):
+            yield str(n - i)
+
+
+pybtex.plugin.register_plugin("pybtex.style.sorting", bibtex_default_style, SortingStyle)
+pybtex.plugin.register_plugin("pybtex.style.labels", bibtex_default_style, LabelStyle)
+
+# Override class defaults
+# Since sphinxcontrib-bibtex doesn't (seem to) give us a way to set
+# `sorting_style` and `label_style`, etc. for the formatting class init
 # https://bitbucket.org/pybtex-devs/pybtex/src/9b97822f5517fc7893456b9827589a003ea7076a/pybtex/style/formatting/__init__.py?at=master#lines-47
 from pybtex.style.formatting.plain import Style
 
+# Original: 'author_year_title'
 Style.default_sorting_style = bibtex_default_style
+
+# Original: None
+Style.default_label_style = bibtex_default_style
