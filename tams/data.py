@@ -4,6 +4,7 @@ Loaders for various data sets.
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,7 +13,7 @@ import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from typing import Any, Sequence
 
     import xarray
 
@@ -394,5 +395,273 @@ def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> x
     ds["precip"] = ds.aprecip.diff("time", label="lower") / da_dt_h
     ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
     ds = ds.drop_vars(["aprecip"])
+
+    return ds
+
+
+def _time_input_to_pandas(
+    time_or_range: Any | tuple[Any, Any],
+) -> tuple[pd.Timestamp | None, pd.Timestamp | None]:
+    if isinstance(time_or_range, tuple):
+        t0_, t1_ = time_or_range
+        t0 = pd.to_datetime(t0_)
+        t1 = pd.to_datetime(t1_)
+    else:  # Assume single time
+        t0 = pd.to_datetime(time_or_range)
+        t1 = t0
+    if not isinstance(t0, pd.Timestamp) or not isinstance(t1, pd.Timestamp):
+        raise TypeError(
+            "`time_or_range` must be a single time or a tuple of two times "
+            "in a format accepted by pandas.to_datetime"
+        )
+    return t0, t1
+
+
+def get_mergir(
+    time_or_range: Any | tuple[Any, Any],  # TODO: positional-only
+    *,
+    version: str = "1",
+    parallel: bool = False,
+    **kwargs,
+) -> xarray.Dataset:
+    """Stream GPM MERGIR brightness temperature from NASA Earthdata.
+
+    https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary
+
+    This is half-hourly ~ 4-km resolution data in the 60°S--60°N latitude band.
+    Each netCDF file contains one hour (two half-hourly time steps).
+
+    .. note::
+       The Python packages
+       `earthaccess <https://earthaccess.readthedocs.io/en/stable/quick-start/>`__
+       and `h5netcdf <https://h5netcdf.org/>`__
+       are required.
+       Additionally, you must have a
+       `NASA Earthdata account <https://www.earthdata.nasa.gov/>`__
+       (see https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
+       for more info).
+
+    Parameters
+    ----------
+    time_or_range
+        Specific time or time range (inclusive) to request.
+    version
+        Currently '1' is the only option.
+    parallel
+        Passed to :func:`xarray.open_mfdataset`, telling it to open files in parallel using Dask.
+        This may speed up loading if you are requesting more than a few hours,
+        especially if you are using ``dask.distributed``.
+    **kwargs
+        Passed to :func:`earthaccess.login`.
+
+    See Also
+    --------
+    :doc:`/examples/get`
+    """
+    import earthaccess
+
+    t0, t1 = _time_input_to_pandas(time_or_range)
+
+    auth = earthaccess.login(**kwargs)
+    if not auth.authenticated:
+        raise RuntimeError("NASA Earthdata authentication failed")
+
+    short_name = "GPM_MERGIR"
+    results = earthaccess.search_data(
+        short_name=short_name,
+        version=version,
+        cloud_hosted=True,
+        temporal=(t0, t1),
+        count=-1,
+    )
+
+    n = len(results)
+    if n == 0:
+        raise ValueError(f"no results for period=({t0}, {t1}), version={version!r}")
+    elif n >= 1:
+        files = earthaccess.open(results)
+        if n == 1:
+            ds = xr.open_dataset(files[0])
+        else:
+            ds = xr.open_mfdataset(
+                files,
+                combine="nested",
+                concat_dim="time",
+                combine_attrs="drop_conflicts",
+                parallel=parallel,
+            )
+
+    ds = ds.rename_vars({"Tb": "tb"})
+    for vn in ds.variables:
+        if vn == "time":
+            continue
+        ds[vn].attrs["long_name"] = ds[vn].attrs["standard_name"].replace("_", " ")
+
+    # Some times are off by sub-seconds, but we know it should be half-hourly
+    ds["time"] = ds.time.dt.round("30min")
+
+    # Select request
+    ds = ds.sel(time=slice(t0, t1)).squeeze()
+
+    if "FileHeader" in ds.attrs:
+        ds.attrs["FileHeader"] = ds.attrs["FileHeader"].strip().replace("\n", "")
+    ds.attrs.update(
+        ShortName=short_name,
+        Version=version,
+    )
+
+    return ds
+
+
+def get_imerg(
+    time_or_range: Any | tuple[Any, Any],  # TODO: positional-only
+    *,
+    version: str = "07",
+    run: str = "final",
+    parallel: bool = False,
+    **kwargs,
+) -> xarray.Dataset:
+    """Stream GPM IMERG L3 precipitation from NASA Earthdata.
+
+    https://gpm.nasa.gov/data/directory
+
+    This is half-hourly 0.1° (~ 10-km) resolution data.
+    Each HDF5 file contains one time step.
+
+    .. note::
+       The Python packages
+       `earthaccess <https://earthaccess.readthedocs.io/en/stable/quick-start/>`__
+       and `h5netcdf <https://h5netcdf.org/>`__
+       are required.
+       Additionally, you must have a
+       `NASA Earthdata account <https://www.earthdata.nasa.gov/>`__
+       (see https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
+       for more info).
+
+    Parameters
+    ----------
+    time_or_range
+        Specific time or time range (inclusive) to request.
+    version
+        For example: '06', '07'.
+    run
+        'early' and 'late' are available in near-realtime;
+        'final' is delayed by a few months.
+        See what's available at
+        `NASA GES DISC <https://disc.gsfc.nasa.gov/datasets?keywords=gpm%20imerg&page=1&temporalResolution=30%20minutes>`__.
+    parallel
+        Passed to :func:`xarray.open_mfdataset`, telling it to open files in parallel using Dask.
+        This may speed up loading if you are requesting more than a few hours,
+        especially if you are using ``dask.distributed``.
+    **kwargs
+        Passed to :func:`earthaccess.login`.
+
+    See Also
+    --------
+    :doc:`/examples/get`
+    """
+    import earthaccess
+
+    t0, t1 = _time_input_to_pandas(time_or_range)
+
+    auth = earthaccess.login(**kwargs)
+    if not auth.authenticated:
+        raise RuntimeError("NASA Earthdata authentication failed")
+
+    try:
+        short_name = (
+            "GPM_3IMERGHH"
+            + {
+                "early": "E",
+                "late": "L",
+                "final": "",
+            }[run.lower()]
+        )
+    except KeyError as e:
+        raise ValueError(f"invalid `run` {run!r}") from e
+
+    results = earthaccess.search_data(
+        short_name=short_name,
+        version=version,
+        cloud_hosted=True,
+        temporal=(t0, t1),
+        count=-1,
+    )
+
+    n = len(results)
+    if n == 0:
+        raise ValueError(
+            f"no {short_name} ({run.lower()}) results for period=({t0}, {t1}), version={version!r}"
+        )
+    elif n >= 1:
+        files = earthaccess.open(results)
+        if n == 1:
+            ds = xr.open_dataset(files[0], group="Grid")
+        else:
+            ds = xr.open_mfdataset(
+                files,
+                group="Grid",
+                combine="nested",
+                concat_dim="time",
+                combine_attrs="drop_conflicts",
+                parallel=parallel,
+            )
+
+    # Convert to normal datetime
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        # `time_unit` is new in v2025.01.2 (2025-01-31)
+        # https://docs.xarray.dev/en/stable/whats-new.html#v2025-01-2-jan-31-2025
+        # The future default will be us instead of ns
+        try:
+            ds["time"] = ds.indexes["time"].to_datetimeindex(time_unit="ns")  # type: ignore[attr-defined]
+        except TypeError:
+            ds["time"] = ds.indexes["time"].to_datetimeindex()  # type: ignore[attr-defined]
+
+    if "precipitationCal" in ds:
+        ds = ds.rename_vars({"precipitationCal": "precipitation"})
+    ds = (
+        ds.drop_dims(["nv", "lonv", "latv"])  # bounds
+        .rename_vars(
+            {
+                "precipitation": "pr",
+                "randomError": "pr_err",
+                "precipitationQualityIndex": "pr_qi",
+            }
+        )
+        .transpose("time", "lat", "lon")
+        .squeeze()
+    )
+    ds = ds.drop_vars(ds.data_vars.keys() - {"pr", "pr_err", "pr_qi"})
+
+    # Clean up attrs
+    long_names = {
+        "time": "time",
+        "lat": "latitude",
+        "lon": "longitude",
+        "pr": "precipitation rate",
+        "pr_err": "RMSE error estimate for precipitation rate",
+        "pr_qi": "quality index for precipitation rate",
+    }
+    ds["pr_qi"].attrs.update(units="1")
+    for vn in ds.variables:
+        assert isinstance(vn, str)
+        if vn == "time":
+            continue
+        try:
+            desc = " ".join(ds[vn].attrs["LongName"].strip().split())
+        except KeyError:
+            desc = None
+        ds[vn].attrs = {
+            "units": ds[vn].attrs["units"],
+            "long_name": long_names[vn],
+        }
+        if desc is not None:
+            ds[vn].attrs["description"] = desc
+    ds.attrs = {
+        "GridHeader": ds.attrs["GridHeader"].strip().replace("\n", ""),
+        "ShortName": short_name,
+        "Version": version,
+    }
 
     return ds

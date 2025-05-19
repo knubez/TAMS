@@ -4,7 +4,20 @@ MOSA: MCSs Over South America [^mosa]
 
 An MCS tracker intercomparison project of the NCAR SAAG Convective Working Group, focusing on the South American region.
 
+Publication: [Prein et al. (2024)](https://doi.org/10.1029/2023JD040254).
+
 TAMS is run on observational ([GPM_MERGIR](https://disc.gsfc.nasa.gov/datasets/GPM_MERGIR_1/summary) brightness temperature and [IMERG](https://gpm.nasa.gov/data/imerg) precip) and model (WRF) datasets for three water years (2011, 2016, 2019).
+
+> [!IMPORTANT]
+> This used TAMS v0.1.x.
+> The scripts may not work with future versions of TAMS.
+> To install TAMS v0.1.x, use
+>
+> ```
+> conda install -c conda-forge tams=0.1
+> ```
+>
+> or clone the repo and check out the latest `v0.1.x` tag.
 
 This directory includes Python and PBS job scripts (for NCAR Casper) for three steps in the run process:
 

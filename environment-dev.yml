@@ -2,14 +2,14 @@ name: tams-dev
 channels:
   - conda-forge
 dependencies:
-  - python =3.10
+  - python =3.11
   - pip
   #
   # Core dependencies
   - geopandas >=0.10
   - matplotlib >=3.4,!=3.8.0
   - numpy
-  - pandas <2
+  - pandas =2.*
   - scikit-image
   - shapely
   - xarray
@@ -17,7 +17,9 @@ dependencies:
   # Extras
   - cartopy >=0.21
   - dask-core
+  - earthaccess
   - gdown
+  - h5netcdf
   - joblib
   - netcdf4
   - regionmask >=0.9
@@ -33,10 +35,10 @@ dependencies:
   - rich
   #
   # Docs
-  - docutils <0.18
+  - docutils
   - myst-nb
   - myst-parser
-  - sphinx =5.*
+  - sphinx =8.*
   - sphinx-autobuild
   - sphinx-book-theme
   - sphinx-copybutton
@@ -44,6 +46,6 @@ dependencies:
   - sphinxcontrib-bibtex
   - watermark
   - pip:
-      - sphinx-prompt <1.6
+      - sphinx-prompt
       - sphinxext-opengraph
       - xrframes >=0.0.4
