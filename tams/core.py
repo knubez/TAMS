@@ -94,7 +94,8 @@ def contours(
 
 def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
     from geopandas import GeoDataFrame
-    from shapely.geometry.polygon import LinearRing, LineString, Point, orient
+    from shapely.geometry import LinearRing, LineString, Point
+    from shapely.geometry.polygon import orient
 
     if isinstance(cs, np.ndarray) and cs.ndim == 2 and cs.shape[1] == 2:
         # Single array, probably mpl 3.8.0
