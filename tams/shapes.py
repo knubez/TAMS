@@ -4,7 +4,7 @@ Shapely shape helpers.
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Union
 
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon
@@ -20,7 +20,7 @@ __all__ = (
     "make_square",
 )
 
-PointLike = Iterable[float] | Point
+PointLike = Union[Iterable[float], Point]
 """
 A 2 (or 3, technically) element sequence of x, y[, z] coords or a :class:`shapely.Point` instance.
 """
@@ -190,6 +190,7 @@ def make_cone(
 
     # Final polygon
     cone = unary_union(convex_hulls)
+    assert isinstance(cone, Polygon), f"expected Polygon, got {type(cone)}"
 
     return cone
 
