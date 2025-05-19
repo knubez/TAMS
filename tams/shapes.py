@@ -7,10 +7,12 @@ from __future__ import annotations
 from typing import Iterable, Union
 
 import numpy as np
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
+from shapely.ops import polygonize, unary_union
 
 __all__ = (
     "make_arc",
+    "make_circle",
     "make_cone",
     "make_cone2",
     "make_ellipse",
@@ -18,6 +20,7 @@ __all__ = (
     "make_rectangle",
     "make_rectangle2",
     "make_square",
+    "split",
 )
 
 PointLike = Union[Iterable[float], Point]
@@ -81,7 +84,6 @@ def make_rectangle(p1: PointLike, p2: PointLike) -> Polygon:
 
 def make_rectangle2(xy: tuple[float, float], w: float, h: float) -> Polygon:
     """Return the rectangle centered on `xy` with width `w` and height `h`."""
-    from shapely.geometry import Polygon
 
     x, y = xy
     if not w > 0 and h > 0:
@@ -105,6 +107,32 @@ def make_square(xy: tuple[float, float], s: float) -> Polygon:
         raise ValueError("s must be positive")
 
     return make_rectangle2(xy, s, s)
+
+
+def make_circle(
+    xy: PointLike,
+    d: float,
+    *,
+    half: bool = True,
+) -> Polygon:
+    """
+    Parameters
+    ----------
+    xy
+        Center point.
+    d
+        Diameter.
+        (Or, radius if `half` is true.)
+    half
+        Whether `d` is diameter (``False``, default)
+        or half-diameter (i.e., radius; ``True``).
+    """
+    from shapely.geometry import Point
+
+    r = d if half else d / 2
+
+    # TODO: increase `quad_segs` for large `r`?
+    return Point(xy).buffer(r)
 
 
 def make_ellipse(
@@ -133,7 +161,6 @@ def make_ellipse(
     """
     # Based on https://gis.stackexchange.com/a/243462
     import shapely.affinity
-    from shapely.geometry import Point
 
     if half:
         hw, hh = w, h
@@ -167,9 +194,6 @@ def make_cone(
         with the smallest circle centered at (0, 0) and the largest at (-10, 0),
         like an ice cream cone that has fallen to the left.
     """
-    from shapely.geometry import MultiPolygon, Polygon
-    from shapely.ops import unary_union
-
     # Based on https://gis.stackexchange.com/a/326692
     n = np.ceil(max(np.ptp(x_range), np.ptp(y_range))).astype(int) * 2
     x = np.linspace(*x_range, n)
@@ -195,7 +219,7 @@ def make_cone(
     return cone
 
 
-def make_cone2(xy: tuple[float, float], h: float, d: float, *, rcap=None):
+def make_cone2(xy: tuple[float, float], h: float, d: float, *, rcap=None) -> Polygon:
     """Make a cone-like shape by combining two lines and an arc.
 
     Compared to the circle-cone (:func:`make_cone`):
@@ -217,7 +241,6 @@ def make_cone2(xy: tuple[float, float], h: float, d: float, *, rcap=None):
         Use infinity (e.g. ``np.inf``) for a straight line
         (i.e., a normal isosceles triangle).
     """
-    from shapely import polygonize
 
     x, y = xy
     r = d / 2
@@ -240,4 +263,25 @@ def make_cone2(xy: tuple[float, float], h: float, d: float, *, rcap=None):
         tdeg = np.rad2deg(t)
         cap = make_arc((xc, y), rcap, (-tdeg, tdeg))
 
-    return polygonize([s1, s2, cap])
+    (poly,) = polygonize([s1, s2, cap])
+
+    return poly
+
+
+def split(poly: Polygon, line: LineString) -> list[Polygon]:
+    """Split polygon along lines."""
+    # Based on https://kuanbutts.com/2020/07/07/subdivide-polygon-with-linestring/
+    # TODO: cut linestring?
+    # TODO: account for polygon holes?
+
+    to_cut = poly
+    cutter = line
+
+    # Union the exterior lines of the polygon with the dividing linestring
+    unioned = to_cut.boundary.union(cutter)
+
+    # Filter out polygons outside of original input polygon
+    polys = [poly for poly in polygonize(unioned) if poly.representative_point().within(to_cut)]
+
+    # TODO: return Polygon/MultiPolygon instead?
+    return polys
