@@ -4,11 +4,14 @@ Shapely shape helpers.
 
 from __future__ import annotations
 
-from typing import Iterable, Union
+from typing import TYPE_CHECKING, Iterable, Union
 
 import numpy as np
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 from shapely.ops import polygonize, unary_union
+
+if TYPE_CHECKING:
+    from shapely import Geometry
 
 __all__ = (
     "make_arc",
@@ -268,14 +271,23 @@ def make_cone2(xy: tuple[float, float], h: float, d: float, *, rcap=None) -> Pol
     return poly
 
 
-def split(poly: Polygon, line: LineString) -> list[Polygon]:
-    """Split polygon along lines."""
+def split(polygon: Polygon, cutter: Geometry) -> list[Polygon]:
+    """Split polygon along line(s).
+
+    Parameters
+    ----------
+    polygon
+        The polygon to cut.
+    cutter
+        `cutter` could be, for example, a :class:`~shapely.LineString`,
+        made with :func:`make_line` or :func:`make_arc`.
+        If it is a :class:`~shapely.Polygon`, the :attr:`~shapely.Polygon.boundary` will be used.
+    """
     # Based on https://kuanbutts.com/2020/07/07/subdivide-polygon-with-linestring/
     # TODO: cut linestring?
     # TODO: account for polygon holes?
 
-    to_cut = poly
-    cutter = line
+    to_cut = polygon
 
     # Union the exterior lines of the polygon with the dividing linestring
     unioned = to_cut.boundary.union(cutter)
