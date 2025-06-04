@@ -204,6 +204,7 @@ def test_classify_cols_check():
     cs = gpd.GeoDataFrame(
         columns=["mcs_id", "geometry", "time", "area_km2", "area219_km2"],
         data=np.full((1, 5), np.nan),
+        geometry="geometry",
         crs="EPSG:4326",
     )
     with pytest.raises(ValueError, match="missing these columns"):
