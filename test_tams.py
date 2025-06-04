@@ -203,8 +203,7 @@ def test_classify_empty():
 def test_classify_cols_check():
     cs = gpd.GeoDataFrame(
         columns=["mcs_id", "geometry", "time", "area_km2", "area219_km2"],
-        data=np.full((1, 5), np.nan),
-        geometry="geometry",
+        data=[[0, None, pd.NaT, np.nan, np.nan]],
         crs="EPSG:4326",
     )
     with pytest.raises(ValueError, match="missing these columns"):
