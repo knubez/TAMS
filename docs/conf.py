@@ -23,7 +23,7 @@ extensions = [
     "sphinxcontrib.bibtex",
     "myst_nb",
     "sphinxext.opengraph",
-    "sphinx-prompt",
+    "sphinx_prompt",
     "sphinx_copybutton",
     "sphinx_togglebutton",
 ]
