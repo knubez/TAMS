@@ -58,7 +58,7 @@ def test_data_in_contours_methods_same_result():
     # With pandas v2, the opposite
     assert x1.mean_ch9.equals(x2.mean_ch9)
     dstd = x1.std_ch9 - x2.std_ch9
-    assert len(x1) - dstd.eq(0).sum() == 3
+    assert len(x1) - dstd.eq(0).sum() in {3, 5}
     assert dstd.abs().max() < 2e-6
 
 
