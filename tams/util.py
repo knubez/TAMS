@@ -110,17 +110,17 @@ def plot_tracked(
             ax = fig.add_subplot(projection=proj)
             if TYPE_CHECKING:
                 assert isinstance(ax, GeoAxes)
-            ax.set_extent([x0, x1, y0, y1])  # type: ignore[attr-defined]
-            ax.gridlines(draw_labels=True)  # type: ignore[attr-defined]
+            ax.set_extent([x0, x1, y0, y1])
+            ax.gridlines(draw_labels=True)
 
             if background == "map":
                 # TODO: a more high-res image
-                ax.stock_img()  # type: ignore[attr-defined]
+                ax.stock_img()
             else:  # countries
                 import cartopy.feature as cfeature
 
-                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")  # type: ignore[attr-defined]
-                ax.coastlines()  # type: ignore[attr-defined]
+                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")
+                ax.coastlines()
 
         else:  # none
             _, ax = plt.subplots()
