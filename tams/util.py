@@ -7,8 +7,9 @@ import numpy as np
 
 if TYPE_CHECKING:
     import geopandas
-    import matplotlib
     import pandas
+    from cartopy.mpl.geoaxes import GeoAxes
+    from matplotlib.axes import Axes
 
 
 def sort_ew(cs: geopandas.GeoDataFrame):
@@ -38,7 +39,7 @@ def plot_tracked(
     label: str = "id",
     add_colorbar: bool = False,
     cbar_kwargs: dict | None = None,
-    ax: matplotlib.axes.Axes | None = None,
+    ax: Axes | GeoAxes | None = None,
     size: float = 4,
     aspect: float | None = None,
 ):
@@ -105,28 +106,38 @@ def plot_tracked(
                 raise RuntimeError("cartopy required") from e
 
             proj = ccrs.Mercator()
-            tran = ccrs.PlateCarree()
             fig = plt.figure(figsize=(size * aspect, size))
             ax = fig.add_subplot(projection=proj)
-            ax.set_extent([x0, x1, y0, y1])  # type: ignore[attr-defined]
-            ax.gridlines(draw_labels=True)  # type: ignore[attr-defined]
+            if TYPE_CHECKING:
+                assert isinstance(ax, GeoAxes)
+            ax.set_extent([x0, x1, y0, y1])
+            ax.gridlines(draw_labels=True)
 
             if background == "map":
                 # TODO: a more high-res image
-                ax.stock_img()  # type: ignore[attr-defined]
+                ax.stock_img()
             else:  # countries
                 import cartopy.feature as cfeature
 
-                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")  # type: ignore[attr-defined]
-                ax.coastlines()  # type: ignore[attr-defined]
-
-            blob_kwargs.update(transform=tran)
-            text_kwargs.update(transform=tran)
+                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")
+                ax.coastlines()
 
         else:  # none
             _, ax = plt.subplots()
 
             ax.set(xlabel="lon [°E]", ylabel="lat [°N]")
+
+    try:
+        import cartopy.crs as ccrs
+        from cartopy.mpl.geoaxes import GeoAxes
+    except ImportError:
+        pass
+    else:
+        if isinstance(ax, GeoAxes):
+            tran = ccrs.PlateCarree()
+
+            blob_kwargs.update(transform=tran)
+            text_kwargs.update(transform=tran)
 
     t = pd.Series(sorted(cs.time.unique()))
     tmin, tmax = t.iloc[0], t.iloc[-1]

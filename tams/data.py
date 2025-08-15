@@ -614,9 +614,9 @@ def get_imerg(
         # https://docs.xarray.dev/en/stable/whats-new.html#v2025-01-2-jan-31-2025
         # The future default will be us instead of ns
         try:
-            ds["time"] = ds.indexes["time"].to_datetimeindex(time_unit="ns")  # type: ignore[attr-defined]
+            ds["time"] = ds.indexes["time"].to_datetimeindex(time_unit="ns")
         except TypeError:
-            ds["time"] = ds.indexes["time"].to_datetimeindex()  # type: ignore[attr-defined]
+            ds["time"] = ds.indexes["time"].to_datetimeindex()
 
     if "precipitationCal" in ds:
         ds = ds.rename_vars({"precipitationCal": "precipitation"})

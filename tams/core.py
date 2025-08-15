@@ -84,7 +84,7 @@ def contours(
         assert x.ndim == 2, "this is for a single image"
         with plt.ioff():  # requires mpl 3.4
             fig = plt.figure()
-            cs = x.plot.contour(x="lon", y="lat", levels=[value])  # type: ignore[attr-defined]
+            cs = x.plot.contour(x="lon", y="lat", levels=[value])
 
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
@@ -530,7 +530,7 @@ def data_in_contours(
     if method in {"sjoin", "geopandas", "gpd"}:
         new_data = _data_in_contours_sjoin(*args, **kwargs)
     elif method in {"regionmask"}:
-        new_data = _data_in_contours_regionmask(*args, **kwargs)  # type: ignore[arg-type]
+        new_data = _data_in_contours_regionmask(*args, **kwargs)
     else:
         raise ValueError(f"method {method!r} not recognized")
 
