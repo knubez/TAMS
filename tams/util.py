@@ -106,7 +106,6 @@ def plot_tracked(
                 raise RuntimeError("cartopy required") from e
 
             proj = ccrs.Mercator()
-            tran = ccrs.PlateCarree()
             fig = plt.figure(figsize=(size * aspect, size))
             ax = fig.add_subplot(projection=proj)
             if TYPE_CHECKING:
@@ -123,13 +122,22 @@ def plot_tracked(
                 ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")  # type: ignore[attr-defined]
                 ax.coastlines()  # type: ignore[attr-defined]
 
-            blob_kwargs.update(transform=tran)
-            text_kwargs.update(transform=tran)
-
         else:  # none
             _, ax = plt.subplots()
 
             ax.set(xlabel="lon [°E]", ylabel="lat [°N]")
+
+    try:
+        import cartopy.crs as ccrs
+        from cartopy.mpl.geoaxes import GeoAxes
+    except ImportError:
+        pass
+    else:
+        if isinstance(ax, GeoAxes):
+            tran = ccrs.PlateCarree()
+
+            blob_kwargs.update(transform=tran)
+            text_kwargs.update(transform=tran)
 
     t = pd.Series(sorted(cs.time.unique()))
     tmin, tmax = t.iloc[0], t.iloc[-1]
