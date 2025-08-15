@@ -530,7 +530,7 @@ def data_in_contours(
     if method in {"sjoin", "geopandas", "gpd"}:
         new_data = _data_in_contours_sjoin(*args, **kwargs)
     elif method in {"regionmask"}:
-        new_data = _data_in_contours_regionmask(*args, **kwargs)  # type: ignore[arg-type]
+        new_data = _data_in_contours_regionmask(*args, **kwargs)
     else:
         raise ValueError(f"method {method!r} not recognized")
 
