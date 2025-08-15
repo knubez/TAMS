@@ -7,8 +7,9 @@ import numpy as np
 
 if TYPE_CHECKING:
     import geopandas
-    import matplotlib
     import pandas
+    from cartopy.mpl.geoaxes import GeoAxes
+    from matplotlib.axes import Axes
 
 
 def sort_ew(cs: geopandas.GeoDataFrame):
@@ -38,7 +39,7 @@ def plot_tracked(
     label: str = "id",
     add_colorbar: bool = False,
     cbar_kwargs: dict | None = None,
-    ax: matplotlib.axes.Axes | None = None,
+    ax: Axes | GeoAxes | None = None,
     size: float = 4,
     aspect: float | None = None,
 ):
@@ -108,6 +109,8 @@ def plot_tracked(
             tran = ccrs.PlateCarree()
             fig = plt.figure(figsize=(size * aspect, size))
             ax = fig.add_subplot(projection=proj)
+            if TYPE_CHECKING:
+                assert isinstance(ax, GeoAxes)
             ax.set_extent([x0, x1, y0, y1])  # type: ignore[attr-defined]
             ax.gridlines(draw_labels=True)  # type: ignore[attr-defined]
 
