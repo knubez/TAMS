@@ -36,7 +36,7 @@ def tb_from_ir(r, ch: int):
     """Compute brightness temperature from IR satellite radiances (`r`)
     in channel `ch` of the EUMETSAT MSG SEVIRI instrument.
 
-    Reference: http://www.eumetrain.org/data/2/204/204.pdf page 13
+    Reference: https://resources.eumetrain.org/data/2/204/204.pdf page 13
 
     https://www.eumetsat.int/seviri
 
