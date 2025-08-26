@@ -38,7 +38,7 @@ def tb_from_ir(r, ch: int):
 
     Reference: https://resources.eumetrain.org/data/2/204/204.pdf page 13
 
-    https://www.eumetsat.int/seviri
+    https://www.eumetsat.int/msg-services
 
     Parameters
     ----------
