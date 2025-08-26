@@ -40,6 +40,10 @@ def tb_from_ir(r, ch: int):
 
     https://www.eumetsat.int/msg-services
 
+    Besides the MSG services page above,
+    the `old SEVIRI page <https://web.archive.org/web/20231112220636/https://www.eumetsat.int/seviri>`__
+    is also a useful source of information.
+
     Parameters
     ----------
     r : array-like
