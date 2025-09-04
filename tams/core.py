@@ -1160,7 +1160,9 @@ def run(
         cen = g.geometry.to_crs("EPSG:32663").centroid.to_crs("EPSG:4326")
         return gpd.GeoSeries({"first_centroid": cen.iloc[0], "last_centroid": cen.iloc[-1]})
 
-    mcs_summary_points = gpd.GeoDataFrame(mcs.groupby("mcs_id").apply(f).astype("geometry"))
+    mcs_summary_points = gpd.GeoDataFrame(
+        mcs.groupby("mcs_id")[["cs235", "time"]].apply(f).astype("geometry")
+    )
     # ^ Initially we have GeoDataFrame but the columns don't have dtype geometry
     # `.astype("geometry")` makes that conversion but we lose GeoDataFrame
 
