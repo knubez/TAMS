@@ -1044,9 +1044,11 @@ def run(
                 category=ShapelyDeprecationWarning,
                 message="__len__ for multi-part geometries is deprecated",
             )
-            d["cs235"] = gpd.GeoSeries(time_group.apply(lambda g: MultiPolygon(g.geometry.values)))
+            d["cs235"] = gpd.GeoSeries(
+                time_group[["cs235"]].apply(lambda g: MultiPolygon(g.geometry.values))
+            )
             d["cs219"] = gpd.GeoSeries(
-                time_group.apply(
+                time_group[["cs219"]].apply(
                     lambda g: MultiPolygon(
                         itertools.chain.from_iterable(mp.geoms for mp in g.cs219.values)
                     )
