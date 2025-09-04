@@ -44,6 +44,8 @@ filterwarnings = [
     'ignore:distutils Version classes are deprecated\. Use packaging\.version instead\.:DeprecationWarning',
     'ignore:np\.find\_common\_type is deprecated\.:DeprecationWarning',
     "ignore:The 'shapely\\.geos' module is deprecated:DeprecationWarning:geopandas._compat",
+    "ignore:The 'shapely\\.geos' module is deprecated:DeprecationWarning:pyogrio",
+    "ignore:Conversion of an array with ndim > 0 to a scalar is deprecated:DeprecationWarning:pyproj\\.transformer",
 ]
 
 [tool.codespell]

@@ -920,7 +920,7 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
             f"missing these columns needed by the classify algorithm: {sorted(missing)}"
         )
 
-    classes = cs.groupby("mcs_id").apply(_classify_one)
+    classes = cs.groupby("mcs_id")[list(cols_needed)].apply(_classify_one)
 
     return cs.assign(mcs_class=cs.mcs_id.map(classes).astype("category"))
 
@@ -1044,9 +1044,11 @@ def run(
                 category=ShapelyDeprecationWarning,
                 message="__len__ for multi-part geometries is deprecated",
             )
-            d["cs235"] = gpd.GeoSeries(time_group.apply(lambda g: MultiPolygon(g.geometry.values)))
+            d["cs235"] = gpd.GeoSeries(
+                time_group[["cs235"]].apply(lambda g: MultiPolygon(g.geometry.values))
+            )
             d["cs219"] = gpd.GeoSeries(
-                time_group.apply(
+                time_group[["cs219"]].apply(
                     lambda g: MultiPolygon(
                         itertools.chain.from_iterable(mp.geoms for mp in g.cs219.values)
                     )
@@ -1158,7 +1160,9 @@ def run(
         cen = g.geometry.to_crs("EPSG:32663").centroid.to_crs("EPSG:4326")
         return gpd.GeoSeries({"first_centroid": cen.iloc[0], "last_centroid": cen.iloc[-1]})
 
-    mcs_summary_points = gpd.GeoDataFrame(mcs.groupby("mcs_id").apply(f).astype("geometry"))
+    mcs_summary_points = gpd.GeoDataFrame(
+        mcs.groupby("mcs_id")[["cs235", "time"]].apply(f).astype("geometry")
+    )
     # ^ Initially we have GeoDataFrame but the columns don't have dtype geometry
     # `.astype("geometry")` makes that conversion but we lose GeoDataFrame
 

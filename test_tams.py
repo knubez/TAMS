@@ -245,3 +245,14 @@ def test_get_imerg(version, run):
     for vn in ds.data_vars:
         assert tuple(ds[vn].dims) == ("lat", "lon"), "squeezed"
     assert ds["pr"].isnull().sum() > 0
+
+
+def test_tams_run_basic():
+    # Keep this like the notebook example but can be shorter
+    ds = tams.load_example_mpas().rename({"tb": "ctt", "precip": "pr"}).isel(time=slice(1, 7))
+
+    ce, mcs, mcs_summary = tams.run(ds)
+    assert isinstance(ce, gpd.GeoDataFrame)
+    assert isinstance(mcs, gpd.GeoDataFrame)
+    assert isinstance(mcs_summary, gpd.GeoDataFrame), "has first and last centroid Points"
+    assert 0 < len(mcs_summary) < len(mcs) < len(ce)
