@@ -920,7 +920,7 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
             f"missing these columns needed by the classify algorithm: {sorted(missing)}"
         )
 
-    classes = cs.groupby("mcs_id").apply(_classify_one)
+    classes = cs.groupby("mcs_id")[cs.columns].apply(_classify_one)
 
     return cs.assign(mcs_class=cs.mcs_id.map(classes).astype("category"))
 
