@@ -4,6 +4,8 @@ build:
   os: "ubuntu-lts-latest"
   tools:
     python: "mambaforge-latest"
+  apt_packages:
+    - attr
   jobs:
     post_install:
       - pip install -e . --no-deps -vv
