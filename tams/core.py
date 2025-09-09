@@ -1055,7 +1055,7 @@ def run(
                 )
             )
 
-        d["nce"] = len(mcs_)  # codespell:ignore nce
+        d["nce"] = time_group.size()  # codespell:ignore nce
         d["area_km2"] = time_group.area_km2.sum()
         d["area219_km2"] = time_group.area219_km2.sum()
         # TODO: compare to re-computing area after (could be different if shift to dissolve)?
