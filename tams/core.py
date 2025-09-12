@@ -27,6 +27,94 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def contour(
+    x: xarray.DataArray,
+    value: float,
+    *,
+    closed_only: bool = True,
+) -> geopandas.GeoDataFrame:
+    import geopandas as gpd
+    import matplotlib.pyplot as plt
+    import shapely
+    from shapely.geometry.polygon import orient
+
+    assert x.ndim == 2, "this is for a single image"
+    with plt.ioff():  # requires mpl 3.4
+        fig = plt.figure()
+        cs = x.plot.contour(x="lon", y="lat", levels=[value])
+
+    plt.close(fig)
+    assert len(cs.allsegs) == 1, "only one level"
+
+    # shapely.linestrings([a.tolist() for a in cs.allsegs[0] if a.shape[0] >= 2])
+
+    data = []
+    for c in cs.allsegs[0]:
+        # x, y = c.T
+        # r = shapely.LinearRing(zip(x, y))
+        if c.shape[0] < 2:
+            # 0 -> empty LinearRing or LineString
+            # 1 -> LineString GEOS exception (needs 2)
+            # 1-2 -> LinearRing ValueError (needs 4)
+            # 3 -> LinearRing will add the first point to the end to make 4
+            continue
+
+        # LinearRing will get implicitly closed if the first and last points are not the same
+        # https://geopandas.org/en/v1.1.1/docs/reference/api/geopandas.GeoSeries.is_ring.html
+        if np.isclose(c[0], c[-1]).all():
+            c[-1] = c[0]  # ensure exact for later valid check
+        is_closed = (c[0] == c[-1]).all()
+        r = shapely.LinearRing(c)
+        # TODO: could just use LineString instead here?
+        # TODO: filter out invalid LineString and log reason (shapely.validation.explain_validity)
+        # or try to make valid (shapely.validation.make_valid)
+
+        # "closed line loops are oriented anticlockwise
+        # if they enclose a region that is higher then the contour level,
+        # or clockwise if they enclose a region that is lower than the contour level"
+        if is_closed:
+            encloses_higher = r.is_ccw
+            p = orient(shapely.Polygon(r))  # ensure consistent
+            assert p.is_valid
+            data.append(
+                {
+                    "geometry": p,
+                    "closed": is_closed,
+                    "encloses_higher": encloses_higher,
+                }
+            )
+        elif closed_only:
+            continue
+        else:
+            encloses_higher = None
+            ls = shapely.LineString(r)
+            if not ls.is_valid:
+                continue
+            data.append(
+                {
+                    "geometry": ls,
+                    "closed": is_closed,
+                    "encloses_higher": encloses_higher,
+                }
+            )
+
+    # Could also use shapely.linestrings -> GeoSeries and then use geopandas ops on them
+    # (.is_closed, .is_ccw, .orient_polygons())
+    # but would have to use apply to convert LineStrings to Polygons
+
+    if not data:
+        data = {
+            "geometry": [],
+            "closed": [],
+            "encloses_higher": [],
+        }
+
+    return gpd.GeoDataFrame(
+        data,
+        crs="EPSG:4326",
+    )
+
+
 def contours(
     x: xarray.DataArray,
     value: float,
