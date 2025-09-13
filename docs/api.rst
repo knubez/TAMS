@@ -46,7 +46,6 @@ Data
    tams.load_example_mpas
    tams.load_example_mpas_ug
    tams.load_mpas_precip
-   tams.data.download_examples
    tams.data.load_example_ir
    tams.data.tb_from_ir
    tams.data.get_mergir

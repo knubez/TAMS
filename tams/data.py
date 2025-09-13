@@ -73,67 +73,6 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
-def download_examples(*, clobber: bool = False) -> None:
-    """Download the example datasets.
-
-    * Satellite data (EUMETSAT MSG SEVIRI 10.8 μm IR radiance):
-      https://drive.google.com/file/d/1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD/view?usp=sharing
-    * MPAS regridded data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-/view?usp=sharing
-    * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248/view?usp=sharing
-
-    .. note::
-       `gdown <https://github.com/wkentaro/gdown>`__,
-       used for downloading the files,
-       is not currently a required dependency of the TAMS Python package,
-       although it is included in the conda-forge recipe.
-       gdown is available on conda-forge and PyPI as ``gdown``.
-       Files < 100 MB can be easily downloaded from Google Drive with ``wget`` or similar,
-       but there are some subtleties with larger files.
-
-       Alternatively, you can download the files manually
-       using the links above.
-
-    Parameters
-    ----------
-    clobber
-        If set, overwrite existing files. Otherwise, skip downloading.
-
-    See Also
-    --------
-    tams.data.load_example_ir
-    tams.load_example_tb
-    tams.load_example_mpas
-    tams.load_example_mpas_ug
-    """
-
-    files = [
-        ("1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD", "Satellite_data.nc"),  # < 100 MB
-        ("1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-", "MPAS_data.nc"),  # < 100 MB
-        ("1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248", "MPAS_unstructured_data.nc"),  # > 100 MB
-    ]
-
-    try:
-        import gdown
-    except ImportError as e:
-        raise RuntimeError(
-            "gdown is required in order to download the example data files. "
-            "It is available on conda-forge and PyPI as 'gdown'."
-        ) from e
-
-    def download(id_: str, to: str):
-        gdown.download(id=id_, output=to, quiet=False)
-
-    for id_, fn in files:
-        fp = HERE / fn
-        if not clobber and fp.is_file():
-            print(f"Skipping {fn} because it already exists at {fp.as_posix()}.")
-            continue
-        else:
-            download(id_, fp.as_posix())
-
-
 class _ExampleFile(NamedTuple):
     key: str
     """Key to identify the example file."""
@@ -196,6 +135,7 @@ def _gdownload(
 
 
 def retrieve_example(key: str, *, progress: bool = False) -> Path:
+    """Retrieve an example data file using pooch and gdown."""
     try:
         import pooch
     except ImportError as e:
@@ -209,7 +149,7 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
     except KeyError:
         s_keys = ", ".join(repr(f.key) for f in _EXAMPLE_FILES)
         raise ValueError(
-            f"unknown example file key {key!r}. " f"Available keys are: {s_keys}. "
+            f"unknown example file key {key!r}. Available keys are: {s_keys}. "
         ) from None
 
     p = pooch.retrieve(
@@ -235,10 +175,10 @@ def load_example_ir() -> xarray.DataArray:
 
     See Also
     --------
-    tams.data.download_examples
+    tams.load_example_tb
     """
 
-    ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
+    ds = xr.open_dataset(retrieve_example("imerg")).rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
     )
 
@@ -262,7 +202,6 @@ def load_example_tb() -> xarray.DataArray:
 
     See Also
     --------
-    :func:`tams.data.download_examples`
     :func:`tams.data.load_example_ir`
     :func:`tams.data.tb_from_ir`
 
@@ -308,7 +247,6 @@ def load_example_mpas() -> xarray.Dataset:
 
     See Also
     --------
-    :func:`tams.data.download_examples`
     :func:`tams.load_example_mpas_ug`
 
     :doc:`/examples/tams-run`
@@ -318,7 +256,7 @@ def load_example_mpas() -> xarray.Dataset:
     :doc:`/examples/sample-mpas-ug-data`
     """
 
-    ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
+    ds = xr.open_dataset(retrieve_example("mpas_regridded")).rename(xtime="time")
 
     # Mask 0 values of T (e.g. at initial time since OLR is zero then)
     ds["tb"] = ds.tb.where(ds.tb > 0)
@@ -361,13 +299,12 @@ def load_example_mpas_ug() -> xarray.Dataset:
 
     See Also
     --------
-    :func:`tams.data.download_examples`
     :func:`tams.load_example_mpas`
 
     :doc:`/examples/sample-mpas-ug-data`
     """
 
-    ds = xr.open_dataset(HERE / "MPAS_unstructured_data.nc").rename(
+    ds = xr.open_dataset(retrieve_example("mpas_native")).rename(
         Time="time",
         nCells="cell",
         latcell="lat",

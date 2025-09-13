@@ -17,9 +17,6 @@ The original TAMS is described in {cite:t}`TAMS1.0`.
 A paper describing _this_ implementation of TAMS {cite:p}`TAMS2.0` in Python has been published in _GMD_ (2024-08-15).
 ```
 
-Datasets used in the examples can be retrieved with
-{func}`tams.data.download_examples`.
-
 ```{toctree}
 :caption: Examples
 :hidden:
