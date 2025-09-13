@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -15,6 +15,7 @@ import xarray as xr
 if TYPE_CHECKING:
     from typing import Any, Sequence
 
+    import pooch
     import xarray
 
 
@@ -131,6 +132,90 @@ def download_examples(*, clobber: bool = False) -> None:
             continue
         else:
             download(id_, fp.as_posix())
+
+
+class _ExampleFile(NamedTuple):
+    key: str
+    """Key to identify the example file."""
+
+    file_id: str
+    """Google Drive file ID."""
+
+    fname: str
+    """File name to save as."""
+
+    sha256: str
+    """Expected (known) SHA256 hash of the file."""
+
+
+_EXAMPLE_FILES: list[_ExampleFile] = [
+    _ExampleFile(
+        key="imerg",
+        file_id="1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD",
+        fname="Satellite_data.nc",
+        sha256="42b0677700b527b677b77ad3450838214a79204188a3c15244af7e88fbfb26db",
+    ),
+    _ExampleFile(
+        key="mpas_regridded",
+        file_id="1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-",
+        fname="MPAS_data.nc",
+        sha256="5d35aae75cf6f8598f922d6326fa8d2e45d6751cc67e0a4b1a5e2719bc1635be",
+    ),
+    _ExampleFile(
+        key="mpas_native",
+        file_id="1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248",
+        fname="MPAS_unstructured_data.nc",
+        sha256="40360896d2043030c48dc809c17e1111124c08519a7b6862670daa73b20f00f2",
+    ),
+]
+
+_EXAMPLE_FILE_LUT = {f.key: f for f in _EXAMPLE_FILES}
+
+
+def _gdown_downloader(
+    url: str, output_file: str, pooch_instance: pooch.Pooch | None = None
+) -> None:
+    """Custom downloader for pooch using gdown.
+    `url` should be just the Google Drive file ID.
+    """
+    try:
+        import gdown
+    except ImportError as e:
+        raise RuntimeError(
+            "gdown is required in order to auto download the example data files. "
+            "It is available on conda-forge and PyPI as 'gdown'."
+        ) from e
+
+    gdown.download(id=url, output=output_file, quiet=True)
+
+
+def retrieve_example(key: str, *, progress: bool = False) -> Path:
+    try:
+        import pooch
+    except ImportError as e:
+        raise RuntimeError(
+            "pooch is required in order to auto download the example data files. "
+            "It is available on conda-forge and PyPI as 'pooch'."
+        ) from e
+
+    try:
+        ef = _EXAMPLE_FILE_LUT[key]
+    except KeyError:
+        s_keys = ", ".join(repr(f.key) for f in _EXAMPLE_FILES)
+        raise ValueError(
+            f"unknown example file key {key!r}. " f"Available keys are: {s_keys}. "
+        ) from None
+
+    p = pooch.retrieve(
+        url=ef.file_id,
+        known_hash=f"sha256:{ef.sha256}",
+        fname=ef.fname,
+        path=pooch.os_cache("tams"),
+        downloader=_gdown_downloader,
+        progressbar=progress,
+    )
+
+    return Path(p)
 
 
 def load_example_ir() -> xarray.DataArray:
