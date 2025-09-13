@@ -13,7 +13,7 @@ from textwrap import indent
 
 TMP = Path(gettempdir()) / "tams-examples"
 
-from tams.data import _EXAMPLE_FILES, _gdown_downloader
+from tams.data import _EXAMPLE_FILES, _gdownload
 
 
 def iter_blocks(p: Path, block_size=4096):
@@ -82,6 +82,6 @@ if __name__ == "__main__":
         if p.exists() and args.use_cached:
             print("Using cached")
         else:
-            _gdown_downloader(ef.file_id, p.as_posix(), quiet=False)
+            _gdownload(ef.file_id, p.as_posix(), quiet=False)
         check_file(p)
         print("\n")

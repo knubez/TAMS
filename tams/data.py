@@ -172,14 +172,16 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
 _EXAMPLE_FILE_LUT = {f.key: f for f in _EXAMPLE_FILES}
 
 
-def _gdown_downloader(
+def _gdownload(
     url: str,
     output_file: str,
     pooch_instance: pooch.Pooch | None = None,
     *,
     quiet: bool = True,
 ) -> None:
-    """Custom downloader for pooch using gdown.
+    """Download a file from Google Drive using gdown.
+
+    Can be used as a custom downloader for pooch.
     `url` should be just the Google Drive file ID.
     """
     try:
@@ -215,7 +217,7 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
         known_hash=f"sha256:{ef.sha256}",
         fname=ef.fname,
         path=pooch.os_cache("tams"),
-        downloader=_gdown_downloader,
+        downloader=_gdownload,
         progressbar=progress,
     )
 
