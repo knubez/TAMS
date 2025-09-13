@@ -1139,6 +1139,7 @@ def run(
     mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
 
     # Add some CTT and PR stats to summary dataset
+    # TODO: these should be duration-weighted, in case dt is not constant
     msg("Computing stats for MCS summary dataset")
     vns = [
         "mean_pr",
