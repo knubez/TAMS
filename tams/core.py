@@ -1147,6 +1147,7 @@ def run(
         "std_ctt219",
         "area_km2",
         "area219_km2",
+        "nce",  # codespell:ignore nce
     ]
     mcs_summary = mcs_summary.join(
         mcs.groupby("mcs_id")[vns].mean().rename(columns={vn: f"mean_{vn}" for vn in vns})

@@ -258,3 +258,6 @@ def test_tams_run_basic():
     assert 0 < len(mcs_summary) < len(mcs) < len(ce)
 
     assert mcs["nce"].eq(mcs.count_geometries()).all()  # codespell:ignore nce
+    mcs.groupby("mcs_id").nce.mean().reset_index(drop=True).eq(  # codespell:ignore nce
+        mcs_summary["mean_nce"]  # codespell:ignore nce
+    ).all()
