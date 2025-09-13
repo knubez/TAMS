@@ -1055,7 +1055,7 @@ def run(
                 )
             )
 
-        d["nce"] = len(mcs_)  # codespell:ignore nce
+        d["nce"] = time_group.size()  # codespell:ignore nce
         d["area_km2"] = time_group.area_km2.sum()
         d["area219_km2"] = time_group.area219_km2.sum()
         # TODO: compare to re-computing area after (could be different if shift to dissolve)?
@@ -1139,6 +1139,7 @@ def run(
     mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
 
     # Add some CTT and PR stats to summary dataset
+    # TODO: these should be duration-weighted, in case dt is not constant
     msg("Computing stats for MCS summary dataset")
     vns = [
         "mean_pr",
@@ -1147,6 +1148,7 @@ def run(
         "std_ctt219",
         "area_km2",
         "area219_km2",
+        "nce",  # codespell:ignore nce
     ]
     mcs_summary = mcs_summary.join(
         mcs.groupby("mcs_id")[vns].mean().rename(columns={vn: f"mean_{vn}" for vn in vns})

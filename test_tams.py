@@ -256,3 +256,8 @@ def test_tams_run_basic():
     assert isinstance(mcs, gpd.GeoDataFrame)
     assert isinstance(mcs_summary, gpd.GeoDataFrame), "has first and last centroid Points"
     assert 0 < len(mcs_summary) < len(mcs) < len(ce)
+
+    assert mcs["nce"].eq(mcs.count_geometries()).all()  # codespell:ignore nce
+    mcs.groupby("mcs_id").nce.mean().reset_index(drop=True).eq(  # codespell:ignore nce
+        mcs_summary["mean_nce"]  # codespell:ignore nce
+    ).all()
