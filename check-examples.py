@@ -48,7 +48,7 @@ def check_file(p: Path) -> None:
         da = ds[vn]
         enc = da.encoding
         print(
-            f"    {vn:<{w}}  {da.dtype}, chunks={da.chunks}, "
+            f"    {vn:<{w}}  "
             f"zlib={enc.get('zlib')}, complevel={enc.get('complevel')}, "
             f"chunksizes={enc.get('chunksizes')}"
         )
