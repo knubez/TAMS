@@ -261,3 +261,19 @@ def test_tams_run_basic():
     mcs.groupby("mcs_id").nce.mean().reset_index(drop=True).eq(  # codespell:ignore nce
         mcs_summary["mean_nce"]  # codespell:ignore nce
     ).all()
+
+
+def test_load_pooch_missing(mocker):
+    mocker.patch.dict("sys.modules", pooch=None)
+    with pytest.raises(RuntimeError, match="pooch is required"):
+        _ = tams.data.load_example_tb()
+
+
+def test_load_gdown_missing(mocker, tmpdir):
+    # Note gdown isn't needed/used if the file is already cached
+    mocker.patch.dict("sys.modules", gdown=None)
+    with (
+        tams.set_options(cache_location=tmpdir),
+        pytest.raises(RuntimeError, match="gdown is required"),
+    ):
+        _ = tams.data.load_example_tb()

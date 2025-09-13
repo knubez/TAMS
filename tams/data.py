@@ -136,6 +136,8 @@ def _gdownload(
 
 def retrieve_example(key: str, *, progress: bool = False) -> Path:
     """Retrieve an example data file using pooch and gdown."""
+    from .options import OPTIONS
+
     try:
         import pooch
     except ImportError as e:
@@ -152,11 +154,15 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
             f"unknown example file key {key!r}. Available keys are: {s_keys}. "
         ) from None
 
+    cache_location = OPTIONS.get("cache_location")
+    if cache_location is None:
+        cache_location = pooch.os_cache("tams")
+
     p = pooch.retrieve(
         url=ef.file_id,
         known_hash=f"sha256:{ef.sha256}",
         fname=ef.fname,
-        path=pooch.os_cache("tams"),
+        path=cache_location,
         downloader=_gdownload,
         progressbar=progress,
     )
