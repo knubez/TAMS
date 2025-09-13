@@ -173,7 +173,11 @@ _EXAMPLE_FILE_LUT = {f.key: f for f in _EXAMPLE_FILES}
 
 
 def _gdown_downloader(
-    url: str, output_file: str, pooch_instance: pooch.Pooch | None = None
+    url: str,
+    output_file: str,
+    pooch_instance: pooch.Pooch | None = None,
+    *,
+    quiet: bool = True,
 ) -> None:
     """Custom downloader for pooch using gdown.
     `url` should be just the Google Drive file ID.
@@ -186,7 +190,7 @@ def _gdown_downloader(
             "It is available on conda-forge and PyPI as 'gdown'."
         ) from e
 
-    gdown.download(id=url, output=output_file, quiet=True)
+    gdown.download(id=url, output=output_file, quiet=quiet)
 
 
 def retrieve_example(key: str, *, progress: bool = False) -> Path:
