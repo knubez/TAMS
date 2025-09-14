@@ -180,18 +180,6 @@ def test_contour_too_small_skipped():
 # and all have a RangeIndex
 
 
-@pytest.mark.skipif(not glade_avail, reason="need to have GLADE fs available")
-def test_mpas_precip_loader():
-    ds = tams.load_mpas_precip(
-        "/glade/scratch/rberrios/cpex-aw/"
-        "2021082500/intrp_output/mpas_init_2021082500_valid_2021-08-25_*_latlon_wpac.nc"
-    )
-
-    assert set(ds.data_vars) == {"tb", "precip"}
-    assert tuple(ds.dims) == ("time", "lat", "lon")
-    assert ds.sizes["time"] == 24
-
-
 def test_classify_empty():
     cs = gpd.GeoDataFrame(
         columns=["mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"],

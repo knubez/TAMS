@@ -15,7 +15,7 @@ import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
-    from typing import Any, Sequence
+    from typing import Any
 
     import pooch
     import xarray
@@ -375,108 +375,6 @@ def load_example(
     """
     with open_example(key, progress=progress, **kwargs) as ds:
         return ds.load()
-
-
-def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> xarray.Dataset:
-    """Derive a TAMS input dataset from post-processed MPAS runs for the PRECIP field campaign.
-
-    Parameters
-    ----------
-    paths
-        Corresponding to the post-processed datasets to load from.
-
-        Pass a string glob or a sequence of string paths.
-        (Ensure sorted if doing the latter.)
-
-        .. important::
-           Currently it is assumed that each individual file corresponds
-           to a single time, which is detected from the file name.
-    parallel
-        If set, do the initial processing (each file) in parallel.
-        Currently uses joblib.
-    """
-
-    if isinstance(paths, str):
-        from glob import glob
-
-        paths = sorted(glob(paths))
-
-    if len(paths) == 0:
-        raise ValueError("no paths")
-
-    def load_one(p):
-        import re
-
-        try:
-            from scipy.constants import sigma
-        except ImportError:
-            sigma = 5.67037442e-8
-
-        p = Path(p)
-
-        ds = xr.open_dataset(p)
-        ds_ = ds[["olrtoa", "rainc", "rainnc"]]
-        ds_ = ds_.rename(Time="time")
-
-        # Detect time from file name and assign
-        fn = p.name
-        m = re.fullmatch(
-            r"mpas_init_20[0-9]{8}_valid_(?P<dt>[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2})_.+\.nc",
-            fn,
-        )
-        s_dt = m.groupdict()["dt"]
-        t = pd.to_datetime(s_dt, format="%Y-%m-%d_%H")
-        ds_["time"] = ("time", [t])
-
-        # Compute CTT from TOA OLR
-        ds_["tb"] = (ds_.olrtoa / sigma) ** (1 / 4)  # TODO: epsilon?
-        ds_.tb.attrs.update(
-            long_name="Brightness temperature",
-            units="K",
-            info="Estimated from 'olrtoa' using the S-B law",
-        )
-
-        # Combine precip vars
-        ds_["aprecip"] = ds_.rainc + ds_.rainnc
-        ds_.aprecip.attrs.update(long_name="Accumulated precip", units="mm")
-
-        # Drop other vars
-        ds_ = ds_.drop_vars(["olrtoa", "rainc", "rainnc"])
-
-        return ds_
-
-    # Load combined
-    if parallel:
-        try:
-            import joblib
-        except ImportError as e:
-            raise RuntimeError("joblib required") from e
-
-        dss = joblib.Parallel(n_jobs=-2, verbose=10)(joblib.delayed(load_one)(p) for p in paths)
-    else:
-        dss = (load_one(p) for p in paths)
-
-    ds = xr.concat(dss, dim="time")
-
-    # Mask 0 values of T (e.g. at initial time since OLR is zero then)
-    ds["tb"] = ds.tb.where(ds.tb > 0)
-
-    # Compute precip by diffing the accumulated precip variable
-    # In MPAS output, precip outputs are accumulated *up to* the output timestamp
-    # Here, we left-label average rain rate over output time step
-    t = pd.to_datetime(ds.time.values)
-    dt = t[1:] - t[:-1]
-    dt_h = dt.total_seconds() / 3600
-    da_dt_h = xr.DataArray(
-        dims="time",
-        data=np.r_[dt_h, np.nan].astype(np.float32),
-        coords={"time": ds.time},
-    )
-    ds["precip"] = ds.aprecip.diff("time", label="lower") / da_dt_h
-    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
-    ds = ds.drop_vars(["aprecip"])
-
-    return ds
 
 
 def _time_input_to_pandas(
