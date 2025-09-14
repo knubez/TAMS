@@ -246,7 +246,7 @@ def clear_cache(*, quiet: bool = False):
             print(f"- {p.relative_to(cache_dir).as_posix()}")
 
 
-def retrieve_example(key: str, *, progress: bool = False) -> Path:
+def fetch_example(key: str, *, progress: bool = False) -> Path:
     """Retrieve an example data file using pooch and gdown.
 
     Parameters
@@ -259,7 +259,12 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
     Examples
     --------
     >>> import tams
-    >>> path = tams.data.retrieve_example("msg-tb")
+    >>> path = tams.data.fetch_example("msg-tb")
+
+    See Also
+    --------
+    open_example
+    load_example
 
     Notes
     -----
@@ -339,7 +344,7 @@ def open_example(
             f"unknown example dataset key {key!r}. Available keys are: {s_keys}."
         ) from None
 
-    p = retrieve_example(ef.key, progress=progress)
+    p = fetch_example(ef.key, progress=progress)
     post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
 
     return post(xr.open_dataset(p, **kwargs))
