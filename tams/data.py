@@ -295,8 +295,13 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
     return Path(p)
 
 
-def load_example(key: str, *, progress: bool = False) -> xarray.Dataset | xarray.DataArray:
-    """Load an example dataset into memory.
+def open_example(
+    key: str,
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> xarray.Dataset | xarray.DataArray:
+    """Open an example dataset with xarray.
 
     Parameters
     ----------
@@ -304,11 +309,18 @@ def load_example(key: str, *, progress: bool = False) -> xarray.Dataset | xarray
         String identifying the example dataset.
     progress
         Show download progress if applicable.
+    **kwargs
+        Passed to :func:`xarray.open_dataset`.
 
     Examples
     --------
     >>> import tams
-    >>> path = tams.data.load_example("msg-tb")
+    >>> ds = tams.data.open_example("msg-tb")
+
+    See Also
+    --------
+    load_example
+        Loads the dataset into memory.
 
     Notes
     -----
@@ -326,8 +338,43 @@ def load_example(key: str, *, progress: bool = False) -> xarray.Dataset | xarray
     p = retrieve_example(ef.key, progress=progress)
     post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
 
-    with xr.open_dataset(p) as ds:
-        return post(ds).load()
+    return post(xr.open_dataset(p, **kwargs))
+
+
+def load_example(
+    key: str,
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> xarray.Dataset | xarray.DataArray:
+    """Load an example dataset into memory with xarray.
+
+    Parameters
+    ----------
+    key
+        String identifying the example dataset.
+    progress
+        Show download progress if applicable.
+    **kwargs
+        Passed to :func:`xarray.open_dataset`.
+
+    Examples
+    --------
+    >>> import tams
+    >>> path = tams.data.load_example("msg-tb")
+
+    See Also
+    --------
+    open_example
+        Just opens (:func:`xarray.open_dataset`) the dataset
+        (without triggering the load into memory).
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
+    with open_example(key, progress=progress, **kwargs) as ds:
+        return ds.load()
 
 
 def load_example_ir() -> xarray.DataArray:
