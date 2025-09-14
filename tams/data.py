@@ -91,7 +91,7 @@ class _ExampleFile(NamedTuple):
 
 _EXAMPLE_FILES: list[_ExampleFile] = [
     _ExampleFile(
-        key="imerg",
+        key="msg",
         file_id="1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD",
         fname="Satellite_data.nc",
         sha256="42b0677700b527b677b77ad3450838214a79204188a3c15244af7e88fbfb26db",
@@ -199,7 +199,7 @@ def load_example_ir() -> xarray.DataArray:
     tams.load_example_tb
     """
 
-    ds = xr.open_dataset(retrieve_example("imerg")).rename_dims(
+    ds = xr.open_dataset(retrieve_example("msg")).rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
     )
 
