@@ -70,7 +70,12 @@ def tb_from_ir(r, ch: int):
     tb = (c2 * vc / np.log((c1 * vc**3) / r + 1) - b) / a
 
     if isinstance(r, xr.DataArray):
-        tb.attrs.update(units="K", long_name="Brightness temperature")
+        tb.attrs.update(
+            units="K",
+            long_name="brightness temperature",
+            channel=ch,
+        )
+        tb.name = "tb"
 
     return tb
 
