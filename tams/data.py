@@ -82,35 +82,76 @@ class _ExampleFile(NamedTuple):
     file_id: str
     """Google Drive file ID."""
 
-    fname: str
-    """File name to save as."""
-
     sha256: str
     """Expected (known) SHA256 hash of the file."""
+
+    fname: str | None = None
+    """File name to save as. ``{key}.nc`` will be used if not provided."""
 
 
 _EXAMPLE_FILES: list[_ExampleFile] = [
     _ExampleFile(
-        key="msg",
+        key="msg-rad-v0.1",
         file_id="1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD",
-        fname="Satellite_data.nc",
         sha256="42b0677700b527b677b77ad3450838214a79204188a3c15244af7e88fbfb26db",
     ),
     _ExampleFile(
-        key="mpas_regridded",
+        key="msg-rad",
+        file_id="1nXpbX98Hs39ovcQXEy6eaBPVumJPLXah",
+        sha256="14ce08ff06e27e75c19e7a32570ee21302717b6bd073cebacac74807d2f0a7cb",
+    ),
+    #
+    _ExampleFile(
+        key="mpas-regridded-v0.1",
         file_id="1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-",
-        fname="MPAS_data.nc",
         sha256="5d35aae75cf6f8598f922d6326fa8d2e45d6751cc67e0a4b1a5e2719bc1635be",
     ),
     _ExampleFile(
-        key="mpas_native",
+        key="mpas-regridded",
+        file_id="1ZPuSXNIM8Vu2AF-L_GVTfx93QfiaWxIv",
+        sha256="240d10c671d8d35a717f41a8343573447d1410355cf80e22c468c594c3401186",
+    ),
+    #
+    _ExampleFile(
+        key="mpas-native-v0.1",
         file_id="1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248",
-        fname="MPAS_unstructured_data.nc",
         sha256="40360896d2043030c48dc809c17e1111124c08519a7b6862670daa73b20f00f2",
+    ),
+    _ExampleFile(
+        key="mpas-native",
+        file_id="1ynhJM1z4zQrZxe0VCizybP_fH34KNVHt",
+        sha256="9e04f279a5fb1016fec7c24cd5e239f3541d5204b2c13d86b7b39f786ffd50ee",
+    ),
+    #
+    _ExampleFile(
+        key="mosa-test-1",
+        file_id="1-yETpWWd6pwypT-CmUZ15RcDh5dO29iW",
+        sha256="ee0fadaf81105c241d580501b19393bae38a683fe1fb37045a917a6849717238",
+    ),
+    _ExampleFile(
+        key="mosa-test-2",
+        file_id="11-8SVOpu39e4HI-l3wIdMHLI_cia8hmx",
+        sha256="a9b90b3c0d59de298d1174e87f8bc4f577fca869b9e1ca573c29674acc21e2b4",
+    ),
+    _ExampleFile(
+        key="mosa-test-3",
+        file_id="1_IAvkWsE6S95lkZwAV1gN8SooajW2Fec",
+        sha256="60b3e27cb3c6b45a5f578a8ed5dde18c9313bf5a22ecf3469d476f7e47b24cc7",
+    ),
+    _ExampleFile(
+        key="mosa-test-4",
+        file_id="1KoeCyT4qn_qLmZsheIC88si_4cfjwYb4",
+        sha256="2759e77d6a600dbec344701899a6430245ecfde363c7ecaacbc5efada5bda2d2",
     ),
 ]
 
 _EXAMPLE_FILE_LUT = {f.key: f for f in _EXAMPLE_FILES}
+
+# _EXAMPLE_LOADERS: dict[str, Any] = {
+#     ef.key: None
+#     for ef in _EXAMPLE_FILES
+#     if not ef.key.endswith("-v0.1")
+# }
 
 
 def _gdownload(
@@ -236,7 +277,7 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
         p = pooch.retrieve(
             url=ef.file_id,
             known_hash=f"sha256:{ef.sha256}",
-            fname=ef.fname,
+            fname=ef.fname or f"{ef.key}.nc",
             path=_get_cache_dir(),
             downloader=partial(_gdownload, quiet=not progress),
         )
