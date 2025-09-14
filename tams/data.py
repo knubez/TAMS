@@ -145,13 +145,16 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
     ),
 ]
 
-_EXAMPLE_FILE_LUT = {f.key: f for f in _EXAMPLE_FILES}
+_EXAMPLE_FILE_DIRECT_LUT = {f.key: f for f in _EXAMPLE_FILES}
 
-# _EXAMPLE_LOADERS: dict[str, Any] = {
-#     ef.key: None
-#     for ef in _EXAMPLE_FILES
-#     if not ef.key.endswith("-v0.1")
-# }
+_EXAMPLE_FILE_INDIRECT_LUT = {
+    "msg-tb": _EXAMPLE_FILE_DIRECT_LUT["msg-rad"],
+}
+
+_EXAMPLE_POSTPROC = {
+    "msg-rad": lambda ds: ds["ch9"],
+    "msg-tb": lambda ds: ds["ch9"].pipe(tb_from_ir, ch=9),
+}
 
 
 def _gdownload(
@@ -262,11 +265,11 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
         ) from e
 
     try:
-        ef = _EXAMPLE_FILE_LUT[key]
+        ef = _EXAMPLE_FILE_DIRECT_LUT[key]
     except KeyError:
         s_keys = ", ".join(repr(f.key) for f in _EXAMPLE_FILES)
         raise ValueError(
-            f"unknown example file key {key!r}. Available keys are: {s_keys}. "
+            f"unknown example file key {key!r}. Available keys are: {s_keys}."
         ) from None
 
     pooch_logger = pooch.get_logger()
@@ -285,6 +288,23 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
         pooch_logger.setLevel(pooch_logger_level)
 
     return Path(p)
+
+
+def load_example(key, *, progress: bool = False) -> xarray.Dataset | xarray.DataArray:
+    lut = {**_EXAMPLE_FILE_DIRECT_LUT, **_EXAMPLE_FILE_INDIRECT_LUT}
+    try:
+        ef = lut[key]
+    except KeyError:
+        s_keys = ", ".join(repr(k) for k in lut)
+        raise ValueError(
+            f"unknown example data key {key!r}. Available keys are: {s_keys}."
+        ) from None
+
+    p = retrieve_example(ef.key, progress=progress)
+    post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
+
+    with xr.open_dataset(p) as ds:
+        return post(ds).load()
 
 
 def load_example_ir() -> xarray.DataArray:
