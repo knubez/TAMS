@@ -7,7 +7,6 @@ build:
   jobs:
     post_install:
       - pip install -e . --no-deps -vv
-      - 'python -c "from tams.data import download_examples; download_examples()"'
 
 conda:
   environment: environment-dev.yml

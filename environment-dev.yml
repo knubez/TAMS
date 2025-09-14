@@ -22,6 +22,7 @@ dependencies:
   - h5netcdf
   - joblib
   - netcdf4
+  - pooch
   - regionmask >=0.9
   - scipy
   - seaborn >=0.13.2
@@ -32,6 +33,7 @@ dependencies:
   - jupyterlab
   - mypy
   - pytest >=6.0
+  - pytest-mock
   - rich
   #
   # Docs

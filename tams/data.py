@@ -4,9 +4,11 @@ Loaders for various data sets.
 
 from __future__ import annotations
 
+import logging
 import warnings
+from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -15,6 +17,7 @@ import xarray as xr
 if TYPE_CHECKING:
     from typing import Any, Sequence
 
+    import pooch
     import xarray
 
 
@@ -72,65 +75,131 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
-def download_examples(*, clobber: bool = False) -> None:
-    """Download the example datasets.
+class _ExampleFile(NamedTuple):
+    key: str
+    """Key to identify the example file."""
 
-    * Satellite data (EUMETSAT MSG SEVIRI 10.8 μm IR radiance):
-      https://drive.google.com/file/d/1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD/view?usp=sharing
-    * MPAS regridded data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-/view?usp=sharing
-    * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248/view?usp=sharing
+    file_id: str
+    """Google Drive file ID."""
 
-    .. note::
-       `gdown <https://github.com/wkentaro/gdown>`__,
-       used for downloading the files,
-       is not currently a required dependency of the TAMS Python package,
-       although it is included in the conda-forge recipe.
-       gdown is available on conda-forge and PyPI as ``gdown``.
-       Files < 100 MB can be easily downloaded from Google Drive with ``wget`` or similar,
-       but there are some subtleties with larger files.
+    fname: str
+    """File name to save as."""
 
-       Alternatively, you can download the files manually
-       using the links above.
+    sha256: str
+    """Expected (known) SHA256 hash of the file."""
 
-    Parameters
-    ----------
-    clobber
-        If set, overwrite existing files. Otherwise, skip downloading.
 
-    See Also
-    --------
-    tams.data.load_example_ir
-    tams.load_example_tb
-    tams.load_example_mpas
-    tams.load_example_mpas_ug
+_EXAMPLE_FILES: list[_ExampleFile] = [
+    _ExampleFile(
+        key="msg",
+        file_id="1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD",
+        fname="Satellite_data.nc",
+        sha256="42b0677700b527b677b77ad3450838214a79204188a3c15244af7e88fbfb26db",
+    ),
+    _ExampleFile(
+        key="mpas_regridded",
+        file_id="1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-",
+        fname="MPAS_data.nc",
+        sha256="5d35aae75cf6f8598f922d6326fa8d2e45d6751cc67e0a4b1a5e2719bc1635be",
+    ),
+    _ExampleFile(
+        key="mpas_native",
+        file_id="1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248",
+        fname="MPAS_unstructured_data.nc",
+        sha256="40360896d2043030c48dc809c17e1111124c08519a7b6862670daa73b20f00f2",
+    ),
+]
+
+_EXAMPLE_FILE_LUT = {f.key: f for f in _EXAMPLE_FILES}
+
+
+def _gdownload(
+    url: str,
+    output_file: str,
+    pooch_instance: pooch.Pooch | None = None,
+    *,
+    quiet: bool = True,
+) -> None:
+    """Download a file from Google Drive using gdown.
+
+    Can be used as a custom downloader for pooch.
+    `url` should be just the Google Drive file ID.
     """
-
-    files = [
-        ("1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD", "Satellite_data.nc"),  # < 100 MB
-        ("1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-", "MPAS_data.nc"),  # < 100 MB
-        ("1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248", "MPAS_unstructured_data.nc"),  # > 100 MB
-    ]
+    from . import __version__
 
     try:
         import gdown
     except ImportError as e:
         raise RuntimeError(
-            "gdown is required in order to download the example data files. "
+            "gdown is required in order to auto download the example data files. "
             "It is available on conda-forge and PyPI as 'gdown'."
         ) from e
 
-    def download(id_: str, to: str):
-        gdown.download(id=id_, output=to, quiet=False)
+    gdown.download(
+        id=url,
+        output=output_file,
+        quiet=quiet,
+        user_agent=f"tams {__version__}",
+    )
 
-    for id_, fn in files:
-        fp = HERE / fn
-        if not clobber and fp.is_file():
-            print(f"Skipping {fn} because it already exists at {fp.as_posix()}.")
-            continue
-        else:
-            download(id_, fp.as_posix())
+
+def retrieve_example(key: str, *, progress: bool = False) -> Path:
+    """Retrieve an example data file using pooch and gdown.
+
+    Parameters
+    ----------
+    key
+        String identifying which example file to retrieve.
+    progress
+        Show download progress.
+
+    Examples
+    --------
+    >>> import tams
+    >>> path = tams.data.retrieve_example("msg")
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
+    from .options import OPTIONS
+
+    try:
+        import pooch
+    except ImportError as e:
+        raise RuntimeError(
+            "pooch is required in order to auto download the example data files. "
+            "It is available on conda-forge and PyPI as 'pooch'."
+        ) from e
+
+    try:
+        ef = _EXAMPLE_FILE_LUT[key]
+    except KeyError:
+        s_keys = ", ".join(repr(f.key) for f in _EXAMPLE_FILES)
+        raise ValueError(
+            f"unknown example file key {key!r}. Available keys are: {s_keys}. "
+        ) from None
+
+    pooch_logger = pooch.get_logger()
+    pooch_logger_level = pooch_logger.level
+    pooch_logger.setLevel(logging.WARNING)
+
+    cache_location = OPTIONS.get("cache_location")
+    if cache_location is None:
+        cache_location = pooch.os_cache("tams")
+
+    try:
+        p = pooch.retrieve(
+            url=ef.file_id,
+            known_hash=f"sha256:{ef.sha256}",
+            fname=ef.fname,
+            path=cache_location,
+            downloader=partial(_gdownload, quiet=not progress),
+        )
+    finally:
+        pooch_logger.setLevel(pooch_logger_level)
+
+    return Path(p)
 
 
 def load_example_ir() -> xarray.DataArray:
@@ -144,10 +213,10 @@ def load_example_ir() -> xarray.DataArray:
 
     See Also
     --------
-    tams.data.download_examples
+    tams.load_example_tb
     """
 
-    ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
+    ds = xr.open_dataset(retrieve_example("msg")).rename_dims(
         {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
     )
 
@@ -171,7 +240,6 @@ def load_example_tb() -> xarray.DataArray:
 
     See Also
     --------
-    :func:`tams.data.download_examples`
     :func:`tams.data.load_example_ir`
     :func:`tams.data.tb_from_ir`
 
@@ -217,7 +285,6 @@ def load_example_mpas() -> xarray.Dataset:
 
     See Also
     --------
-    :func:`tams.data.download_examples`
     :func:`tams.load_example_mpas_ug`
 
     :doc:`/examples/tams-run`
@@ -227,7 +294,7 @@ def load_example_mpas() -> xarray.Dataset:
     :doc:`/examples/sample-mpas-ug-data`
     """
 
-    ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
+    ds = xr.open_dataset(retrieve_example("mpas_regridded")).rename(xtime="time")
 
     # Mask 0 values of T (e.g. at initial time since OLR is zero then)
     ds["tb"] = ds.tb.where(ds.tb > 0)
@@ -270,13 +337,12 @@ def load_example_mpas_ug() -> xarray.Dataset:
 
     See Also
     --------
-    :func:`tams.data.download_examples`
     :func:`tams.load_example_mpas`
 
     :doc:`/examples/sample-mpas-ug-data`
     """
 
-    ds = xr.open_dataset(HERE / "MPAS_unstructured_data.nc").rename(
+    ds = xr.open_dataset(retrieve_example("mpas_native")).rename(
         Time="time",
         nCells="cell",
         latcell="lat",
