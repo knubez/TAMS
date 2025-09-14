@@ -9,7 +9,7 @@ import xarray as xr
 
 import tams
 
-r = tams.data.open_example("msg-rad").isel(time=0).load()
+r = tams.data.open_example("msg-rad")["ch9"].isel(time=0).load()
 
 tb = tams.data.tb_from_ir(r, ch=9)
 

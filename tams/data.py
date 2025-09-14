@@ -162,8 +162,7 @@ _EXAMPLE_FILE_INDIRECT_LUT = {
 }
 
 _EXAMPLE_POSTPROC = {
-    "msg-rad": lambda ds: ds["ch9"],
-    "msg-tb": lambda ds: ds["ch9"].pipe(tb_from_ir, ch=9),
+    "msg-tb": lambda ds: ds.assign(tb=ds["ch9"].pipe(tb_from_ir, ch=9)).drop_vars(["ch9"]),
 }
 
 
@@ -305,7 +304,7 @@ def open_example(
     *,
     progress: bool = False,
     **kwargs,
-) -> xarray.Dataset | xarray.DataArray:
+) -> xarray.Dataset:
     """Open an example dataset with xarray.
 
     Parameters
@@ -351,7 +350,7 @@ def load_example(
     *,
     progress: bool = False,
     **kwargs,
-) -> xarray.Dataset | xarray.DataArray:
+) -> xarray.Dataset:
     """Load an example dataset into memory with xarray.
 
     Parameters
