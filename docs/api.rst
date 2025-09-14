@@ -50,6 +50,8 @@ Data
    tams.data.get_imerg
 
 
+.. _example_datasets:
+
 Example datasets
 ~~~~~~~~~~~~~~~~
 
