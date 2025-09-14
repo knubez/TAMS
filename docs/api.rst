@@ -170,3 +170,12 @@ Utilities
    :toctree: api/
 
    tams.plot_tracked
+
+Options
+-------
+
+.. autosummary::
+   :toctree: api/
+
+   tams.set_options
+   tams.get_options
