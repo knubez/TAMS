@@ -105,6 +105,11 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
         file_id="1nXpbX98Hs39ovcQXEy6eaBPVumJPLXah",
         sha256="14ce08ff06e27e75c19e7a32570ee21302717b6bd073cebacac74807d2f0a7cb",
     ),
+    _ExampleFile(
+        "imerg",
+        file_id="1wWV7eugFrw9T5h4NMFFKKr8kLcKKckn-",
+        sha256="3aa2c2ca23d6c6d1abd3a9f3df5e0acae939e76d586c3a6ea1c7af807a99e154",
+    ),
     #
     _ExampleFile(
         key="mpas-regridded-v0.1",
@@ -435,6 +440,10 @@ def get_mergir(
     See Also
     --------
     :doc:`/examples/get`
+
+    Notes
+    -----
+    .. versionadded:: 0.1.6
     """
     import earthaccess
 
@@ -505,6 +514,9 @@ def get_imerg(
 
     This is half-hourly 0.1° (~ 10-km) resolution data.
     Each HDF5 file contains one time step.
+    Each time step represents the mean precipitation rate
+    for the half-hourly period that starts at the indicated time
+    (i.e., left-labeled).
 
     .. note::
        The Python packages
@@ -537,6 +549,10 @@ def get_imerg(
     See Also
     --------
     :doc:`/examples/get`
+
+    Notes
+    -----
+    .. versionadded:: 0.1.6
     """
     import earthaccess
 

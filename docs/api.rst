@@ -45,7 +45,6 @@ Data
    tams.data.retrieve_example
    tams.data.open_example
    tams.data.load_example
-   tams.load_mpas_precip
    tams.data.tb_from_ir
    tams.data.get_mergir
    tams.data.get_imerg
@@ -76,6 +75,14 @@ These can be accessed with :func:`tams.data.open_example` or
      - As in ``msg-tb`` but with :func:`tams.data.tb_from_ir` applied
        to convert radiance to brightness temperature (K).
      - :doc:`/examples/sample-satellite-data`, :doc:`/examples/identify`
+   * - ``imerg``
+     - GPM IMERG precipitation data.
+
+       This is left-labeled half-hourly precipitation rate (mm/hr)
+       fetched using :func:`tams.data.get_imerg`
+       for the same period as the MSG data (2006-09-01 00:00--11:30;
+       extended so that we have data for the full last two-hour period).
+     - :doc:`/examples/sample-satellite-data`
    * - ``mpas-regridded``
      - MPAS-A model output (regridded).
 
