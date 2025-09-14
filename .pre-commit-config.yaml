@@ -46,6 +46,9 @@ repos:
     rev: "0.8.1"
     hooks:
       - id: nbstripout
+        args:
+          - --extra-keys
+          - metadata.kernelspec metadata.language_info.version
         exclude: '^docs/examples/tracking-options\.ipynb'
 
   - repo: https://github.com/codespell-project/codespell
