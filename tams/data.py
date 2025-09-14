@@ -4,7 +4,9 @@ Loaders for various data sets.
 
 from __future__ import annotations
 
+import logging
 import warnings
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -123,6 +125,8 @@ def _gdownload(
     Can be used as a custom downloader for pooch.
     `url` should be just the Google Drive file ID.
     """
+    from . import __version__
+
     try:
         import gdown
     except ImportError as e:
@@ -131,7 +135,12 @@ def _gdownload(
             "It is available on conda-forge and PyPI as 'gdown'."
         ) from e
 
-    gdown.download(id=url, output=output_file, quiet=quiet)
+    gdown.download(
+        id=url,
+        output=output_file,
+        quiet=quiet,
+        user_agent=f"tams {__version__}",
+    )
 
 
 def retrieve_example(key: str, *, progress: bool = False) -> Path:
@@ -154,18 +163,26 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
             f"unknown example file key {key!r}. Available keys are: {s_keys}. "
         ) from None
 
+    pooch_logger = pooch.get_logger()
+    pooch_logger_level = pooch_logger.level
+    pooch_logger.setLevel(logging.WARNING)
+
     cache_location = OPTIONS.get("cache_location")
     if cache_location is None:
         cache_location = pooch.os_cache("tams")
 
-    p = pooch.retrieve(
-        url=ef.file_id,
-        known_hash=f"sha256:{ef.sha256}",
-        fname=ef.fname,
-        path=cache_location,
-        downloader=_gdownload,
-        progressbar=progress,
-    )
+    try:
+        p = pooch.retrieve(
+            url=ef.file_id,
+            known_hash=f"sha256:{ef.sha256}",
+            fname=ef.fname,
+            path=cache_location,
+            downloader=partial(_gdownload, quiet=not progress),
+        )
+    except Exception:
+        raise
+    finally:
+        pooch_logger.setLevel(pooch_logger_level)
 
     return Path(p)
 
