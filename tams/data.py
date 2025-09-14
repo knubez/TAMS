@@ -143,6 +143,56 @@ def _gdownload(
     )
 
 
+def _get_cache_dir() -> Path:
+    from .options import OPTIONS
+
+    cache_location = OPTIONS.get("cache_location")
+    if cache_location is None:
+        try:
+            import pooch
+        except ImportError as e:
+            raise RuntimeError(
+                "pooch is required for caching the example data files. "
+                "It is available on conda-forge and PyPI as 'pooch'."
+            ) from e
+        else:
+            p = pooch.os_cache("tams")
+    else:
+        p = Path(cache_location)
+
+    return p
+
+
+def clear_cache(*, quiet: bool = False):
+    """Clear the cache if it exists, leaving an empty directory.
+
+    Parameters
+    ----------
+    quiet
+        Suppress output messages.
+    """
+    from shutil import rmtree
+
+    cache_dir = _get_cache_dir()
+    s_cache_dir = cache_dir.as_posix()
+
+    if not cache_dir.exists():
+        if not quiet:
+            print(f"Cache directory {s_cache_dir} does not exist")
+        return
+
+    files = sorted(p for p in cache_dir.glob("**/*") if p.is_file())
+    if not files and not quiet:
+        print(f"No files found in cache directory {s_cache_dir}")
+
+    rmtree(cache_dir)
+    cache_dir.mkdir()
+    if not quiet:
+        print("Removed:")
+        for p in files:
+            print(f"- {p.relative_to(cache_dir).as_posix()}")
+
+
 def retrieve_example(key: str, *, progress: bool = False) -> Path:
     """Retrieve an example data file using pooch and gdown.
 
@@ -162,8 +212,6 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
     -----
     .. versionadded:: 0.2.0
     """
-    from .options import OPTIONS
-
     try:
         import pooch
     except ImportError as e:
@@ -184,16 +232,12 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
     pooch_logger_level = pooch_logger.level
     pooch_logger.setLevel(logging.WARNING)
 
-    cache_location = OPTIONS.get("cache_location")
-    if cache_location is None:
-        cache_location = pooch.os_cache("tams")
-
     try:
         p = pooch.retrieve(
             url=ef.file_id,
             known_hash=f"sha256:{ef.sha256}",
             fname=ef.fname,
-            path=cache_location,
+            path=_get_cache_dir(),
             downloader=partial(_gdownload, quiet=not progress),
         )
     finally:
