@@ -250,7 +250,7 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
     Examples
     --------
     >>> import tams
-    >>> path = tams.data.retrieve_example("msg")
+    >>> path = tams.data.retrieve_example("msg-tb")
 
     Notes
     -----
@@ -290,14 +290,32 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
     return Path(p)
 
 
-def load_example(key, *, progress: bool = False) -> xarray.Dataset | xarray.DataArray:
+def load_example(key: str, *, progress: bool = False) -> xarray.Dataset | xarray.DataArray:
+    """Load an example dataset into memory.
+
+    Parameters
+    ----------
+    key
+        String identifying the example dataset.
+    progress
+        Show download progress if applicable.
+
+    Examples
+    --------
+    >>> import tams
+    >>> path = tams.data.load_example("msg-tb")
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
     lut = {**_EXAMPLE_FILE_DIRECT_LUT, **_EXAMPLE_FILE_INDIRECT_LUT}
     try:
         ef = lut[key]
     except KeyError:
         s_keys = ", ".join(repr(k) for k in lut)
         raise ValueError(
-            f"unknown example data key {key!r}. Available keys are: {s_keys}."
+            f"unknown example dataset key {key!r}. Available keys are: {s_keys}."
         ) from None
 
     p = retrieve_example(ef.key, progress=progress)
