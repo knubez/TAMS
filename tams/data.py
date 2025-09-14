@@ -179,8 +179,6 @@ def retrieve_example(key: str, *, progress: bool = False) -> Path:
             path=cache_location,
             downloader=partial(_gdownload, quiet=not progress),
         )
-    except Exception:
-        raise
     finally:
         pooch_logger.setLevel(pooch_logger_level)
 
