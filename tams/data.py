@@ -361,7 +361,7 @@ def load_example(
     Examples
     --------
     >>> import tams
-    >>> path = tams.data.load_example("msg-tb")
+    >>> ds = tams.data.load_example("msg-tb")
 
     See Also
     --------

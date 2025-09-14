@@ -9,7 +9,7 @@ import xarray as xr
 
 import tams
 
-r = tams.data.load_example("msg-rad").isel(time=0).load()
+r = tams.data.open_example("msg-rad").isel(time=0).load()
 
 tb = tams.data.tb_from_ir(r, ch=9)
 
@@ -257,7 +257,7 @@ def test_tams_run_basic():
 def test_load_pooch_missing(mocker):
     mocker.patch.dict("sys.modules", pooch=None)
     with pytest.raises(RuntimeError, match="pooch is required"):
-        _ = tams.data.load_example("msg-rad")
+        _ = tams.data.open_example("msg-rad")
 
 
 def test_load_gdown_missing(mocker, tmpdir):
@@ -267,4 +267,4 @@ def test_load_gdown_missing(mocker, tmpdir):
         tams.set_options(cache_location=tmpdir),
         pytest.raises(RuntimeError, match="gdown is required"),
     ):
-        _ = tams.data.load_example("msg-rad")
+        _ = tams.data.open_example("msg-rad")
