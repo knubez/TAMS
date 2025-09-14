@@ -144,7 +144,24 @@ def _gdownload(
 
 
 def retrieve_example(key: str, *, progress: bool = False) -> Path:
-    """Retrieve an example data file using pooch and gdown."""
+    """Retrieve an example data file using pooch and gdown.
+
+    Parameters
+    ----------
+    key
+        String identifying which example file to retrieve.
+    progress
+        Show download progress.
+
+    Examples
+    --------
+    >>> import tams
+    >>> path = tams.data.retrieve_example("msg")
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
     from .options import OPTIONS
 
     try:

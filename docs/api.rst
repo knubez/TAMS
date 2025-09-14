@@ -42,6 +42,7 @@ Data
 .. autosummary::
    :toctree: api/
 
+   tams.data.retrieve_example
    tams.load_example_tb
    tams.load_example_mpas
    tams.load_example_mpas_ug

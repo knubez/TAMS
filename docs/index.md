@@ -34,6 +34,7 @@ examples/get.ipynb
 :hidden:
 
 api.rst
+changes.md
 differences.md
 GitHub <https://github.com/knubez/TAMS>
 ```

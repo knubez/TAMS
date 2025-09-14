@@ -49,6 +49,12 @@ intersphinx_mapping = {
     "earthaccess": ("https://earthaccess.readthedocs.io/en/stable/", None),
 }
 
+extlinks = {
+    "issue": ("https://github.com/knubez/TAMS/issues/%s", "GH%s"),
+    "pull": ("https://github.com/knubez/TAMS/pull/%s", "PR%s"),
+}
+
+
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 napoleon_preprocess_types = True
