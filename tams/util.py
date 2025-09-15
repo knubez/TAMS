@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
+import sys
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -196,3 +199,55 @@ def _the_unique(s: pandas.Series):
         return u[0]
     else:
         raise ValueError(f"the Series has more than one unique value: {u}")
+
+
+def get_logger():
+    logger = logging.getLogger("tams")
+
+    return logger
+
+
+def set_logger_level(level: int | str):
+    """Set the logging level for the "tams" logger.
+
+    Parameters
+    ----------
+    level
+        Logging level, e.g., ``0`` (unset), ``logging.DEBUG``, ``'INFO'``, ``logging.WARNING``.
+    """
+    logger = get_logger()
+    logger.setLevel(level)
+
+
+def set_logger_handler(
+    *,
+    stderr: bool = True,
+    stdout: bool = False,
+    file: str | Path | None = None,
+):
+    """Set logging handler(s) for the "tams" logger."""
+    logger = get_logger()
+
+    if stderr and stdout:
+        raise ValueError("only one of `stderr` and `stdout` can be True")
+
+    logger.handlers = []
+
+    fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    if stderr:
+        handler = logging.StreamHandler(sys.stderr)
+        formatter = logging.Formatter(fmt)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    if stdout:
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(fmt)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    if file is not None:
+        handler = logging.FileHandler(file)
+        formatter = logging.Formatter(fmt)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
