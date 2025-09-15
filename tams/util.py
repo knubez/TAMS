@@ -201,13 +201,13 @@ def _the_unique(s: pandas.Series):
         raise ValueError(f"the Series has more than one unique value: {u}")
 
 
-def get_logger():
+def get_logger() -> logging.Logger:
     logger = logging.getLogger("tams")
 
     return logger
 
 
-def set_logger_level(level: int | str):
+def set_logger_level(level: int | str) -> None:
     """Set the logging level for the "tams" logger.
 
     Parameters
@@ -221,11 +221,13 @@ def set_logger_level(level: int | str):
 
 def set_logger_handler(
     *,
-    stderr: bool = True,
+    stderr: bool = False,
     stdout: bool = False,
     file: str | Path | None = None,
-):
-    """Set logging handler(s) for the "tams" logger."""
+) -> None:
+    """Set logging handler(s) for the "tams" logger.
+    By default, resets to no handlers.
+    """
     logger = get_logger()
 
     if stderr and stdout:
@@ -233,21 +235,22 @@ def set_logger_handler(
 
     logger.handlers = []
 
-    fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    fmt_file = "%(levelname)s:%(asctime)s - %(message)s"
+    fmt_console = f"%(name)s:{fmt_file}"
+
     if stderr:
         handler = logging.StreamHandler(sys.stderr)
-        formatter = logging.Formatter(fmt)
+        formatter = logging.Formatter(fmt_console)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-
-    if stdout:
+    elif stdout:
         handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(fmt)
+        formatter = logging.Formatter(fmt_console)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
     if file is not None:
         handler = logging.FileHandler(file)
-        formatter = logging.Formatter(fmt)
+        formatter = logging.Formatter(fmt_file)
         handler.setFormatter(formatter)
         logger.addHandler(handler)

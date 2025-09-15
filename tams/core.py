@@ -5,7 +5,6 @@ Core routines that make up the TAMS algorithm.
 from __future__ import annotations
 
 import functools
-import logging
 import warnings
 from typing import TYPE_CHECKING
 
@@ -13,7 +12,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .util import _the_unique, sort_ew
+from .util import _the_unique, get_logger, sort_ew
 
 if TYPE_CHECKING:
     import geopandas
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
     import xarray
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def contour(
@@ -38,6 +37,10 @@ def contour(
     import shapely
     from shapely.geometry.polygon import orient
 
+    name = x.name or "?"
+    s_dims = ", ".join(f"{d}: {n}" for d, n in x.sizes.items())
+    logger.info(f"contouring {name} ({s_dims}) at {value}, closed_only={closed_only}")
+
     assert x.ndim == 2, "this is for a single image"
     with plt.ioff():  # requires mpl 3.4
         fig = plt.figure()
@@ -48,6 +51,7 @@ def contour(
 
     # shapely.linestrings([a.tolist() for a in cs.allsegs[0] if a.shape[0] >= 2])
 
+    logger.info(f"processing {len(cs.allsegs[0])} contours")
     data = []
     for c in cs.allsegs[0]:
         # x, y = c.T
@@ -57,6 +61,7 @@ def contour(
             # 1 -> LineString GEOS exception (needs 2)
             # 1-2 -> LinearRing ValueError (needs 4)
             # 3 -> LinearRing will add the first point to the end to make 4
+            logger.debug(f"skipping an input contour with less than 2 points: {c}")
             continue
 
         # LinearRing will get implicitly closed if the first and last points are not the same
@@ -102,6 +107,7 @@ def contour(
     # (.is_closed, .is_ccw, .orient_polygons())
     # but would have to use apply to convert LineStrings to Polygons
 
+    logger.info(f"returning {len(data)} contours")
     if not data:
         data = {
             "geometry": [],

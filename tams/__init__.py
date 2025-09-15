@@ -17,4 +17,4 @@ from .core import (
     track,
 )
 from .options import get_options, set_options
-from .util import plot_tracked
+from .util import get_logger, plot_tracked
