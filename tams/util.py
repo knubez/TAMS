@@ -202,6 +202,7 @@ def _the_unique(s: pandas.Series):
 
 
 def get_logger() -> logging.Logger:
+    """Get the "tams" logger."""
     logger = logging.getLogger("tams")
 
     return logger
@@ -227,6 +228,17 @@ def set_logger_handler(
 ) -> None:
     """Set logging handler(s) for the "tams" logger.
     By default, resets to no handlers.
+
+    Examples
+    --------
+    To stderr:
+    >>> set_logger_handler(stderr=True)
+
+    To file:
+    >>> set_logger_handler(file="tams.log")
+
+    Reset to nothing:
+    >>> set_logger_handler()
     """
     logger = get_logger()
 

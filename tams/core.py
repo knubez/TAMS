@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     import pandas
     import shapely
     import xarray
+    from matplotlib.tri import Triangulation
 
 
 logger = get_logger()
@@ -30,32 +31,90 @@ def contour(
     x: xarray.DataArray,
     value: float,
     *,
+    unstructured: bool | None = None,
+    triangulation: Triangulation | None = None,
     closed_only: bool = True,
 ) -> geopandas.GeoDataFrame:
+    """Contour `x` at `value`.
+
+    Parameters
+    ----------
+    x
+        Data to be contoured.
+        Needs to have ``'lat'`` and ``'lon'`` coordinates.
+        The array should be 2-D if structured, 1-D if unstructured.
+    value
+        Find contours where `x` has this value.
+    unstructured
+        Whether the grid of `x` is unstructured (e.g. MPAS native output).
+        Default: assume unstructured if `x` is 1-D.
+    triangulation
+        A pre-computed :class:`~matplotlib.tri.Triangulation` for `x`
+        with unstructured grid.
+    closed_only
+        Only return closed contours.
+
+    Returns
+    -------
+    contours
+        GeoDataframe of analyzed contours.
+        Closed contours as :class:`~shapely.LinearRing`,
+        open contours as :class:`~shapely.LineString`.
+
+    Raises
+    ------
+    ValueError
+        If all values in `x` are null.
+        Or if `x` has an unexpected number of dimensions.
+    """
     import geopandas as gpd
     import matplotlib.pyplot as plt
     import shapely
     from shapely.geometry.polygon import orient
+    from shapely.validation import explain_validity
+
+    if x.isnull().all():
+        raise ValueError("input array `x` is all null (e.g. NaN)")
+
+    if unstructured is None:
+        unstructured = x.ndim == 1
 
     name = x.name or "?"
     s_dims = ", ".join(f"{d}: {n}" for d, n in x.sizes.items())
-    logger.info(f"contouring {name} ({s_dims}) at {value}, closed_only={closed_only}")
+    s_tri = "..." if triangulation is not None else "None"
+    logger.info(
+        f"contouring {name} ({s_dims}) at {value}, "
+        f"unstructured={unstructured}, triangulation={s_tri}, "
+        f"closed_only={closed_only}"
+    )
 
-    assert x.ndim == 2, "this is for a single image"
-    with plt.ioff():  # requires mpl 3.4
-        fig = plt.figure()
-        cs = x.plot.contour(x="lon", y="lat", levels=[value])
+    if unstructured:
+        if not x.ndim == 1:
+            raise ValueError(
+                "this is for a single time step. For unstructured grid there should be one dim."
+            )
+        tri = triangulation
+        if tri is None:
+            from matplotlib.tri import Triangulation
+
+            tri = Triangulation(x=x.lon, y=x.lat)
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = plt.tricontour(tri, x, levels=[value])
+    else:
+        if not x.ndim == 2:
+            raise ValueError("this is for a single image")
+        with plt.ioff():  # requires mpl 3.4
+            fig = plt.figure()
+            cs = x.plot.contour(x="lon", y="lat", levels=[value])
 
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
 
-    # shapely.linestrings([a.tolist() for a in cs.allsegs[0] if a.shape[0] >= 2])
-
-    logger.info(f"processing {len(cs.allsegs[0])} contours")
+    n0 = len(cs.allsegs[0])
+    logger.info(f"processing {n0} contours")
     data = []
     for c in cs.allsegs[0]:
-        # x, y = c.T
-        # r = shapely.LinearRing(zip(x, y))
         if c.shape[0] < 2:
             # 0 -> empty LinearRing or LineString
             # 1 -> LineString GEOS exception (needs 2)
@@ -69,8 +128,7 @@ def contour(
         if np.isclose(c[0], c[-1]).all():
             c[-1] = c[0]  # ensure exact for later valid check
         is_closed = (c[0] == c[-1]).all()
-        r = shapely.LinearRing(c)
-        # TODO: could just use LineString instead here?
+        ls = shapely.LineString(c)
         # TODO: filter out invalid LineString and log reason (shapely.validation.explain_validity)
         # or try to make valid (shapely.validation.make_valid)
 
@@ -78,12 +136,16 @@ def contour(
         # if they enclose a region that is higher then the contour level,
         # or clockwise if they enclose a region that is lower than the contour level"
         if is_closed:
+            r = shapely.LinearRing(c)
+            if not r.is_valid:
+                logger.debug(f"skipping invalid closed contour: {explain_validity(r)}")
+                continue
             encloses_higher = r.is_ccw
-            p = orient(shapely.Polygon(r))  # ensure consistent
-            assert p.is_valid
+            r_ccw = orient(shapely.Polygon(r)).exterior  # ensure consistent
+            assert r_ccw.is_valid
             data.append(
                 {
-                    "geometry": p,
+                    "contour": r_ccw,
                     "closed": is_closed,
                     "encloses_higher": encloses_higher,
                 }
@@ -92,12 +154,12 @@ def contour(
             continue
         else:
             encloses_higher = None
-            ls = shapely.LineString(r)
             if not ls.is_valid:
+                logger.debug(f"skipping invalid open contour: {explain_validity(ls)}")
                 continue
             data.append(
                 {
-                    "geometry": ls,
+                    "contour": ls,
                     "closed": is_closed,
                     "encloses_higher": encloses_higher,
                 }
@@ -107,17 +169,23 @@ def contour(
     # (.is_closed, .is_ccw, .orient_polygons())
     # but would have to use apply to convert LineStrings to Polygons
 
-    logger.info(f"returning {len(data)} contours")
+    logger.info(f"returning {len(data)}/{n0} contours")
     if not data:
         data = {  # type: ignore[assignment]
-            "geometry": [],
+            "contour": [],
             "closed": [],
             "encloses_higher": [],
         }
 
     return gpd.GeoDataFrame(
         data,
+        geometry="contour",
         crs="EPSG:4326",
+    ).astype(
+        {
+            "closed": bool,
+            "encloses_higher": "boolean",  # nullable
+        },
     )
 
 
