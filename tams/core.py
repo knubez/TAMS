@@ -77,7 +77,11 @@ def _contours_to_gdf_new(
         # if they enclose a region that is higher then the contour level,
         # or clockwise if they enclose a region that is lower than the contour level"
         if is_closed:
-            r = LinearRing(c)
+            try:
+                r = LinearRing(c)
+            except ValueError as e:
+                logger.debug(f"skipping invalid closed contour: {e}")
+                continue
             if not r.is_valid:
                 logger.debug(f"skipping invalid closed contour: {explain_validity(r)}")
                 continue
@@ -92,11 +96,16 @@ def _contours_to_gdf_new(
                 }
             )
         elif closed_only:
+            logger.debug("skipping open contour")
             continue
         else:
             encloses_higher = None
             if not ls.is_valid:
                 logger.debug(f"skipping invalid open contour: {explain_validity(ls)}")
+                continue
+            if not ls.is_simple:
+                # e.g. self-intersecting
+                logger.debug("skipping non-simple open contour")
                 continue
             data.append(
                 {

@@ -8,6 +8,7 @@ from . import data
 from .core import (
     calc_ellipse_eccen,
     classify,
+    contour,
     contours,
     data_in_contours,
     identify,
