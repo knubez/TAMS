@@ -50,7 +50,7 @@ def check_file(p: Path) -> None:
         print(
             f"    {vn:<{w}}  "
             f"zlib={enc.get('zlib')}, complevel={enc.get('complevel')}, "
-            f"chunksizes={enc.get('chunksizes')}"
+            f"shuffle={enc.get('shuffle')}, chunksizes={enc.get('chunksizes')}"
         )
 
     print("  Attributes:")
@@ -78,9 +78,13 @@ if __name__ == "__main__":
 
     TMP.mkdir(exist_ok=True)
     for ef in _EXAMPLE_FILES:
-        p = TMP / ef.fname
+        if ef.key.endswith("-v0.1"):
+            print(f"Skipping {ef.key} (old version)\n\n")
+            continue
+        fn = ef.fname or f"{ef.key}.nc"
+        p = TMP / fn
         if p.exists() and args.use_cached:
-            print("Using cached")
+            print(f"Using cached {ef.key}")
         else:
             _gdownload(ef.file_id, p.as_posix(), quiet=False)
         check_file(p)

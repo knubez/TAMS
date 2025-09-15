@@ -12,6 +12,12 @@ class set_options:
     ----------
     cache_location : str or Path, optional
         ``None`` (default) -> ``pooch.os_cache('tams')``.
+
+    Examples
+    --------
+    >>> import tams
+    >>> with tams.set_options(cache_location="."):
+    ...     ds = tams.data.open_example("msg-tb")
     """
 
     def __init__(self, **kwargs):
