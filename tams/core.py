@@ -64,14 +64,14 @@ def _contours_to_gdf_new(
             logger.debug(f"skipping an input contour with less than 2 points: {c}")
             continue
 
-        # LinearRing will get implicitly closed if the first and last points are not the same
-        # https://geopandas.org/en/v1.1.1/docs/reference/api/geopandas.GeoSeries.is_ring.html
+        # Snap closed if close
+        # TODO: use a set tolerance instead?
         if np.isclose(c[0], c[-1]).all():
-            c[-1] = c[0]  # ensure exact for later valid check
+            c[-1] = c[0]
+
         is_closed = (c[0] == c[-1]).all()
         ls = LineString(c)
-        # TODO: filter out invalid LineString and log reason (shapely.validation.explain_validity)
-        # or try to make valid (shapely.validation.make_valid)
+        # TODO: shapely.remove_repeated_points()
 
         # "closed line loops are oriented anticlockwise
         # if they enclose a region that is higher then the contour level,
@@ -114,10 +114,6 @@ def _contours_to_gdf_new(
                     "encloses_higher": encloses_higher,
                 }
             )
-
-    # Could also use shapely.linestrings -> GeoSeries and then use geopandas ops on them
-    # (.is_closed, .is_ccw, .orient_polygons())
-    # but would have to use apply to convert LineStrings to Polygons
 
     logger.info(f"returning {len(data)}/{n0} contours")
     if not data:
