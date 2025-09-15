@@ -25,6 +25,36 @@ def test_contour_too_small_skipped():
     assert len(gdf) == 1
 
 
+def test_contour(msg_tb0, caplog):
+    tb = msg_tb0
+
+    with caplog.at_level("DEBUG", logger="tams"):
+        cs_closed = tams.contour(tb, 219)
+
+    debug_msgs = [r.message for r in caplog.records if r.levelname == "DEBUG"]
+    assert set(debug_msgs) == {"skipping open contour"}
+
+    assert set(cs_closed.geom_type) == {"LinearRing"}
+
+    caplog.clear()
+    with caplog.at_level("DEBUG", logger="tams"):
+        cs = tams.contour(tb, 219, closed_only=False)
+
+    debug_msgs = [r.message for r in caplog.records if r.levelname == "DEBUG"]
+    assert not debug_msgs
+
+    assert len(cs) > len(cs_closed)
+
+    for gdf in [cs_closed, cs]:
+        assert gdf.columns.tolist() == ["contour", "closed", "encloses_higher"]
+        assert gdf.active_geometry_name == "contour"
+        assert gdf.crs == "EPSG:4326"
+        assert set(gdf.geom_type) <= {"LinearRing", "LineString"}
+        assert gdf.dtypes["contour"] == "geometry"
+        assert gdf.dtypes["closed"] == bool
+        assert gdf.dtypes["encloses_higher"] == "boolean"
+
+
 @pytest.mark.parametrize(
     "contour, messages",
     [
