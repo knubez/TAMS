@@ -109,7 +109,7 @@ def contour(
 
     logger.info(f"returning {len(data)} contours")
     if not data:
-        data = {
+        data = {  # type: ignore[assignment]
             "geometry": [],
             "closed": [],
             "encloses_higher": [],

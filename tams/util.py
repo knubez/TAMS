@@ -238,6 +238,7 @@ def set_logger_handler(
     fmt_file = "%(levelname)s:%(asctime)s - %(message)s"
     fmt_console = f"%(name)s:{fmt_file}"
 
+    handler: logging.Handler
     if stderr:
         handler = logging.StreamHandler(sys.stderr)
         formatter = logging.Formatter(fmt_console)
