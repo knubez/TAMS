@@ -24,9 +24,6 @@ jobs:
           environment-file: environment-dev.yml
           cache-environment: true
 
-      - name: Download the sample data
-        run: python -c "from tams.data import download_examples; download_examples()"
-
       - name: pytest
         run: pytest -v -ra test_tams.py
 

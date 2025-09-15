@@ -1143,7 +1143,7 @@ def run(
                 )
             )
 
-        d["nce"] = len(mcs_)  # codespell:ignore nce
+        d["nce"] = time_group.size()  # codespell:ignore nce
         d["area_km2"] = time_group.area_km2.sum()
         d["area219_km2"] = time_group.area219_km2.sum()
         # TODO: compare to re-computing area after (could be different if shift to dissolve)?
@@ -1227,6 +1227,7 @@ def run(
     mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
 
     # Add some CTT and PR stats to summary dataset
+    # TODO: these should be duration-weighted, in case dt is not constant
     msg("Computing stats for MCS summary dataset")
     vns = [
         "mean_pr",
@@ -1235,6 +1236,7 @@ def run(
         "std_ctt219",
         "area_km2",
         "area219_km2",
+        "nce",  # codespell:ignore nce
     ]
     mcs_summary = mcs_summary.join(
         mcs.groupby("mcs_id")[vns].mean().rename(columns={vn: f"mean_{vn}" for vn in vns})
@@ -1279,42 +1281,3 @@ def run(
     msg("Done")
 
     return ce, mcs, mcs_summary
-
-
-if __name__ == "__main__":
-    import cartopy.crs as ccrs
-    import matplotlib.pyplot as plt
-    import regionmask
-
-    from .data import load_example_ir, tb_from_ir
-
-    r = load_example_ir().isel(time=0)
-
-    tb = tb_from_ir(r, ch=9)
-
-    tran = ccrs.PlateCarree()
-    proj = ccrs.Mercator()
-    fig, ax = plt.subplots(subplot_kw=dict(projection=proj))
-
-    # tb.plot(x="lon", y="lat", cmap="gray_r", ax=ax)
-    cs = contours(tb, 235)
-    cs = sorted(cs, key=len, reverse=True)  # [:30]
-    for c in cs:
-        ax.plot(c[:, 0], c[:, 1], "g", transform=tran)
-
-    cs235 = _contours_to_gdf(cs)
-    cs219 = _contours_to_gdf(contours(tb, 219))
-
-    cs235, cs219 = _size_filter_contours(cs235, cs219)
-
-    # Trying regionmask
-    shapes = cs235[["geometry"]]
-    regions = regionmask.from_geopandas(shapes)
-    mask = regions.mask(tb)
-
-    regions.plot(ax=ax)
-
-    # tb.where(mask >= 0).plot.pcolormesh(ax=ax, transform=tran)  # takes long
-    tb.where(mask >= 0).plot.pcolormesh(size=4, aspect=2)
-
-    plt.show()

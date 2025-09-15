@@ -32,7 +32,6 @@ exclude_patterns = [
     "_build/**/*",
     "**.ipynb_checkpoints",
     # "api/**/*",
-    "examples/t2.ipynb",
 ]
 
 html_theme = "sphinx_book_theme"
@@ -48,6 +47,12 @@ intersphinx_mapping = {
     "shapely": ("https://shapely.readthedocs.io/en/stable/", None),
     "earthaccess": ("https://earthaccess.readthedocs.io/en/stable/", None),
 }
+
+extlinks = {
+    "issue": ("https://github.com/knubez/TAMS/issues/%s", "GH%s"),
+    "pull": ("https://github.com/knubez/TAMS/pull/%s", "PR%s"),
+}
+
 
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True

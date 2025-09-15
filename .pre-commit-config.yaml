@@ -13,7 +13,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-docstring-first
-        exclude: ^examples/(mosa|dyamond)/lib.py
+        exclude: '^examples/(mosa|dyamond)/lib\.py'
       - id: check-yaml
 
   - repo: https://github.com/asottile/pyupgrade
@@ -46,11 +46,14 @@ repos:
     rev: "0.8.1"
     hooks:
       - id: nbstripout
-        exclude: ^docs/examples/tracking-options.ipynb
+        args:
+          - --extra-keys
+          - metadata.kernelspec metadata.language_info.version
+        exclude: '^docs/examples/tracking-options\.ipynb'
 
   - repo: https://github.com/codespell-project/codespell
     rev: "v2.4.1"
     hooks:
       - id: codespell
         additional_dependencies: [tomli]
-        exclude: 'docs/examples/tracking-options\.ipynb'
+        exclude: '^docs/examples/tracking-options\.ipynb'

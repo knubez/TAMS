@@ -9,7 +9,7 @@ import xarray as xr
 
 import tams
 
-r = tams.data.load_example_ir().isel(time=0)
+r = tams.data.open_example("msg-rad")["ch9"].isel(time=0).load()
 
 tb = tams.data.tb_from_ir(r, ch=9)
 
@@ -39,7 +39,8 @@ skipif_no_earthdata = pytest.mark.skipif(not earthdata, reason="need Earthdata a
 
 
 def test_ch9_tb_loaded():
-    assert tb.name == "ch9"
+    assert tb.name == "tb"
+    assert tb.attrs["channel"] == 9
     assert tuple(tb.coords) == ("lon", "lat", "time")
 
 
@@ -48,16 +49,17 @@ def test_data_in_contours_methods_same_result():
     cs219 = tams.core._contours_to_gdf(tams.contours(tb, 219))
     cs235, _ = tams.core._size_filter_contours(cs235, cs219)
 
-    varnames = ["ch9"]
+    vn = "tb"
+    varnames = [vn]
     x1 = tams.core._data_in_contours_sjoin(tb, cs235, varnames=varnames)
     x2 = tams.core._data_in_contours_regionmask(tb, cs235, varnames=varnames)
     assert len(x1) == len(x2)
-    assert (x1.count_ch9 > 0).all()
-    assert x1.count_ch9.equals(x2.count_ch9)
+    assert (x1[f"count_{vn}"] > 0).all()
+    assert x1[f"count_{vn}"].equals(x2[f"count_{vn}"])
     # Note: With pandas v1, std's were all the same exactly, but not mean
     # With pandas v2, the opposite
-    assert x1.mean_ch9.equals(x2.mean_ch9)
-    dstd = x1.std_ch9 - x2.std_ch9
+    assert x1[f"mean_{vn}"].equals(x2[f"mean_{vn}"])
+    dstd = x1[f"std_{vn}"] - x2[f"std_{vn}"]
     assert len(x1) - dstd.eq(0).sum() in {3, 5}
     assert dstd.abs().max() < 2e-6
 
@@ -65,17 +67,17 @@ def test_data_in_contours_methods_same_result():
 def test_data_in_contours_non_xy():
     # The MPAS one has real lat/lon 1-D dim-coords, not x/y with 2-D lat/lon
     # so with `to_dataframe().reset_index(drop=True)` lat/lon were lost
-    ds = tams.load_example_mpas().isel(time=1)
+    ds = tams.data.open_example("mpas-regridded").isel(time=1)
     cs = tams.identify(ds.tb)[0][0]
-    data = ds.precip
+    data = ds.pr
     cs_precip = tams.data_in_contours(data, cs, method="sjoin")
-    assert cs_precip.mean_precip.sum() > 0
-    assert (cs_precip.count_precip > 0).all()
+    assert cs_precip.mean_pr.sum() > 0
+    assert (cs_precip.count_pr > 0).all()
 
 
 def test_data_in_contours_raises_full_nan():
-    data = tams.load_example_mpas().isel(time=0).tb
-    cs = tams.identify(tams.load_example_mpas().isel(time=1).tb)[0][0]
+    data = tams.data.open_example("mpas-regridded").isel(time=0).tb
+    cs = tams.identify(tams.data.open_example("mpas-regridded").isel(time=1).tb)[0][0]
     assert data.isnull().all()
     with pytest.raises(ValueError, match="all null"):
         tams.data_in_contours(data, cs)
@@ -123,8 +125,8 @@ def test_data_in_contours_pass_ds_multiple_vars(method):
 
 
 def test_load_mpas_sample():
-    ds = tams.load_example_mpas()
-    assert tuple(ds.data_vars) == ("tb", "precip")
+    ds = tams.data.open_example("mpas-regridded")
+    assert tuple(ds.data_vars) == ("tb", "pr")
     assert tuple(ds.coords) == ("time", "lon", "lat")
 
 
@@ -176,18 +178,6 @@ def test_contour_too_small_skipped():
 
 # TODO: test to check crs of all geometry columns returned by `run` are correct
 # and all have a RangeIndex
-
-
-@pytest.mark.skipif(not glade_avail, reason="need to have GLADE fs available")
-def test_mpas_precip_loader():
-    ds = tams.load_mpas_precip(
-        "/glade/scratch/rberrios/cpex-aw/"
-        "2021082500/intrp_output/mpas_init_2021082500_valid_2021-08-25_*_latlon_wpac.nc"
-    )
-
-    assert set(ds.data_vars) == {"tb", "precip"}
-    assert tuple(ds.dims) == ("time", "lat", "lon")
-    assert ds.sizes["time"] == 24
 
 
 def test_classify_empty():
@@ -249,10 +239,32 @@ def test_get_imerg(version, run):
 
 def test_tams_run_basic():
     # Keep this like the notebook example but can be shorter
-    ds = tams.load_example_mpas().rename({"tb": "ctt", "precip": "pr"}).isel(time=slice(1, 7))
+    ds = tams.data.open_example("mpas-regridded").rename({"tb": "ctt"}).isel(time=slice(1, 7))
+    assert isinstance(ds, xr.Dataset)
 
     ce, mcs, mcs_summary = tams.run(ds)
     assert isinstance(ce, gpd.GeoDataFrame)
     assert isinstance(mcs, gpd.GeoDataFrame)
     assert isinstance(mcs_summary, gpd.GeoDataFrame), "has first and last centroid Points"
     assert 0 < len(mcs_summary) < len(mcs) < len(ce)
+
+    assert mcs["nce"].eq(mcs.count_geometries()).all()  # codespell:ignore nce
+    mcs.groupby("mcs_id").nce.mean().reset_index(drop=True).eq(  # codespell:ignore nce
+        mcs_summary["mean_nce"]  # codespell:ignore nce
+    ).all()
+
+
+def test_load_pooch_missing(mocker):
+    mocker.patch.dict("sys.modules", pooch=None)
+    with pytest.raises(RuntimeError, match="pooch is required"):
+        _ = tams.data.open_example("msg-rad")
+
+
+def test_load_gdown_missing(mocker, tmpdir):
+    # Note gdown isn't needed/used if the file is already cached
+    mocker.patch.dict("sys.modules", gdown=None)
+    with (
+        tams.set_options(cache_location=tmpdir),
+        pytest.raises(RuntimeError, match="gdown is required"),
+    ):
+        _ = tams.data.open_example("msg-rad")
