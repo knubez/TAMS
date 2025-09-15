@@ -31,6 +31,7 @@ def _contours_to_gdf_new(
     segs: list[np.ndarray],
     *,
     closed_only: bool = True,
+    tolerance: float = 1e-12,
 ) -> geopandas.GeoDataFrame:
     """Convert contour segments from matplotlib to a GeoDataFrame.
 
@@ -39,6 +40,11 @@ def _contours_to_gdf_new(
     segs
         List of 2-D arrays describing contours.
         The arrays are shape ``(n, 2)``; each row is a coordinate pair.
+    closed_only
+        Only return closed contours.
+    tolerance
+        Tolerance for snapping the start and end points of a contour together
+        and for removing repeated points.
 
     Returns
     -------
@@ -53,6 +59,9 @@ def _contours_to_gdf_new(
     from shapely.geometry.polygon import orient
     from shapely.validation import explain_validity
 
+    if not tolerance >= 0:
+        raise ValueError("tolerance must be non-negative")
+
     n0 = len(segs)
     logger.info(f"processing {n0} contours")
     data = []
@@ -66,12 +75,11 @@ def _contours_to_gdf_new(
             continue
 
         # Snap closed if close
-        # TODO: use a set tolerance instead?
-        if np.isclose(c[0], c[-1]).all():
+        if np.isclose(c[0], c[-1], atol=tolerance, rtol=0).all():
             c[-1] = c[0]
 
-        is_closed = (c[0] == c[-1]).all()
-        ls = remove_repeated_points(LineString(c))
+        is_closed = (c[-1] == c[0]).all()
+        ls = remove_repeated_points(LineString(c), tolerance=tolerance)
 
         # "closed line loops are oriented anticlockwise
         # if they enclose a region that is higher then the contour level,
@@ -142,6 +150,7 @@ def contour(
     unstructured: bool | None = None,
     triangulation: Triangulation | None = None,
     closed_only: bool = True,
+    tolerance: float = 1e-12,
 ) -> geopandas.GeoDataFrame:
     """Contour `x` at `value`.
 
@@ -161,6 +170,9 @@ def contour(
         with unstructured grid.
     closed_only
         Only return closed contours.
+    tolerance
+        Tolerance for snapping the start and end points of a contour together
+        and for removing repeated points.
 
     Returns
     -------
@@ -197,7 +209,7 @@ def contour(
     logger.info(
         f"contouring {name} ({s_dims}) at {value}, "
         f"unstructured={unstructured}, triangulation={s_tri}, "
-        f"closed_only={closed_only}"
+        f"closed_only={closed_only}, tolerance={tolerance}"
     )
 
     if unstructured:
@@ -223,7 +235,7 @@ def contour(
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
 
-    return _contours_to_gdf_new(cs.allsegs[0], closed_only=closed_only)
+    return _contours_to_gdf_new(cs.allsegs[0], closed_only=closed_only, tolerance=tolerance)
 
 
 def contours(

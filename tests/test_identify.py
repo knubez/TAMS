@@ -162,6 +162,32 @@ def test_contour_repeated_point():
         assert shapely.get_coordinates(geom).shape[0] == 4 if geom.is_closed else 3
 
 
+def test_contour_tolerance_snap():
+    eps = 1e-6
+    contour = [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0 + eps]]
+    contours = [np.asarray(contour)]
+
+    cs = tams.core._contours_to_gdf_new(contours)
+    assert cs.empty
+
+    cs = tams.core._contours_to_gdf_new(contours, tolerance=eps * 2)
+    assert len(cs) == 1
+
+
+def test_contour_tolerance_dedupe():
+    eps = 1e-6
+    contour = [[0, 0], [1, 0], [1, 0 + eps], [1, 1], [0, 1], [0, 0]]
+    contours = [np.asarray(contour)]
+
+    cs = tams.core._contours_to_gdf_new(contours)
+    assert len(cs) == 1
+    assert shapely.get_coordinates(cs.iloc[0].contour).shape[0] == len(contour)
+
+    cs = tams.core._contours_to_gdf_new(contours, tolerance=eps * 2)
+    assert len(cs) == 1
+    assert shapely.get_coordinates(cs.iloc[0].contour).shape[0] == len(contour) - 1
+
+
 def test_identify_no_ces_warning(msg_tb0):
     tb = msg_tb0
     tb_p100 = tb + 100
