@@ -48,7 +48,8 @@ def _contours_to_gdf_new(
         open contours as :class:`~shapely.LineString`.
     """
     import geopandas as gpd
-    from shapely import LinearRing, LineString, Polygon
+    from shapely import LinearRing, LineString, Polygon, remove_repeated_points
+    from shapely.errors import TopologicalError
     from shapely.geometry.polygon import orient
     from shapely.validation import explain_validity
 
@@ -70,16 +71,15 @@ def _contours_to_gdf_new(
             c[-1] = c[0]
 
         is_closed = (c[0] == c[-1]).all()
-        ls = LineString(c)
-        # TODO: shapely.remove_repeated_points()
+        ls = remove_repeated_points(LineString(c))
 
         # "closed line loops are oriented anticlockwise
         # if they enclose a region that is higher then the contour level,
         # or clockwise if they enclose a region that is lower than the contour level"
         if is_closed:
             try:
-                r = LinearRing(c)
-            except ValueError as e:
+                r = LinearRing(ls)
+            except (ValueError, TopologicalError) as e:
                 logger.debug(f"skipping invalid closed contour: {e}")
                 continue
             if not r.is_valid:

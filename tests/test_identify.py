@@ -4,6 +4,7 @@ Test :func:`tams.identify` and related routines.
 
 import numpy as np
 import pytest
+import shapely
 import xarray as xr
 
 import tams
@@ -35,6 +36,8 @@ def test_contour(msg_tb0, caplog):
     assert set(debug_msgs) == {"skipping open contour"}
 
     assert set(cs_closed.geom_type) == {"LinearRing"}
+    assert cs_closed.closed.all()  # our series
+    assert cs_closed.is_closed.all()  # gpd property
 
     caplog.clear()
     with caplog.at_level("DEBUG", logger="tams"):
@@ -43,7 +46,7 @@ def test_contour(msg_tb0, caplog):
     debug_msgs = [r.message for r in caplog.records if r.levelname == "DEBUG"]
     assert not debug_msgs
 
-    assert len(cs) > len(cs_closed)
+    assert (~cs.closed).sum() == (~cs.is_closed).sum() == (len(cs) - len(cs_closed)) == 2
 
     for gdf in [cs_closed, cs]:
         assert gdf.columns.tolist() == ["contour", "closed", "encloses_higher"]
@@ -70,8 +73,8 @@ def test_contour(msg_tb0, caplog):
         ),
         pytest.param(
             [[0, 0], [0, 0]],
-            "skipping invalid closed contour: A linearring requires at least 4 coordinates.",
-            id="2-pt open",
+            "skipping invalid closed contour: An input LineString must be valid.",
+            id="2-pt closed",
         ),
         pytest.param(
             [[0, 0], [1, 1]],
@@ -136,6 +139,27 @@ def test_contour_skipped_open(contour, messages, caplog):
 
     debug_msgs = [r.message for r in caplog.records if r.levelname == "DEBUG"]
     assert debug_msgs == messages
+
+
+def test_contour_repeated_point():
+    closed_contour = [[0, 0], [1, 0], [1, 0], [0.5, 1], [0.5, 1], [0, 0]]
+    open_contour = [[0, 0], [0, 0], [1, 1], [2, 2], [2, 2]]
+    contours = [
+        np.asarray(closed_contour),
+        np.asarray(open_contour),
+    ]
+    assert [len({tuple(row) for row in c}) for c in contours] == [3] * len(contours)
+
+    cs = tams.core._contours_to_gdf_new(contours, closed_only=False)
+
+    assert len(cs) == 2
+    assert cs.iloc[0].closed
+    assert not cs.iloc[1].closed
+
+    for geom in cs.geometry:
+        assert geom.is_valid
+        assert geom.is_simple
+        assert shapely.get_coordinates(geom).shape[0] == 4 if geom.is_closed else 3
 
 
 def test_identify_no_ces_warning(msg_tb0):
