@@ -16,7 +16,6 @@ from .util import _the_unique, get_logger, sort_ew
 
 if TYPE_CHECKING:
     import geopandas
-    import matplotlib
     import numpy
     import pandas
     import shapely
@@ -28,7 +27,7 @@ logger = get_logger()
 
 
 def _contours_to_gdf_new(
-    segs: list[np.ndarray],
+    segs: list[numpy.ndarray],
     *,
     closed_only: bool = True,
     tolerance: float = 1e-12,
@@ -314,102 +313,7 @@ def _contours_to_shields(
     )
 
 
-def contours(
-    x: xarray.DataArray,
-    value: float,
-    *,
-    unstructured: bool | None = None,
-    **kwargs,
-) -> list[numpy.ndarray]:
-    """Find contour definitions for data `x` at value `value`.
-
-    Parameters
-    ----------
-    x
-        Data to be contoured.
-        Currently needs to have ``'lat'`` and ``'lon'`` coordinates.
-        The array should be 2-D if structured, 1-D if unstructured.
-    value
-        Find contours where `x` has this value.
-    unstructured
-        Whether the grid of `x` is unstructured (e.g. MPAS native output).
-        Default: assume unstructured if `x` is 1-D.
-
-    Returns
-    -------
-    :
-        List of 2-D arrays describing contours.
-        The arrays are shape ``(n, 2)``; each row is a coordinate pair.
-
-    Raises
-    ------
-    ValueError
-        If all values in `x` are null.
-    """
-    if x.isnull().all():
-        raise ValueError("Input array `x` is all null (e.g. NaN)")
-
-    if unstructured is None:
-        unstructured = x.ndim == 1
-
-    # TODO: have this return GDF instead?
-    # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
-    # TODO: optionally filter out unclosed?
-    import matplotlib.pyplot as plt
-
-    if unstructured:
-        assert x.ndim == 1, "this is for a single time step"
-        tri = kwargs.get("triangulation")
-        if tri is None:
-            from matplotlib.tri import Triangulation
-
-            tri = Triangulation(x=x.lon, y=x.lat)
-        with plt.ioff():  # requires mpl 3.4
-            fig = plt.figure()
-            cs = plt.tricontour(tri, x, levels=[value])
-    else:
-        assert x.ndim == 2, "this is for a single image"
-        with plt.ioff():  # requires mpl 3.4
-            fig = plt.figure()
-            cs = x.plot.contour(x="lon", y="lat", levels=[value])
-
-    plt.close(fig)
-    assert len(cs.allsegs) == 1, "only one level"
-
-    return cs.allsegs[0]
-
-
-def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
-    from geopandas import GeoDataFrame
-    from shapely import LinearRing, LineString, Point
-    from shapely.geometry.polygon import orient
-
-    if isinstance(cs, np.ndarray) and cs.ndim == 2 and cs.shape[1] == 2:
-        # Single array, probably mpl 3.8.0
-        import matplotlib
-
-        mpl_ver = getattr(matplotlib, "__version__", "?")
-
-        logger.debug(f"got single array `cs`; matplotlib version: {mpl_ver}")
-
-    polys = []
-    for c in cs:
-        x, y = c.T
-        if x.size < 3:
-            logger.info(f"skipping an input contour with less than 3 points: {c}")
-            continue
-        r = LinearRing(zip(x, y))
-        p0 = r.convex_hull  # TODO: optional, also add buffer option
-        if type(p0) is LineString or type(p0) is Point:
-            continue  # not a closed contour
-        p = orient(p0)  # -> counter-clockwise
-        polys.append(p)
-
-    return GeoDataFrame(geometry=polys, crs="EPSG:4326")
-    # ^ This crs indicates input in degrees
-
-
-def _size_filter_contours(
+def _size_filter(
     cs235: geopandas.GeoDataFrame,
     cs219: geopandas.GeoDataFrame,
     *,
@@ -508,25 +412,22 @@ def _identify_one(
     size_filter: bool = True,
     size_threshold: float = 4000,
     unstructured: bool | None = None,
-    triangulation: matplotlib.tri.Triangulation | None = None,
+    triangulation: Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
-    cs235 = sort_ew(
-        _contours_to_gdf(
-            contours(ctt, ctt_threshold, unstructured=unstructured, triangulation=triangulation)
-        )
-    ).reset_index(drop=True)
-    cs219 = sort_ew(
-        _contours_to_gdf(
-            contours(
-                ctt, ctt_core_threshold, unstructured=unstructured, triangulation=triangulation
-            )
-        )
-    ).reset_index(drop=True)
+    kws = dict(
+        unstructured=unstructured,
+        triangulation=triangulation,
+        closed_only=True,
+    )
+    cs235 = sort_ew(_contours_to_shields(contour(ctt, ctt_threshold, **kws))).reset_index(drop=True)
+    cs219 = sort_ew(_contours_to_shields(contour(ctt, ctt_core_threshold, **kws))).reset_index(
+        drop=True
+    )
 
     if size_filter:
-        cs235, cs219 = _size_filter_contours(cs235, cs219, threshold=size_threshold)
+        cs235, cs219 = _size_filter(cs235, cs219, threshold=size_threshold)
 
     return cs235, cs219
 
@@ -588,9 +489,20 @@ def identify(
     :doc:`/examples/identify`
         Demonstrating the impacts of options.
     """
+    # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
     dims = tuple(ctt.dims)
 
+    s_dims = ", ".join(f"{d}: {n}" for d, n in ctt.sizes.items())
+    name = ctt.name or "?"
+    logger.info(
+        f"identifying CEs in {name} ({s_dims}), "
+        f"ctt_threshold={ctt_threshold}, ctt_core_threshold={ctt_core_threshold}, "
+        f"size_filter={size_filter}, size_threshold={size_threshold}, "
+        f"parallel={parallel}"
+    )
+
     unstructured = (len(dims) == 2 and "time" in dims) or (len(dims) == 1)
+    logger.debug(f"assuming unstructured={unstructured}")
 
     triangulation = None
     if unstructured:
@@ -617,6 +529,9 @@ def identify(
     )
 
     if (not unstructured and len(dims) == 2) or (unstructured and len(dims) == 1):
+        if parallel:
+            logger.debug(f"assuming one time, ignoring parallel={parallel}")
+
         cs235, cs219 = f(ctt)
         css235, css219 = (cs235,), (cs219,)  # to tuple for consistency
 
