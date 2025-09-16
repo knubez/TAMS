@@ -238,6 +238,82 @@ def contour(
     return _contours_to_gdf_new(cs.allsegs[0], closed_only=closed_only, tolerance=tolerance)
 
 
+def _contours_to_shields(
+    cs: geopandas.GeoDataFrame,
+    *,
+    edge_encloses_higher: bool | None = None,
+) -> geopandas.GeoDataFrame:
+    """Take the closed contours in `cs` (from :func:`contour`),
+    which are :class:`LineString`,
+    and convert to :class:`Polygon`, accounting for holes."""
+    from collections import defaultdict
+
+    import geopandas as gpd
+    from shapely import Polygon
+    from shapely.geometry.polygon import orient
+
+    if cs.empty:
+        return gpd.GeoDataFrame(
+            geometry=[],
+            crs="EPSG:4326",
+        )
+
+    # Preprocess by selecting closed contours, converting to polygons,
+    # computing area, and sorting (smallest -> largest)
+    cs = (
+        cs.query("closed")
+        .assign(contour=cs.geometry.apply(lambda r: Polygon(r)))
+        .assign(area_km2=lambda df: df.geometry.to_crs("EPSG:32663").area / 1e6)
+        .sort_values("area_km2")
+        .reset_index(drop=True)
+    )
+    if edge_encloses_higher is None:
+        largest = cs.iloc[-1]
+        edge_encloses_higher = largest.encloses_higher
+
+    contains = cs.sjoin(cs, predicate="contains", how="left")
+
+    # Work from smallest outwards
+    # A contour is a hole if it is within another contour and its `encloses_higher`
+    # is opposite that of `edge_encloses_higher`.
+    # Take the smallest container to be the parent.
+    # A hole can only belong to one parent,
+    # though a parent can have multiple holes.
+    hole_inds = defaultdict(list)
+    all_holes = set()
+    for _, g in contains.rename_axis("index_left").reset_index().groupby("index_left"):
+        for _, row in g.iterrows():
+            if (
+                row.encloses_higher_right != edge_encloses_higher
+                and row.encloses_higher_left == edge_encloses_higher
+                and row.index_right not in all_holes
+            ):
+                hole_inds[row.index_left].append(row.index_right)
+                all_holes.add(row.index_right)
+
+    # Construct new polygons from the existing
+    new_polys = []
+    for i in cs.index:
+        if i in hole_inds:
+            p = Polygon(
+                cs.loc[i].contour.exterior,
+                [orient(cs.loc[j].contour, -1).exterior for j in hole_inds[i]],
+            )
+            new_polys.append(p)
+        elif i in all_holes:
+            continue
+        else:
+            # Technically, an outermost edge could still be a hole
+            if cs.loc[i].encloses_higher != edge_encloses_higher:
+                continue
+            new_polys.append(cs.loc[i].contour)
+
+    return gpd.GeoDataFrame(
+        geometry=new_polys,
+        crs="EPSG:4326",
+    )
+
+
 def contours(
     x: xarray.DataArray,
     value: float,

@@ -188,6 +188,89 @@ def test_contour_tolerance_dedupe():
     assert shapely.get_coordinates(cs.iloc[0].contour).shape[0] == len(contour) - 1
 
 
+@pytest.mark.parametrize("rem", [0, 1], ids=["inner-ccw", "inner-cw"])
+@pytest.mark.parametrize("rev", [True, False], ids=["rev", "fwd"])
+@pytest.mark.parametrize("num", [4, 5])
+def test_contours_to_shields_auto_edge(rem, rev, num):
+    # Nested contours, auto detecting if polygon edges are `encloses_higher`
+    # true or false
+
+    # CCW square made of ones
+    inner_ccw = rem == 0
+    is_even = num % 2 == 0
+    is_odd = not is_even
+    ones_square = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]])
+
+    # Scale the square, reversing winding every other
+    segs = [f * ones_square[:: -1 if f % 2 == rem else 1] for f in range(1, num + 1)]
+    i_inner, i_outer = 0, -1
+    if rev:
+        segs = segs[::-1]
+        i_outer, i_inner = i_inner, i_outer
+    assert shapely.LinearRing(segs[i_inner]).is_ccw == inner_ccw
+
+    cs = tams.core._contours_to_gdf_new(segs)
+    assert len(cs) == len(segs)
+    assert cs.iloc[i_outer].encloses_higher == (not inner_ccw if is_even else inner_ccw)
+    assert cs.encloses_higher.sum() == len(cs) // 2 + int(is_odd and inner_ccw)
+
+    el = tams.core._contours_to_shields(cs)
+    assert el.area.is_monotonic_increasing
+    assert len(el) == len(cs) // 2 + int(is_odd)
+    if is_even:
+        assert el.geometry.interiors.str.len().eq(1).all()
+    else:
+        assert len(el.iloc[0].geometry.interiors) == 0
+        assert el.iloc[1:].geometry.interiors.str.len().eq(1).all()
+
+
+def test_contours_to_shields_manual_edge():
+    # Two contours, one inside the other
+
+    # CCW square made of ones
+    ones_square = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]])
+    segs = [(2 * ones_square), ones_square[::-1]]
+
+    assert shapely.LinearRing(segs[0]).is_ccw
+    assert not shapely.LinearRing(segs[1]).is_ccw
+
+    cs = tams.core._contours_to_gdf_new(segs)
+    assert len(cs) == len(segs)
+    assert cs.iloc[0].encloses_higher  # edge
+    assert not cs.iloc[1].encloses_higher
+
+    # Outermost encloses higher, but we specified edges don't enclose higher
+    # so the outermost is a hole with no parent (not returned),
+    # and the innermost is a polygon with no holes
+    el = tams.core._contours_to_shields(cs, edge_encloses_higher=False)
+    assert len(el) == 1
+    assert el.geometry.interiors.str.len().eq(0).all()
+    assert (shapely.get_coordinates(el.iloc[0].geometry) == segs[1][::-1]).all()
+
+    # Outermost encloses higher, and we specified edges do enclose higher
+    # so we get one polygon with one hole
+    el = tams.core._contours_to_shields(cs, edge_encloses_higher=True)
+    assert len(el) == 1
+    assert el.geometry.interiors.str.len().eq(1).all()
+    assert (shapely.get_coordinates(el.iloc[0].geometry.exterior) == segs[0]).all()
+    assert (shapely.get_coordinates(el.iloc[0].geometry.interiors[0]) == segs[1]).all()
+
+
+def test_contours_to_shields_two_holes():
+    # CCW square made of ones
+    ones_square = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]])
+    h1 = ones_square[::-1] - np.r_[1.5, 0]
+    h2 = ones_square[::-1] + np.r_[1.5, 0]
+    segs = [(5 * ones_square), h1, h2]
+
+    cs = tams.core._contours_to_gdf_new(segs)
+    assert len(cs) == len(segs)
+
+    el = tams.core._contours_to_shields(cs)
+    assert len(el) == 1
+    assert el.geometry.interiors.str.len().eq(2).all()
+
+
 def test_identify_no_ces_warning(msg_tb0):
     tb = msg_tb0
     tb_p100 = tb + 100
