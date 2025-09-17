@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -202,7 +203,7 @@ def _the_unique(s: pandas.Series):
 
 
 def get_logger() -> logging.Logger:
-    """Get the "tams" logger."""
+    """Get the ``'tams'`` logger."""
     logger = logging.getLogger("tams")
 
     return logger
@@ -245,7 +246,8 @@ def set_logger_handler(
     if stderr and stdout:
         raise ValueError("only one of `stderr` and `stdout` can be True")
 
-    logger.handlers = []
+    for h in logger.handlers:
+        logger.removeHandler(h)
 
     fmt_file = "%(levelname)s:%(asctime)s - %(message)s"
     fmt_console = f"%(name)s:{fmt_file}"
@@ -267,3 +269,103 @@ def set_logger_handler(
         formatter = logging.Formatter(fmt_file)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
+
+def get_worker_logger():
+    """Get logger for a worker process, adapting to the joblib backend.
+
+    Special cases:
+
+    * serial execution: the ``'tams'`` logger will be returned, unmodified
+      - :func:`get_logger`
+    * Dask: the ``'distributed.worker'`` logger will be returned, unmodified
+      - ``client.get_worker_logs()``
+    * Ray: the ``'ray'`` logger will be returned, unmodified
+      - https://docs.ray.io/en/latest/ray-observability/user-guides/configure-logging.html
+
+    Otherwise (joblib loky, multiprocessing, threading backends),
+    the ``'tams.worker'`` logger will be returned,
+    configured to indicate process and/or thread ID in the log messages,
+    and handler/level consistent with the TAMS options.
+
+    Configure Dask or Ray logging beforehand.
+    This can be as simple as::
+
+        logging.getLogger('distributed.worker').setLevel(logging.DEBUG)
+
+    or::
+
+        logging.getLogger('ray').setLevel(logging.DEBUG)
+    """
+    from multiprocessing import current_process
+    from threading import current_thread
+
+    # For Dask or Ray, just return their logger,
+    # rely on their native logging.
+    try:
+        from dask.distributed import get_client
+
+        _ = get_client()
+        return logging.getLogger("distributed.worker")
+    except (ImportError, ValueError):
+        pass
+    try:
+        import ray
+
+        if ray.is_initialized():
+            return logging.getLogger("ray")
+    except (ImportError, ValueError):
+        pass
+
+    # Standard joblib backends or serial execution
+    fmt_file = "%(levelname)s:%(asctime)s - %(message)s"
+    this_process = current_process()
+    this_thread = current_thread()
+    if this_process.name != "MainProcess":
+        # Joblib process-based (loky or multiprocessing)
+        fmt_file = "%(processName)s:" + fmt_file
+    elif this_thread.name != "MainThread":
+        # Threading
+        fmt_file = "%(threadName)s:" + fmt_file
+    else:
+        # Serial
+        return get_logger()
+
+    # For joblib, use worker logger
+    logger = logging.getLogger("tams.worker")
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+    logger.propagate = False
+
+    # Set handler
+    handler_setting = os.getenv("TAMS_WORKER_LOGGER_HANDLER", "").strip()
+    if handler_setting != "":
+        if handler_setting == "stderr":
+            h = logging.StreamHandler(sys.stderr)
+            fmt = f"%(name)s:{fmt_file}"
+        elif handler_setting == "stdout":
+            h = logging.StreamHandler(sys.stdout)
+            fmt = f"%(name)s:{fmt_file}"
+        else:
+            h = logging.FileHandler(handler_setting)
+            fmt = fmt_file
+        h.setFormatter(logging.Formatter(fmt))
+        logger.addHandler(h)
+
+    # Set log level
+    level_setting = os.getenv("TAMS_WORKER_LOGGER_LEVEL", "").strip()
+    try:
+        level_setting = int(level_setting)
+    except ValueError:
+        pass
+    if level_setting == "":
+        logger.setLevel(logging.NOTSET)
+    else:
+        logger.setLevel(level_setting)
+
+    # Log worker info
+    this_pid = os.getpid()
+    main_pid = os.getppid()
+    logger.debug(f"{this_pid=}, {main_pid=}, {this_process.name=}, {this_thread.name=}")
+
+    return logger

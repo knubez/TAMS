@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .util import _the_unique, get_logger, sort_ew
+from .util import _the_unique, get_logger, get_worker_logger, sort_ew
 
 if TYPE_CHECKING:
     import geopandas
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 logger = get_logger()
 
 
-def _contours_to_gdf_new(
+def _contours_to_gdf(
     segs: list[numpy.ndarray],
     *,
     closed_only: bool = True,
@@ -52,16 +52,21 @@ def _contours_to_gdf_new(
         Closed contours as :class:`~shapely.LinearRing`,
         open contours as :class:`~shapely.LineString`.
     """
+    from collections import Counter
+
     import geopandas as gpd
     from shapely import LinearRing, LineString, Polygon, remove_repeated_points
     from shapely.errors import TopologicalError
     from shapely.geometry.polygon import orient
     from shapely.validation import explain_validity
 
+    logger = get_worker_logger()
+
     if not tolerance >= 0:
         raise ValueError("tolerance must be non-negative")
 
     n0 = len(segs)
+    skipped = Counter()
     logger.info(f"processing {n0} contours")
     data = []
     for c in segs:
@@ -70,7 +75,7 @@ def _contours_to_gdf_new(
             # 1 -> LineString GEOS exception (needs 2)
             # 1-2 -> LinearRing ValueError (needs 4)
             # 3 -> LinearRing will add the first point to the end to make 4
-            logger.debug(f"skipping an input contour with less than 2 points: {c}")
+            skipped["too few points"] += 1
             continue
 
         # Snap closed if close
@@ -87,10 +92,10 @@ def _contours_to_gdf_new(
             try:
                 r = LinearRing(ls)
             except (ValueError, TopologicalError) as e:
-                logger.debug(f"skipping invalid closed contour: {e}")
+                skipped[f"invalid closed ({e})"] += 1
                 continue
             if not r.is_valid:
-                logger.debug(f"skipping invalid closed contour: {explain_validity(r)}")
+                skipped[f"invalid closed ({explain_validity(r)})"] += 1
                 continue
             encloses_higher = r.is_ccw
             r_ccw = orient(Polygon(r)).exterior  # ensure consistent
@@ -103,16 +108,16 @@ def _contours_to_gdf_new(
                 }
             )
         elif closed_only:
-            logger.debug("skipping open contour")
+            skipped["open"] += 1
             continue
         else:
             encloses_higher = None
             if not ls.is_valid:
-                logger.debug(f"skipping invalid open contour: {explain_validity(ls)}")
+                skipped[f"invalid open ({explain_validity(ls)})"] += 1
                 continue
             if not ls.is_simple:
                 # e.g. self-intersecting
-                logger.debug("skipping non-simple open contour")
+                skipped["non-simple open"] += 1
                 continue
             data.append(
                 {
@@ -122,6 +127,8 @@ def _contours_to_gdf_new(
                 }
             )
 
+    assert skipped.total() == n0 - len(data)
+    logger.debug("skipped contours: " + ", ".join(f"{k}: {v}" for k, v in sorted(skipped.items())))
     logger.info(f"returning {len(data)}/{n0} contours")
     if not data:
         data = {  # type: ignore[assignment]
@@ -196,6 +203,8 @@ def contour(
     """
     import matplotlib.pyplot as plt
 
+    logger = get_worker_logger()
+
     if x.isnull().all():
         raise ValueError("input array `x` is all null (e.g. NaN)")
 
@@ -234,7 +243,7 @@ def contour(
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
 
-    return _contours_to_gdf_new(cs.allsegs[0], closed_only=closed_only, tolerance=tolerance)
+    return _contours_to_gdf(cs.allsegs[0], closed_only=closed_only, tolerance=tolerance)
 
 
 def _contours_to_shields(
@@ -327,6 +336,8 @@ def _size_filter(
     import geopandas as gpd
     from shapely.geometry import MultiPolygon
 
+    logger = get_worker_logger()
+
     # Drop small 235s (a 235 with area < 4000 km2 can't have 219 area of 4000)
     cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
     # ^ This crs is equidistant cylindrical
@@ -334,7 +345,7 @@ def _size_filter(
     if not big_enough.empty:
         logger.info(
             f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-            f" of 235s are big enough ({threshold} km2)"
+            f"of 235s are big enough ({threshold} km2)"
         )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
@@ -347,7 +358,7 @@ def _size_filter(
     if not big_enough.empty:
         logger.info(
             f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-            f" of 219s are big enough ({individual_219_threshold} km2)"
+            f"of 219s are big enough ({individual_219_threshold} km2)"
         )
     cs219 = cs219[big_enough].reset_index(drop=True)
 
@@ -415,6 +426,16 @@ def _identify_one(
     triangulation: Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
+
+    logger = get_worker_logger()
+
+    name = ctt.name or "?"
+    time = ctt.coords.get("time", None)
+    if time is None:
+        s_time = "?"
+    else:
+        s_time = time.values[()]
+    logger.info(f"identifying CEs in {name} at time {s_time}")
 
     kws = dict(
         unstructured=unstructured,
@@ -547,6 +568,7 @@ def identify(
             except ImportError as e:
                 raise RuntimeError("joblib required") from e
 
+            logger.info(f"identifying in parallel over {len(itimes)} time steps")
             res = joblib.Parallel(n_jobs=-2, verbose=10)(
                 joblib.delayed(f)(ctt.isel(time=i)) for i in itimes
             )
@@ -568,6 +590,7 @@ def identify(
         warnings.warn("No CEs identified", stacklevel=2)
     elif inds_empty:
         warnings.warn(f"No CEs identified for time steps: {inds_empty}", stacklevel=2)
+    logger.info(f"identified CEs in {len(css235) - len(inds_empty)}/{len(css235)} time steps")
 
     return list(css235), list(css219)
 
@@ -878,6 +901,9 @@ def track(
         ``'b'`` for ``look='forward'``
         ), i.e. the CE at the later of the two times.
     """
+
+    logger = get_worker_logger()
+
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
     itimes = list(range(times.size))

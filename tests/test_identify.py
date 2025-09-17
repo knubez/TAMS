@@ -20,7 +20,12 @@ def test_contour_too_small_skipped():
     assert len(contours) == 1
     assert len(gdf) == 0
 
-    contours = [np.array([[0, 0], [1, 1], [0, 0.5]])]
+    contours = [np.array([[0, 0], [1, 1], [0, 0.5]])]  # open
+    gdf = tams.core._contours_to_gdf(contours)
+    assert len(contours) == 1
+    assert len(gdf) == 0
+
+    contours = [np.array([[0, 0], [1, 1], [0, 0.5], [0, 0]])]  # closed
     gdf = tams.core._contours_to_gdf(contours)
     assert len(contours) == 1
     assert len(gdf) == 1
@@ -33,7 +38,8 @@ def test_contour(msg_tb0, caplog):
         cs_closed = tams.contour(tb, 219)
 
     debug_msgs = [r.message for r in caplog.records if r.levelname == "DEBUG"]
-    assert set(debug_msgs) == {"skipping open contour"}
+    # assert set(debug_msgs) == {"skipping open contour"}
+    assert debug_msgs == ["skipped 2 open contours"]
 
     assert set(cs_closed.geom_type) == {"LinearRing"}
     assert cs_closed.closed.all()  # our series
@@ -78,7 +84,7 @@ def test_contour(msg_tb0, caplog):
         ),
         pytest.param(
             [[0, 0], [1, 1]],
-            "skipping open contour",
+            "skipped 1 open contours",
             id="2-pt open",
         ),
         pytest.param(
@@ -99,7 +105,7 @@ def test_contour_skipped(contour, messages, caplog):
         messages = [messages]
 
     with caplog.at_level("DEBUG", logger="tams"):
-        cs = tams.core._contours_to_gdf_new(contours)
+        cs = tams.core._contours_to_gdf(contours)
 
     assert cs.empty
 
@@ -133,7 +139,7 @@ def test_contour_skipped_open(contour, messages, caplog):
         messages = [messages]
 
     with caplog.at_level("DEBUG", logger="tams"):
-        cs = tams.core._contours_to_gdf_new(contours, closed_only=False)
+        cs = tams.core._contours_to_gdf(contours, closed_only=False)
 
     assert cs.empty
 
@@ -150,7 +156,7 @@ def test_contour_repeated_point():
     ]
     assert [len({tuple(row) for row in c}) for c in contours] == [3] * len(contours)
 
-    cs = tams.core._contours_to_gdf_new(contours, closed_only=False)
+    cs = tams.core._contours_to_gdf(contours, closed_only=False)
 
     assert len(cs) == 2
     assert cs.iloc[0].closed
@@ -167,10 +173,10 @@ def test_contour_tolerance_snap():
     contour = [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0 + eps]]
     contours = [np.asarray(contour)]
 
-    cs = tams.core._contours_to_gdf_new(contours)
+    cs = tams.core._contours_to_gdf(contours)
     assert cs.empty
 
-    cs = tams.core._contours_to_gdf_new(contours, tolerance=eps * 2)
+    cs = tams.core._contours_to_gdf(contours, tolerance=eps * 2)
     assert len(cs) == 1
 
 
@@ -179,11 +185,11 @@ def test_contour_tolerance_dedupe():
     contour = [[0, 0], [1, 0], [1, 0 + eps], [1, 1], [0, 1], [0, 0]]
     contours = [np.asarray(contour)]
 
-    cs = tams.core._contours_to_gdf_new(contours)
+    cs = tams.core._contours_to_gdf(contours)
     assert len(cs) == 1
     assert shapely.get_coordinates(cs.iloc[0].contour).shape[0] == len(contour)
 
-    cs = tams.core._contours_to_gdf_new(contours, tolerance=eps * 2)
+    cs = tams.core._contours_to_gdf(contours, tolerance=eps * 2)
     assert len(cs) == 1
     assert shapely.get_coordinates(cs.iloc[0].contour).shape[0] == len(contour) - 1
 
@@ -209,7 +215,7 @@ def test_contours_to_shields_auto_edge(rem, rev, num):
         i_outer, i_inner = i_inner, i_outer
     assert shapely.LinearRing(segs[i_inner]).is_ccw == inner_ccw
 
-    cs = tams.core._contours_to_gdf_new(segs)
+    cs = tams.core._contours_to_gdf(segs)
     assert len(cs) == len(segs)
     assert cs.iloc[i_outer].encloses_higher == (not inner_ccw if is_even else inner_ccw)
     assert cs.encloses_higher.sum() == len(cs) // 2 + int(is_odd and inner_ccw)
@@ -234,7 +240,7 @@ def test_contours_to_shields_manual_edge():
     assert shapely.LinearRing(segs[0]).is_ccw
     assert not shapely.LinearRing(segs[1]).is_ccw
 
-    cs = tams.core._contours_to_gdf_new(segs)
+    cs = tams.core._contours_to_gdf(segs)
     assert len(cs) == len(segs)
     assert cs.iloc[0].encloses_higher  # edge
     assert not cs.iloc[1].encloses_higher
@@ -263,7 +269,7 @@ def test_contours_to_shields_two_holes():
     h2 = ones_square[::-1] + np.r_[1.5, 0]
     segs = [(5 * ones_square), h1, h2]
 
-    cs = tams.core._contours_to_gdf_new(segs)
+    cs = tams.core._contours_to_gdf(segs)
     assert len(cs) == len(segs)
 
     el = tams.core._contours_to_shields(cs)

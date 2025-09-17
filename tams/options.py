@@ -1,4 +1,5 @@
 import logging
+import os
 from copy import deepcopy
 from pathlib import Path
 from typing import TypedDict
@@ -67,6 +68,7 @@ class set_options:
                     set_logger_level(logging.NOTSET)
                 else:
                     set_logger_level(v)
+                os.environ["TAMS_WORKER_LOGGER_LEVEL"] = str(v) if v is not None else ""
             elif k == "logger_handler":
                 if v == "stderr":
                     set_logger_handler(stderr=True)
@@ -74,6 +76,7 @@ class set_options:
                     set_logger_handler(stdout=True)
                 else:
                     set_logger_handler(file=v)
+                os.environ["TAMS_WORKER_LOGGER_HANDLER"] = str(v) if v is not None else ""
             OPTIONS[k] = v
 
     def __enter__(self):
