@@ -220,7 +220,7 @@ def test_contours_to_shields_auto_edge(rem, rev, num):
     assert cs.encloses_higher.sum() == len(cs) // 2 + int(is_odd and inner_ccw)
 
     el = tams.core._contours_to_polygons(cs)
-    assert el.area.is_monotonic_increasing
+    assert el.to_crs("EPSG:32663").area.is_monotonic_increasing
     assert len(el) == len(cs) // 2 + int(is_odd)
     if is_even:
         assert el.geometry.interiors.str.len().eq(1).all()
