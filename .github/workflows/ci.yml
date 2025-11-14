@@ -25,7 +25,7 @@ jobs:
           cache-environment: true
 
       - name: pytest
-        run: pytest -v -ra test_tams.py
+        run: pytest -v -ra tests
 
       - name: Run as script
         run: python -m tams.core
@@ -34,4 +34,4 @@ jobs:
         run: |
           mypy --install-types --non-interactive \
             --ignore-missing-imports \
-            tams test_tams.py
+            tams tests

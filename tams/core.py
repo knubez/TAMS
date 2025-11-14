@@ -5,7 +5,6 @@ Core routines that make up the TAMS algorithm.
 from __future__ import annotations
 
 import functools
-import logging
 import warnings
 from typing import TYPE_CHECKING
 
@@ -13,66 +12,223 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .util import _the_unique, sort_ew
+from .util import _the_unique, get_logger, get_worker_logger, sort_ew
 
 if TYPE_CHECKING:
     import geopandas
-    import matplotlib
     import numpy
     import pandas
     import shapely
     import xarray
+    from matplotlib.tri import Triangulation
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
-def contours(
+def _contour_segs_to_gdf(
+    segs: list[numpy.ndarray],
+    *,
+    closed_only: bool = True,
+    tolerance: float = 1e-12,
+) -> geopandas.GeoDataFrame:
+    """Convert contour segments from matplotlib to a GeoDataFrame.
+
+    Parameters
+    ----------
+    segs
+        List of 2-D arrays describing contours.
+        The arrays are shape ``(n, 2)``; each row is a coordinate pair.
+    closed_only
+        Only return closed contours.
+    tolerance
+        Tolerance for snapping the start and end points of a contour together
+        and for removing repeated points.
+
+    Returns
+    -------
+    :
+        GeoDataframe of analyzed contours.
+        Closed contours as :class:`~shapely.LinearRing`,
+        open contours as :class:`~shapely.LineString`.
+    """
+    from collections import Counter
+
+    import geopandas as gpd
+    from shapely import LinearRing, LineString, Polygon, remove_repeated_points
+    from shapely.errors import TopologicalError
+    from shapely.geometry.polygon import orient
+    from shapely.validation import explain_validity
+
+    logger = get_worker_logger()
+
+    if not tolerance >= 0:
+        raise ValueError("tolerance must be non-negative")
+
+    n0 = len(segs)
+    skipped: Counter[str] = Counter()
+    logger.info(f"processing {n0} contours")
+    data = []
+    for c in segs:
+        if c.shape[0] < 2:
+            # 0 -> empty LinearRing or LineString
+            # 1 -> LineString GEOS exception (needs 2)
+            # 1-2 -> LinearRing ValueError (needs 4)
+            # 3 -> LinearRing will add the first point to the end to make 4
+            skipped["too few points"] += 1
+            continue
+
+        # Snap closed if close
+        if np.isclose(c[0], c[-1], atol=tolerance, rtol=0).all():
+            c[-1] = c[0]
+
+        is_closed = (c[-1] == c[0]).all()
+        ls = remove_repeated_points(LineString(c), tolerance=tolerance)
+
+        # "closed line loops are oriented anticlockwise
+        # if they enclose a region that is higher then the contour level,
+        # or clockwise if they enclose a region that is lower than the contour level"
+        if is_closed:
+            try:
+                r = LinearRing(ls)
+            except (ValueError, TopologicalError) as e:
+                skipped[f"invalid closed ({e})"] += 1
+                continue
+            if not r.is_valid:
+                skipped[f"invalid closed ({explain_validity(r)})"] += 1
+                continue
+            encloses_higher = r.is_ccw
+            r_ccw = orient(Polygon(r)).exterior  # ensure consistent
+            assert r_ccw.is_valid
+            data.append(
+                {
+                    "contour": r_ccw,
+                    "closed": is_closed,
+                    "encloses_higher": encloses_higher,
+                }
+            )
+        elif closed_only:
+            skipped["open"] += 1
+            continue
+        else:
+            encloses_higher = None
+            if not ls.is_valid:
+                skipped[f"invalid open ({explain_validity(ls)})"] += 1
+                continue
+            if not ls.is_simple:
+                # e.g. self-intersecting
+                skipped["non-simple open"] += 1
+                continue
+            data.append(
+                {
+                    "contour": ls,
+                    "closed": is_closed,
+                    "encloses_higher": encloses_higher,
+                }
+            )
+
+    assert skipped.total() == n0 - len(data)
+    if skipped:
+        logger.debug(
+            "skipped contours: " + ", ".join(f"{k}: {v}" for k, v in sorted(skipped.items()))
+        )
+    logger.info(f"returning {len(data)}/{n0} contours")
+    if not data:
+        data = {  # type: ignore[assignment]
+            "contour": [],
+            "closed": [],
+            "encloses_higher": [],
+        }
+
+    return gpd.GeoDataFrame(
+        data,
+        geometry="contour",
+        crs="EPSG:4326",
+    ).astype(
+        {
+            "closed": bool,
+            "encloses_higher": "boolean",  # nullable
+        },
+    )
+
+
+def contour(
     x: xarray.DataArray,
     value: float,
     *,
     unstructured: bool | None = None,
-    **kwargs,
-) -> list[numpy.ndarray]:
-    """Find contour definitions for data `x` at value `value`.
+    triangulation: Triangulation | None = None,
+    closed_only: bool = True,
+    tolerance: float = 1e-12,
+) -> geopandas.GeoDataFrame:
+    """Contour `x` at `value`, producing a dataframe of contour lines.
 
     Parameters
     ----------
     x
         Data to be contoured.
-        Currently needs to have ``'lat'`` and ``'lon'`` coordinates.
+        Needs to have ``'lat'`` and ``'lon'`` coordinates.
         The array should be 2-D if structured, 1-D if unstructured.
     value
         Find contours where `x` has this value.
     unstructured
         Whether the grid of `x` is unstructured (e.g. MPAS native output).
         Default: assume unstructured if `x` is 1-D.
+    triangulation
+        A pre-computed :class:`~matplotlib.tri.Triangulation` for `x`
+        with unstructured grid.
+    closed_only
+        Only return closed contours.
+    tolerance
+        Tolerance for snapping the start and end points of a contour together
+        and for removing repeated points.
 
     Returns
     -------
-    :
-        List of 2-D arrays describing contours.
-        The arrays are shape ``(n, 2)``; each row is a coordinate pair.
+    cs
+        GeoDataframe of analyzed contours.
+        Closed contours as :class:`~shapely.LinearRing`,
+        open contours as :class:`~shapely.LineString`.
+
+        Columns:
+
+        - ``contour`` -- geometry, the contours
+        - ``closed`` -- bool, whether the contour is closed
+        - ``encloses_higher`` -- nullable bool, if closed, whether the contour
+          encloses a region with values higher than `value`.
+          If not closed, this is null.
 
     Raises
     ------
     ValueError
         If all values in `x` are null.
+        Or if `x` has an unexpected number of dimensions.
     """
+    import matplotlib.pyplot as plt
+
+    logger = get_worker_logger()
+
     if x.isnull().all():
-        raise ValueError("Input array `x` is all null (e.g. NaN)")
+        raise ValueError("input array `x` is all null (e.g. NaN)")
 
     if unstructured is None:
         unstructured = x.ndim == 1
 
-    # TODO: have this return GDF instead?
-    # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
-    # TODO: optionally filter out unclosed?
-    import matplotlib.pyplot as plt
+    name = x.name or "?"
+    s_dims = ", ".join(f"{d}: {n}" for d, n in x.sizes.items())
+    s_tri = "..." if triangulation is not None else "None"
+    logger.info(
+        f"contouring {name} ({s_dims}) at {value}, "
+        f"unstructured={unstructured}, triangulation={s_tri}, "
+        f"closed_only={closed_only}, tolerance={tolerance}"
+    )
 
     if unstructured:
-        assert x.ndim == 1, "this is for a single time step"
-        tri = kwargs.get("triangulation")
+        if not x.ndim == 1:
+            raise ValueError(
+                "this is for a single time step. For unstructured grid there should be one dim."
+            )
+        tri = triangulation
         if tri is None:
             from matplotlib.tri import Triangulation
 
@@ -81,7 +237,8 @@ def contours(
             fig = plt.figure()
             cs = plt.tricontour(tri, x, levels=[value])
     else:
-        assert x.ndim == 2, "this is for a single image"
+        if not x.ndim == 2:
+            raise ValueError("this is for a single image")
         with plt.ioff():  # requires mpl 3.4
             fig = plt.figure()
             cs = x.plot.contour(x="lon", y="lat", levels=[value])
@@ -89,39 +246,86 @@ def contours(
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
 
-    return cs.allsegs[0]
+    return _contour_segs_to_gdf(cs.allsegs[0], closed_only=closed_only, tolerance=tolerance)
 
 
-def _contours_to_gdf(cs: list[np.ndarray]) -> geopandas.GeoDataFrame:
-    from geopandas import GeoDataFrame
-    from shapely.geometry.polygon import LinearRing, LineString, Point, orient
+def _contours_to_polygons(
+    cs: geopandas.GeoDataFrame,
+    *,
+    edge_encloses_higher: bool | None = None,
+) -> geopandas.GeoDataFrame:
+    """Take the closed contours in `cs` (from :func:`contour`),
+    which are :class:`~shapely.LineString`,
+    and convert to :class:`~shapely.Polygon`, accounting for holes."""
+    from collections import defaultdict
 
-    if isinstance(cs, np.ndarray) and cs.ndim == 2 and cs.shape[1] == 2:
-        # Single array, probably mpl 3.8.0
-        import matplotlib
+    import geopandas as gpd
+    from shapely import Polygon
+    from shapely.geometry.polygon import orient
 
-        mpl_ver = getattr(matplotlib, "__version__", "?")
+    if cs.empty:
+        return gpd.GeoDataFrame(
+            geometry=[],
+            crs="EPSG:4326",
+        )
 
-        logger.debug(f"got single array `cs`; matplotlib version: {mpl_ver}")
+    # Preprocess by selecting closed contours, converting to polygons,
+    # computing area, and sorting (smallest -> largest)
+    cs = (
+        cs.query("closed")
+        .assign(contour=cs.geometry.apply(lambda r: Polygon(r)))
+        .assign(area_km2=lambda df: df.geometry.to_crs("EPSG:32663").area / 1e6)
+        .sort_values("area_km2")
+        .reset_index(drop=True)
+    )
+    if edge_encloses_higher is None:
+        largest = cs.iloc[-1]
+        edge_encloses_higher = largest.encloses_higher
 
-    polys = []
-    for c in cs:
-        x, y = c.T
-        if x.size < 3:
-            logger.info(f"skipping an input contour with less than 3 points: {c}")
+    contains = cs.sjoin(cs, predicate="contains", how="left")
+
+    # Work from smallest outwards
+    # A contour is a hole if it is within another contour and its `encloses_higher`
+    # is opposite that of `edge_encloses_higher`.
+    # Take the smallest container to be the parent.
+    # A hole can only belong to one parent,
+    # though a parent can have multiple holes.
+    hole_inds = defaultdict(list)
+    all_holes = set()
+    for _, g in contains.rename_axis("index_left").reset_index().groupby("index_left"):
+        for _, row in g.iterrows():
+            if (
+                row.encloses_higher_right != edge_encloses_higher
+                and row.encloses_higher_left == edge_encloses_higher
+                and row.index_right not in all_holes
+            ):
+                hole_inds[row.index_left].append(row.index_right)
+                all_holes.add(row.index_right)
+
+    # Construct new polygons from the existing
+    new_polys = []
+    for i in cs.index:
+        if i in hole_inds:
+            p = Polygon(
+                cs.loc[i].contour.exterior,
+                [orient(cs.loc[j].contour, -1).exterior for j in hole_inds[i]],
+            )
+            new_polys.append(p)
+        elif i in all_holes:
             continue
-        r = LinearRing(zip(x, y))
-        p0 = r.convex_hull  # TODO: optional, also add buffer option
-        if type(p0) is LineString or type(p0) is Point:
-            continue  # not a closed contour
-        p = orient(p0)  # -> counter-clockwise
-        polys.append(p)
+        else:
+            # Technically, an outermost edge could still be a hole
+            if cs.loc[i].encloses_higher != edge_encloses_higher:
+                continue
+            new_polys.append(cs.loc[i].contour)
 
-    return GeoDataFrame(geometry=polys, crs="EPSG:4326")
-    # ^ This crs indicates input in degrees
+    return gpd.GeoDataFrame(
+        geometry=new_polys,
+        crs="EPSG:4326",
+    )
 
 
-def _size_filter_contours(
+def _size_filter(
     cs235: geopandas.GeoDataFrame,
     cs219: geopandas.GeoDataFrame,
     *,
@@ -135,6 +339,8 @@ def _size_filter_contours(
     import geopandas as gpd
     from shapely.geometry import MultiPolygon
 
+    logger = get_worker_logger()
+
     # Drop small 235s (a 235 with area < 4000 km2 can't have 219 area of 4000)
     cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
     # ^ This crs is equidistant cylindrical
@@ -142,7 +348,7 @@ def _size_filter_contours(
     if not big_enough.empty:
         logger.info(
             f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-            f" of 235s are big enough ({threshold} km2)"
+            f"of 235s are big enough ({threshold} km2)"
         )
     cs235 = cs235[big_enough].reset_index(drop=True)
 
@@ -155,7 +361,7 @@ def _size_filter_contours(
     if not big_enough.empty:
         logger.info(
             f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-            f" of 219s are big enough ({individual_219_threshold} km2)"
+            f"of 219s are big enough ({individual_219_threshold} km2)"
         )
     cs219 = cs219[big_enough].reset_index(drop=True)
 
@@ -219,26 +425,46 @@ def _identify_one(
     ctt_core_threshold: float = 219,
     size_filter: bool = True,
     size_threshold: float = 4000,
+    convex_hull: bool = True,
     unstructured: bool | None = None,
-    triangulation: matplotlib.tri.Triangulation | None = None,
+    triangulation: Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
-    cs235 = sort_ew(
-        _contours_to_gdf(
-            contours(ctt, ctt_threshold, unstructured=unstructured, triangulation=triangulation)
-        )
-    ).reset_index(drop=True)
-    cs219 = sort_ew(
-        _contours_to_gdf(
-            contours(
-                ctt, ctt_core_threshold, unstructured=unstructured, triangulation=triangulation
-            )
-        )
-    ).reset_index(drop=True)
+    logger = get_worker_logger()
+
+    name = ctt.name or "?"
+    time = ctt.coords.get("time", None)
+    if time is None:
+        s_time = "?"
+    else:
+        s_time = time.values[()]
+    logger.info(f"identifying CEs in {name} at time {s_time}")
+
+    kws = dict(
+        unstructured=unstructured,
+        triangulation=triangulation,
+        closed_only=True,
+    )
+    cs235 = (
+        contour(ctt, ctt_threshold, **kws)  # type: ignore[arg-type]
+        .pipe(_contours_to_polygons)
+        .pipe(sort_ew)
+        .reset_index(drop=True)
+    )
+    cs219 = (
+        contour(ctt, ctt_core_threshold, **kws)  # type: ignore[arg-type]
+        .pipe(_contours_to_polygons)
+        .pipe(sort_ew)
+        .reset_index(drop=True)
+    )
+
+    if convex_hull:
+        cs235["geometry"] = cs235.geometry.convex_hull
+        cs219["geometry"] = cs219.geometry.convex_hull
 
     if size_filter:
-        cs235, cs219 = _size_filter_contours(cs235, cs219, threshold=size_threshold)
+        cs235, cs219 = _size_filter(cs235, cs219, threshold=size_threshold)
 
     return cs235, cs219
 
@@ -250,6 +476,7 @@ def identify(
     ctt_core_threshold: float = 219,
     size_filter: bool = True,
     size_threshold: float = 4000,
+    convex_hull: bool = True,
     parallel: bool = False,
 ) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
@@ -280,6 +507,13 @@ def identify(
         Only 235s with enough 219 area (`size_threshold`) are kept.
     size_threshold
         Area threshold (units: km²) to use when `size_filter` is enabled.
+    convex_hull
+        Apply convex hull to the CE polygons to simplify the shapes.
+
+        .. note::
+
+           * This is done before size filtering / area computation.
+           * This fills in any holes the CE polygons may have.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
 
@@ -300,9 +534,21 @@ def identify(
     :doc:`/examples/identify`
         Demonstrating the impacts of options.
     """
+    # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
     dims = tuple(ctt.dims)
 
+    s_dims = ", ".join(f"{d}: {n}" for d, n in ctt.sizes.items())
+    name = ctt.name or "?"
+    logger.info(
+        f"identifying CEs in {name} ({s_dims}), "
+        f"ctt_threshold={ctt_threshold}, ctt_core_threshold={ctt_core_threshold}, "
+        f"size_filter={size_filter}, size_threshold={size_threshold}, "
+        f"convex_hull={convex_hull}, "
+        f"parallel={parallel}"
+    )
+
     unstructured = (len(dims) == 2 and "time" in dims) or (len(dims) == 1)
+    logger.debug(f"assuming unstructured={unstructured}")
 
     triangulation = None
     if unstructured:
@@ -324,11 +570,15 @@ def identify(
         ctt_core_threshold=ctt_core_threshold,
         size_filter=size_filter,
         size_threshold=size_threshold,
+        convex_hull=convex_hull,
         unstructured=unstructured,
         triangulation=triangulation,
     )
 
     if (not unstructured and len(dims) == 2) or (unstructured and len(dims) == 1):
+        if parallel:
+            logger.debug(f"assuming one time, ignoring parallel={parallel}")
+
         cs235, cs219 = f(ctt)
         css235, css219 = (cs235,), (cs219,)  # to tuple for consistency
 
@@ -344,6 +594,7 @@ def identify(
             except ImportError as e:
                 raise RuntimeError("joblib required") from e
 
+            logger.info(f"identifying in parallel over {len(itimes)} time steps")
             res = joblib.Parallel(n_jobs=-2, verbose=10)(
                 joblib.delayed(f)(ctt.isel(time=i)) for i in itimes
             )
@@ -365,6 +616,7 @@ def identify(
         warnings.warn("No CEs identified", stacklevel=2)
     elif inds_empty:
         warnings.warn(f"No CEs identified for time steps: {inds_empty}", stacklevel=2)
+    logger.info(f"identified CEs in {len(css235) - len(inds_empty)}/{len(css235)} time steps")
 
     return list(css235), list(css219)
 
@@ -675,6 +927,9 @@ def track(
         ``'b'`` for ``look='forward'``
         ), i.e. the CE at the later of the two times.
     """
+
+    logger = get_worker_logger()
+
     assert len(contours_sets) == len(times) and len(times) > 1
     times = pd.DatetimeIndex(times)
     itimes = list(range(times.size))

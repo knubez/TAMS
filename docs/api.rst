@@ -30,7 +30,7 @@ Lower level functions used in the above include:
    :toctree: api/
 
    tams.calc_ellipse_eccen
-   tams.contours
+   tams.contour
    tams.data_in_contours
    tams.overlap
    tams.project
