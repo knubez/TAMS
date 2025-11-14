@@ -44,8 +44,8 @@ def test_ellipse_eccen(wh):
 
 def test_data_in_contours_methods_same_result(msg_tb0):
     tb = msg_tb0
-    cs235 = tams.core._contours_to_gdf(tams.contours(tb, 235))
-    cs219 = tams.core._contours_to_gdf(tams.contours(tb, 219))
+    cs235 = tams.core._contours_to_shields(tams.contour(tb, 235))
+    cs219 = tams.core._contours_to_shields(tams.contour(tb, 219))
     cs235, _ = tams.core._size_filter(cs235, cs219)
 
     vn = "tb"

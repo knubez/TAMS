@@ -69,32 +69,32 @@ def test_contour(msg_tb0, caplog):
     [
         pytest.param(
             [[]],
-            "skipping an input contour with less than 2 points: []",
+            "skipped contours: too few points: 1",
             id="empty",
         ),
         pytest.param(
             [[0, 0]],
-            "skipping an input contour with less than 2 points: [[0 0]]",
+            "skipped contours: too few points: 1",
             id="1-pt",
         ),
         pytest.param(
             [[0, 0], [0, 0]],
-            "skipping invalid closed contour: An input LineString must be valid.",
+            "skipped contours: invalid closed (An input LineString must be valid.): 1",
             id="2-pt closed",
         ),
         pytest.param(
             [[0, 0], [1, 1]],
-            "skipped 1 open contours",
+            "skipped contours: open: 1",
             id="2-pt open",
         ),
         pytest.param(
             [[0, 0], [1, 1], [0, 0]],
-            "skipping invalid closed contour: Too few points in geometry component[0 0]",
+            "skipped contours: invalid closed (Too few points in geometry component[0 0]): 1",
             id="3-pt closed",
         ),
         pytest.param(
             [[0, 0], [1, 0], [0.5, 1], [0.5, -1], [0, 0]],
-            "skipping invalid closed contour: Ring Self-intersection[0.5 0]",
+            "skipped contours: invalid closed (Ring Self-intersection[0.5 0]): 1",
             id="self-intersecting",
         ),
     ],
@@ -118,17 +118,17 @@ def test_contour_skipped(contour, messages, caplog):
     [
         pytest.param(
             [[0, 0], [1, 1], [0, 0], [1, 1]],
-            "skipping non-simple open contour",
+            "skipped contours: non-simple open: 1",
             id="back-and-forth",
         ),
         pytest.param(
             [[0, 0], [1, 0], [0.5, 1], [0.5, -1]],
-            "skipping non-simple open contour",
+            "skipped contours: non-simple open: 1",
             id="self-intersecting (through)",
         ),
         pytest.param(
             [[0, 0], [1, 0], [0.5, 1], [0.5, 0]],
-            "skipping non-simple open contour",
+            "skipped contours: non-simple open: 1",
             id="self-intersecting (tangent)",
         ),
     ],
