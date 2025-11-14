@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 logger = get_logger()
 
 
-def _contours_to_gdf(
+def _contour_segs_to_gdf(
     segs: list[numpy.ndarray],
     *,
     closed_only: bool = True,
@@ -128,7 +128,10 @@ def _contours_to_gdf(
             )
 
     assert skipped.total() == n0 - len(data)
-    logger.debug("skipped contours: " + ", ".join(f"{k}: {v}" for k, v in sorted(skipped.items())))
+    if skipped:
+        logger.debug(
+            "skipped contours: " + ", ".join(f"{k}: {v}" for k, v in sorted(skipped.items()))
+        )
     logger.info(f"returning {len(data)}/{n0} contours")
     if not data:
         data = {  # type: ignore[assignment]
@@ -158,7 +161,7 @@ def contour(
     closed_only: bool = True,
     tolerance: float = 1e-12,
 ) -> geopandas.GeoDataFrame:
-    """Contour `x` at `value`.
+    """Contour `x` at `value`, producing a dataframe of contour lines.
 
     Parameters
     ----------
@@ -243,17 +246,17 @@ def contour(
     plt.close(fig)
     assert len(cs.allsegs) == 1, "only one level"
 
-    return _contours_to_gdf(cs.allsegs[0], closed_only=closed_only, tolerance=tolerance)
+    return _contour_segs_to_gdf(cs.allsegs[0], closed_only=closed_only, tolerance=tolerance)
 
 
-def _contours_to_shields(
+def _contours_to_polygons(
     cs: geopandas.GeoDataFrame,
     *,
     edge_encloses_higher: bool | None = None,
 ) -> geopandas.GeoDataFrame:
     """Take the closed contours in `cs` (from :func:`contour`),
-    which are :class:`LineString`,
-    and convert to :class:`Polygon`, accounting for holes."""
+    which are :class:`~shapely.LineString`,
+    and convert to :class:`~shapely.Polygon`, accounting for holes."""
     from collections import defaultdict
 
     import geopandas as gpd
@@ -422,6 +425,7 @@ def _identify_one(
     ctt_core_threshold: float = 219,
     size_filter: bool = True,
     size_threshold: float = 4000,
+    convex_hull: bool = True,
     unstructured: bool | None = None,
     triangulation: Triangulation | None = None,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
@@ -442,10 +446,22 @@ def _identify_one(
         triangulation=triangulation,
         closed_only=True,
     )
-    cs235 = sort_ew(_contours_to_shields(contour(ctt, ctt_threshold, **kws))).reset_index(drop=True)
-    cs219 = sort_ew(_contours_to_shields(contour(ctt, ctt_core_threshold, **kws))).reset_index(
-        drop=True
+    cs235 = (
+        contour(ctt, ctt_threshold, **kws)
+        .pipe(_contours_to_polygons)
+        .pipe(sort_ew)
+        .reset_index(drop=True)
     )
+    cs219 = (
+        contour(ctt, ctt_core_threshold, **kws)
+        .pipe(_contours_to_polygons)
+        .pipe(sort_ew)
+        .reset_index(drop=True)
+    )
+
+    if convex_hull:
+        cs235["geometry"] = cs235.geometry.convex_hull
+        cs219["geometry"] = cs219.geometry.convex_hull
 
     if size_filter:
         cs235, cs219 = _size_filter(cs235, cs219, threshold=size_threshold)
@@ -460,6 +476,7 @@ def identify(
     ctt_core_threshold: float = 219,
     size_filter: bool = True,
     size_threshold: float = 4000,
+    convex_hull: bool = True,
     parallel: bool = False,
 ) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
@@ -490,6 +507,13 @@ def identify(
         Only 235s with enough 219 area (`size_threshold`) are kept.
     size_threshold
         Area threshold (units: km²) to use when `size_filter` is enabled.
+    convex_hull
+        Apply convex hull to the CE polygons to simplify the shapes.
+
+        .. note::
+
+           * This is done before size filtering / area computation.
+           * This fills in any holes the CE polygons may have.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
 
@@ -519,6 +543,7 @@ def identify(
         f"identifying CEs in {name} ({s_dims}), "
         f"ctt_threshold={ctt_threshold}, ctt_core_threshold={ctt_core_threshold}, "
         f"size_filter={size_filter}, size_threshold={size_threshold}, "
+        f"convex_hull={convex_hull}, "
         f"parallel={parallel}"
     )
 
@@ -545,6 +570,7 @@ def identify(
         ctt_core_threshold=ctt_core_threshold,
         size_filter=size_filter,
         size_threshold=size_threshold,
+        convex_hull=convex_hull,
         unstructured=unstructured,
         triangulation=triangulation,
     )
