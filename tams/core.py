@@ -66,7 +66,7 @@ def _contour_segs_to_gdf(
         raise ValueError("tolerance must be non-negative")
 
     n0 = len(segs)
-    skipped = Counter()
+    skipped: Counter[str] = Counter()
     logger.info(f"processing {n0} contours")
     data = []
     for c in segs:
@@ -447,13 +447,13 @@ def _identify_one(
         closed_only=True,
     )
     cs235 = (
-        contour(ctt, ctt_threshold, **kws)
+        contour(ctt, ctt_threshold, **kws)  # type: ignore[arg-type]
         .pipe(_contours_to_polygons)
         .pipe(sort_ew)
         .reset_index(drop=True)
     )
     cs219 = (
-        contour(ctt, ctt_core_threshold, **kws)
+        contour(ctt, ctt_core_threshold, **kws)  # type: ignore[arg-type]
         .pipe(_contours_to_polygons)
         .pipe(sort_ew)
         .reset_index(drop=True)
