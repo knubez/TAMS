@@ -17,6 +17,9 @@
   [PRECIP field campaign](http://precip.org/) (summer 2022).
   It was specifically designed to load postprocessed outputs
   from near-real-time runs associated with that campaign.
+- `tams.contours()` has been renamed to {func}`tams.contour`
+  and now returns a {class}`~geopandas.GeoDataFrame` of contour lines
+  (instead of a list of arrays of line segment coordinates; {pull}`74`).
 
 ### New features
 
@@ -24,3 +27,11 @@
   and additional datasets have been added,
   including the MOSA test cases and a sample IMERG dataset ({pull}`70`).
   See {ref}`example_datasets` for details.
+- Contouring ({func}`tams.contour`) now drops non-closed contours by default
+  and computes whether the contour encloses higher or lower values
+  (to account for holes in CE polygons; {pull}`74`).
+- Convex hulling can be disabled in {func}`tams.identify` ({pull}`74`).
+- Logger level and handler can be controlled using {func}`tams.set_options`
+  and should still work even when using `parallel=True`.
+  The logs now include more information about the contouring,
+  including reasons for exclusion ({pull}`74`).

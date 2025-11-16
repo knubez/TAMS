@@ -42,6 +42,7 @@ warn_unused_ignores = true
 [tool.pytest.ini_options]
 filterwarnings = [
     'ignore:distutils Version classes are deprecated\. Use packaging\.version instead\.:DeprecationWarning',
+    'ignore:numpy\.ndarray size changed, may indicate binary incompat:RuntimeWarning',
     'ignore:np\.find\_common\_type is deprecated\.:DeprecationWarning',
     "ignore:The 'shapely\\.geos' module is deprecated:DeprecationWarning:geopandas._compat",
     "ignore:The 'shapely\\.geos' module is deprecated:DeprecationWarning:pyogrio",
