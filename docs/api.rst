@@ -1,18 +1,24 @@
+.. module:: tams
+
 ===
 API
 ===
 
+
+.. _core:
+
 Core
 ----
 
-These functions make up the core of the TAMS algorithm:
+These functions make up the core of the TAMS algorithm
+and are available at the top level (:mod:`tams`):
 
 .. autosummary::
    :toctree: api/
 
-   tams.identify
-   tams.track
-   tams.classify
+   identify
+   track
+   classify
 
 
 The helper function :func:`tams.run` combines the above plus additional processing,
@@ -21,7 +27,7 @@ including computing stats on gridded data within the identified cloud element re
 .. autosummary::
    :toctree: api/
 
-   tams.run
+   run
 
 
 Lower level functions used in the above include:
@@ -29,25 +35,29 @@ Lower level functions used in the above include:
 .. autosummary::
    :toctree: api/
 
-   tams.calc_ellipse_eccen
-   tams.contour
-   tams.data_in_contours
-   tams.overlap
-   tams.project
+   calc_ellipse_eccen
+   contour
+   data_in_contours
+   overlap
+   project
 
 
 Data
 ----
 
+:mod:`tams.data`
+
+.. automodule:: tams.data
+
 .. autosummary::
    :toctree: api/
 
-   tams.data.fetch_example
-   tams.data.open_example
-   tams.data.load_example
-   tams.data.tb_from_ir
-   tams.data.get_mergir
-   tams.data.get_imerg
+   fetch_example
+   open_example
+   load_example
+   tb_from_ir
+   get_mergir
+   get_imerg
 
 
 .. _example_datasets:
@@ -166,7 +176,7 @@ External data sources
 Idealized
 ~~~~~~~~~
 
-.. currentmodule:: tams.idealized
+:mod:`tams.idealized`
 
 .. automodule:: tams.idealized
 
@@ -229,17 +239,23 @@ Simulate a collection of blobs:
 Utilities
 ---------
 
+Currently this is available at the top level (:mod:`tams`),
+but it may be separate in the future.
+
 .. autosummary::
    :toctree: api/
 
-   tams.plot_tracked
+   plot_tracked
 
 
 Options
 -------
 
+Like the :ref:`core routines <core>`,
+options management is available at the top level (:mod:`tams`).
+
 .. autosummary::
    :toctree: api/
 
-   tams.set_options
-   tams.get_options
+   set_options
+   get_options
