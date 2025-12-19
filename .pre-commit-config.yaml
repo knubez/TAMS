@@ -8,49 +8,52 @@ repos:
       - id: check-useless-excludes
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: "v5.0.0"
+    rev: "v6.0.0"
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-docstring-first
-        exclude: ^examples/(mosa|dyamond)/lib.py
+        exclude: '^examples/(mosa|dyamond)/lib\.py'
       - id: check-yaml
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: "v3.19.1"
+    rev: "v3.21.2"
     hooks:
       - id: pyupgrade
         args: [--py37-plus]
 
   - repo: https://github.com/PyCQA/isort
-    rev: "6.0.1"
+    rev: "7.0.0"
     hooks:
       - id: isort
 
-  - repo: https://github.com/psf/black
-    rev: "25.1.0"
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: "25.11.0"
     hooks:
       - id: black
 
   - repo: https://github.com/PyCQA/flake8
-    rev: "7.2.0"
+    rev: "7.3.0"
     hooks:
       - id: flake8
 
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: "v3.5.3"
+    rev: "v3.7.3"
     hooks:
       - id: prettier
 
   - repo: https://github.com/kynan/nbstripout
-    rev: "0.8.1"
+    rev: "0.8.2"
     hooks:
       - id: nbstripout
-        exclude: ^docs/examples/tracking-options.ipynb
+        args:
+          - --extra-keys
+          - metadata.kernelspec metadata.language_info.version
+        exclude: '^docs/examples/tracking-options\.ipynb'
 
   - repo: https://github.com/codespell-project/codespell
     rev: "v2.4.1"
     hooks:
       - id: codespell
         additional_dependencies: [tomli]
-        exclude: 'docs/examples/tracking-options\.ipynb'
+        exclude: '^docs/examples/tracking-options\.ipynb'

@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import logging
+import os
+import sys
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 if TYPE_CHECKING:
     import geopandas
-    import matplotlib
     import pandas
+    from cartopy.mpl.geoaxes import GeoAxes
+    from matplotlib.axes import Axes
 
 
 def sort_ew(cs: geopandas.GeoDataFrame):
@@ -38,7 +43,7 @@ def plot_tracked(
     label: str = "id",
     add_colorbar: bool = False,
     cbar_kwargs: dict | None = None,
-    ax: matplotlib.axes.Axes | None = None,
+    ax: Axes | GeoAxes | None = None,
     size: float = 4,
     aspect: float | None = None,
 ):
@@ -105,28 +110,38 @@ def plot_tracked(
                 raise RuntimeError("cartopy required") from e
 
             proj = ccrs.Mercator()
-            tran = ccrs.PlateCarree()
             fig = plt.figure(figsize=(size * aspect, size))
             ax = fig.add_subplot(projection=proj)
-            ax.set_extent([x0, x1, y0, y1])  # type: ignore[attr-defined]
-            ax.gridlines(draw_labels=True)  # type: ignore[attr-defined]
+            if TYPE_CHECKING:
+                assert isinstance(ax, GeoAxes)
+            ax.set_extent([x0, x1, y0, y1])
+            ax.gridlines(draw_labels=True)
 
             if background == "map":
                 # TODO: a more high-res image
-                ax.stock_img()  # type: ignore[attr-defined]
+                ax.stock_img()
             else:  # countries
                 import cartopy.feature as cfeature
 
-                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")  # type: ignore[attr-defined]
-                ax.coastlines()  # type: ignore[attr-defined]
-
-            blob_kwargs.update(transform=tran)
-            text_kwargs.update(transform=tran)
+                ax.add_feature(cfeature.BORDERS, linewidth=0.7, edgecolor="0.3")
+                ax.coastlines()
 
         else:  # none
             _, ax = plt.subplots()
 
             ax.set(xlabel="lon [°E]", ylabel="lat [°N]")
+
+    try:
+        import cartopy.crs as ccrs
+        from cartopy.mpl.geoaxes import GeoAxes
+    except ImportError:
+        pass
+    else:
+        if isinstance(ax, GeoAxes):
+            tran = ccrs.PlateCarree()
+
+            blob_kwargs.update(transform=tran)
+            text_kwargs.update(transform=tran)
 
     t = pd.Series(sorted(cs.time.unique()))
     tmin, tmax = t.iloc[0], t.iloc[-1]
@@ -185,3 +200,172 @@ def _the_unique(s: pandas.Series):
         return u[0]
     else:
         raise ValueError(f"the Series has more than one unique value: {u}")
+
+
+def get_logger() -> logging.Logger:
+    """Get the ``'tams'`` logger."""
+    logger = logging.getLogger("tams")
+
+    return logger
+
+
+def set_logger_level(level: int | str) -> None:
+    """Set the logging level for the "tams" logger.
+
+    Parameters
+    ----------
+    level
+        Logging level, e.g., ``0`` (unset), ``logging.DEBUG``, ``'INFO'``, ``logging.WARNING``.
+    """
+    logger = get_logger()
+    logger.setLevel(level)
+
+
+def set_logger_handler(
+    *,
+    stderr: bool = False,
+    stdout: bool = False,
+    file: str | Path | None = None,
+) -> None:
+    """Set logging handler(s) for the "tams" logger.
+    By default, resets to no handlers.
+
+    Examples
+    --------
+    To stderr:
+    >>> set_logger_handler(stderr=True)
+
+    To file:
+    >>> set_logger_handler(file="tams.log")
+
+    Reset to nothing:
+    >>> set_logger_handler()
+    """
+    logger = get_logger()
+
+    if stderr and stdout:
+        raise ValueError("only one of `stderr` and `stdout` can be True")
+
+    for h in logger.handlers:
+        logger.removeHandler(h)
+
+    fmt_file = "%(levelname)s:%(asctime)s - %(message)s"
+    fmt_console = f"%(name)s:{fmt_file}"
+
+    handler: logging.Handler
+    if stderr:
+        handler = logging.StreamHandler(sys.stderr)
+        formatter = logging.Formatter(fmt_console)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    elif stdout:
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(fmt_console)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    if file is not None:
+        handler = logging.FileHandler(file)
+        formatter = logging.Formatter(fmt_file)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+
+def get_worker_logger():
+    """Get logger for a worker process, adapting to the joblib backend.
+
+    Special cases:
+
+    * serial execution: the ``'tams'`` logger will be returned, unmodified
+      - :func:`get_logger`
+    * Dask: the ``'distributed.worker'`` logger will be returned, unmodified
+      - ``client.get_worker_logs()``
+    * Ray: the ``'ray'`` logger will be returned, unmodified
+      - https://docs.ray.io/en/latest/ray-observability/user-guides/configure-logging.html
+
+    Otherwise (joblib loky, multiprocessing, threading backends),
+    the ``'tams.worker'`` logger will be returned,
+    configured to indicate process and/or thread ID in the log messages,
+    and handler/level consistent with the TAMS options.
+
+    Configure Dask or Ray logging beforehand.
+    This can be as simple as::
+
+        logging.getLogger('distributed.worker').setLevel(logging.DEBUG)
+
+    or::
+
+        logging.getLogger('ray').setLevel(logging.DEBUG)
+    """
+    from multiprocessing import current_process
+    from threading import current_thread
+
+    # For Dask or Ray, just return their logger,
+    # rely on their native logging.
+    try:
+        from dask.distributed import get_client
+
+        _ = get_client()
+        return logging.getLogger("distributed.worker")
+    except (ImportError, ValueError):
+        pass
+    try:
+        import ray
+
+        if ray.is_initialized():
+            return logging.getLogger("ray")
+    except (ImportError, ValueError):
+        pass
+
+    # Standard joblib backends or serial execution
+    fmt_file = "%(levelname)s:%(asctime)s - %(message)s"
+    this_process = current_process()
+    this_thread = current_thread()
+    if this_process.name != "MainProcess":
+        # Joblib process-based (loky or multiprocessing)
+        fmt_file = "%(processName)s:" + fmt_file
+    elif this_thread.name != "MainThread":
+        # Threading
+        fmt_file = "%(threadName)s:" + fmt_file
+    else:
+        # Serial
+        return get_logger()
+
+    # For joblib, use worker logger
+    logger = logging.getLogger("tams.worker")
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+    logger.propagate = False
+
+    # Set handler
+    handler_setting = os.getenv("TAMS_WORKER_LOGGER_HANDLER", "").strip()
+    if handler_setting != "":
+        if handler_setting == "stderr":
+            h = logging.StreamHandler(sys.stderr)
+            fmt = f"%(name)s:{fmt_file}"
+        elif handler_setting == "stdout":
+            h = logging.StreamHandler(sys.stdout)
+            fmt = f"%(name)s:{fmt_file}"
+        else:
+            h = logging.FileHandler(handler_setting)
+            fmt = fmt_file
+        h.setFormatter(logging.Formatter(fmt))
+        logger.addHandler(h)
+
+    # Set log level
+    level_setting = os.getenv("TAMS_WORKER_LOGGER_LEVEL", "").strip()
+    try:
+        level_setting = int(level_setting)
+    except ValueError:
+        pass
+    if level_setting == "":
+        logger.setLevel(logging.NOTSET)
+    else:
+        logger.setLevel(level_setting)
+
+    # Log worker info
+    this_pid = os.getpid()
+    main_pid = os.getppid()
+    logger.debug(f"{this_pid=}, {main_pid=}, {this_process.name=}, {this_thread.name=}")
+
+    return logger

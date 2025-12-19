@@ -99,7 +99,7 @@ if __name__ == "__main__":
     z = peaks(n=5)
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    z.plot.contourf(shading="auto", cmap="bone_r")  # type: ignore[attr-defined]
+    z.plot.contourf(shading="auto", cmap="bone_r")
     ax.axis("scaled")
     fig.tight_layout()
 

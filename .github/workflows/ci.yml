@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: "0 12 1,15 * *"
 
 jobs:
   test:
@@ -14,19 +16,16 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment-dev.yml
           cache-environment: true
 
-      - name: Download the sample data
-        run: python -c "from tams.data import download_examples; download_examples()"
-
       - name: pytest
-        run: pytest -v -ra test_tams.py
+        run: pytest -v -ra tests
 
       - name: Run as script
         run: python -m tams.core
@@ -35,4 +34,4 @@ jobs:
         run: |
           mypy --install-types --non-interactive \
             --ignore-missing-imports \
-            tams test_tams.py
+            tams tests

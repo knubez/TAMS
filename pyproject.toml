@@ -5,8 +5,8 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "tams"
 authors = [
-    {name = "knubez", email = "knocasio@ucar.edu"},
-    {name = "zmoon", email = "zmoon92@gmail.com"},
+    {name = "knubez", email = "knunez.ocasio@tamu.edu"},
+    {name = "zmoon", email = "zmoon@tamu.edu"},
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -35,10 +35,18 @@ known_first_party = "lib"
 [tool.black]
 line-length = 100
 
+[tool.mypy]
+warn_unused_configs = true
+warn_unused_ignores = true
+
 [tool.pytest.ini_options]
 filterwarnings = [
     'ignore:distutils Version classes are deprecated\. Use packaging\.version instead\.:DeprecationWarning',
+    'ignore:numpy\.ndarray size changed, may indicate binary incompat:RuntimeWarning',
     'ignore:np\.find\_common\_type is deprecated\.:DeprecationWarning',
+    "ignore:The 'shapely\\.geos' module is deprecated:DeprecationWarning:geopandas._compat",
+    "ignore:The 'shapely\\.geos' module is deprecated:DeprecationWarning:pyogrio",
+    "ignore:Conversion of an array with ndim > 0 to a scalar is deprecated:DeprecationWarning:pyproj\\.transformer",
 ]
 
 [tool.codespell]

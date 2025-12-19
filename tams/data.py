@@ -4,17 +4,20 @@ Loaders for various data sets.
 
 from __future__ import annotations
 
+import logging
 import warnings
+from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
-    from typing import Any, Sequence
+    from typing import Any
 
+    import pooch
     import xarray
 
 
@@ -36,9 +39,13 @@ def tb_from_ir(r, ch: int):
     """Compute brightness temperature from IR satellite radiances (`r`)
     in channel `ch` of the EUMETSAT MSG SEVIRI instrument.
 
-    Reference: http://www.eumetrain.org/data/2/204/204.pdf page 13
+    Reference: https://resources.eumetrain.org/data/2/204/204.pdf page 13
 
-    https://www.eumetsat.int/seviri
+    https://www.eumetsat.int/msg-services
+
+    The `old SEVIRI page <https://web.archive.org/web/20231112220636/https://www.eumetsat.int/seviri>`__
+    provides more detailed information about SEVIRI
+    (may take some time to load).
 
     Parameters
     ----------
@@ -63,340 +70,320 @@ def tb_from_ir(r, ch: int):
     tb = (c2 * vc / np.log((c1 * vc**3) / r + 1) - b) / a
 
     if isinstance(r, xr.DataArray):
-        tb.attrs.update(units="K", long_name="Brightness temperature")
+        tb.attrs.update(
+            units="K",
+            long_name="brightness temperature",
+            channel=ch,
+        )
+        tb.name = "tb"
 
     return tb
 
 
-def download_examples(*, clobber: bool = False) -> None:
-    """Download the example datasets.
+class _ExampleFile(NamedTuple):
+    key: str
+    """Key to identify the example file."""
 
-    * Satellite data (EUMETSAT MSG SEVIRI 10.8 μm IR radiance):
-      https://drive.google.com/file/d/1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD/view?usp=sharing
-    * MPAS regridded data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-/view?usp=sharing
-    * MPAS native output (unstructured grid) data (brightness temperature and precipitation):
-      https://drive.google.com/file/d/1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248/view?usp=sharing
+    file_id: str
+    """Google Drive file ID."""
 
-    .. note::
-       `gdown <https://github.com/wkentaro/gdown>`__,
-       used for downloading the files,
-       is not currently a required dependency of the TAMS Python package,
-       although it is included in the conda-forge recipe.
-       gdown is available on conda-forge and PyPI as ``gdown``.
-       Files < 100 MB can be easily downloaded from Google Drive with ``wget`` or similar,
-       but there are some subtleties with larger files.
+    sha256: str
+    """Expected (known) SHA256 hash of the file."""
 
-       Alternatively, you can download the files manually
-       using the links above.
+    fname: str | None = None
+    """File name to save as. ``{key}.nc`` will be used if not provided."""
 
-    Parameters
-    ----------
-    clobber
-        If set, overwrite existing files. Otherwise, skip downloading.
 
-    See Also
-    --------
-    tams.data.load_example_ir
-    tams.load_example_tb
-    tams.load_example_mpas
-    tams.load_example_mpas_ug
+_EXAMPLE_FILES: list[_ExampleFile] = [
+    _ExampleFile(
+        key="msg-rad-v0.1",
+        file_id="1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD",
+        sha256="42b0677700b527b677b77ad3450838214a79204188a3c15244af7e88fbfb26db",
+    ),
+    _ExampleFile(
+        key="msg-rad",
+        file_id="1nXpbX98Hs39ovcQXEy6eaBPVumJPLXah",
+        sha256="14ce08ff06e27e75c19e7a32570ee21302717b6bd073cebacac74807d2f0a7cb",
+    ),
+    _ExampleFile(
+        "imerg",
+        file_id="1wWV7eugFrw9T5h4NMFFKKr8kLcKKckn-",
+        sha256="3aa2c2ca23d6c6d1abd3a9f3df5e0acae939e76d586c3a6ea1c7af807a99e154",
+    ),
+    #
+    _ExampleFile(
+        key="mpas-regridded-v0.1",
+        file_id="1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-",
+        sha256="5d35aae75cf6f8598f922d6326fa8d2e45d6751cc67e0a4b1a5e2719bc1635be",
+    ),
+    _ExampleFile(
+        key="mpas-regridded",
+        file_id="1ZPuSXNIM8Vu2AF-L_GVTfx93QfiaWxIv",
+        sha256="240d10c671d8d35a717f41a8343573447d1410355cf80e22c468c594c3401186",
+    ),
+    #
+    _ExampleFile(
+        key="mpas-native-v0.1",
+        file_id="1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248",
+        sha256="40360896d2043030c48dc809c17e1111124c08519a7b6862670daa73b20f00f2",
+    ),
+    _ExampleFile(
+        key="mpas-native",
+        file_id="1ynhJM1z4zQrZxe0VCizybP_fH34KNVHt",
+        sha256="9e04f279a5fb1016fec7c24cd5e239f3541d5204b2c13d86b7b39f786ffd50ee",
+    ),
+    #
+    _ExampleFile(
+        key="mosa-test-1",
+        file_id="1-yETpWWd6pwypT-CmUZ15RcDh5dO29iW",
+        sha256="ee0fadaf81105c241d580501b19393bae38a683fe1fb37045a917a6849717238",
+    ),
+    _ExampleFile(
+        key="mosa-test-2",
+        file_id="11-8SVOpu39e4HI-l3wIdMHLI_cia8hmx",
+        sha256="a9b90b3c0d59de298d1174e87f8bc4f577fca869b9e1ca573c29674acc21e2b4",
+    ),
+    _ExampleFile(
+        key="mosa-test-3",
+        file_id="1_IAvkWsE6S95lkZwAV1gN8SooajW2Fec",
+        sha256="60b3e27cb3c6b45a5f578a8ed5dde18c9313bf5a22ecf3469d476f7e47b24cc7",
+    ),
+    _ExampleFile(
+        key="mosa-test-4",
+        file_id="1KoeCyT4qn_qLmZsheIC88si_4cfjwYb4",
+        sha256="2759e77d6a600dbec344701899a6430245ecfde363c7ecaacbc5efada5bda2d2",
+    ),
+]
+
+_EXAMPLE_FILE_DIRECT_LUT = {f.key: f for f in _EXAMPLE_FILES}
+
+_EXAMPLE_FILE_INDIRECT_LUT = {
+    "msg-tb": _EXAMPLE_FILE_DIRECT_LUT["msg-rad"],
+}
+
+_EXAMPLE_POSTPROC = {
+    "msg-tb": lambda ds: ds.assign(tb=ds["ch9"].pipe(tb_from_ir, ch=9)).drop_vars(["ch9"]),
+}
+
+
+def _gdownload(
+    url: str,
+    output_file: str,
+    pooch_instance: pooch.Pooch | None = None,
+    *,
+    quiet: bool = True,
+) -> None:
+    """Download a file from Google Drive using gdown.
+
+    Can be used as a custom downloader for pooch.
+    `url` should be just the Google Drive file ID.
     """
-
-    files = [
-        ("1nDWGLPzpe_nld_qbsyQcEYJ-KmMKRSqD", "Satellite_data.nc"),  # < 100 MB
-        ("1iQEAkFp397ZYGfgBJLMZYiE9aGPqx3o-", "MPAS_data.nc"),  # < 100 MB
-        ("1Bb9rjyhfSgJyJTuLnwCun3XnkWUOJ248", "MPAS_unstructured_data.nc"),  # > 100 MB
-    ]
+    from . import __version__
 
     try:
         import gdown
     except ImportError as e:
         raise RuntimeError(
-            "gdown is required in order to download the example data files. "
+            "gdown is required in order to auto download the example data files. "
             "It is available on conda-forge and PyPI as 'gdown'."
         ) from e
 
-    def download(id_: str, to: str):
-        gdown.download(id=id_, output=to, quiet=False)
+    gdown.download(
+        id=url,
+        output=output_file,
+        quiet=quiet,
+        user_agent=f"tams {__version__}",
+    )
 
-    for id_, fn in files:
-        fp = HERE / fn
-        if not clobber and fp.is_file():
-            print(f"Skipping {fn} because it already exists at {fp.as_posix()}.")
-            continue
+
+def _get_cache_dir() -> Path:
+    from .options import OPTIONS
+
+    cache_location = OPTIONS.get("cache_location")
+    if cache_location is None:
+        try:
+            import pooch
+        except ImportError as e:
+            raise RuntimeError(
+                "pooch is required for caching the example data files. "
+                "It is available on conda-forge and PyPI as 'pooch'."
+            ) from e
         else:
-            download(id_, fp.as_posix())
+            p = pooch.os_cache("tams")
+    else:
+        p = Path(cache_location)
+
+    return p
 
 
-def load_example_ir() -> xarray.DataArray:
-    """Load the example satellite infrared radiance data.
-
-    This comes from the EUMETSAT MSG SEVIRI instrument,
-    specifically the 10.8 μm channel (ch9).
-
-    This dataset contains 6 time steps of 2-hourly data (every 2 hours):
-    2006-09-01 00--10
-
-    See Also
-    --------
-    tams.data.download_examples
-    """
-
-    ds = xr.open_dataset(HERE / "Satellite_data.nc").rename_dims(
-        {"num_rows_vis_ir": "y", "num_columns_vis_ir": "x"}
-    )
-
-    ds.lon.attrs.update(long_name="Longitude")
-    ds.lat.attrs.update(long_name="Latitude")
-
-    # Times are 2006-Sep-01 00 -- 10, every 2 hours
-    ds["time"] = pd.date_range("2006-Sep-01", freq="2h", periods=6)
-
-    return ds.ch9
-
-
-def load_example_tb() -> xarray.DataArray:
-    """Load the example derived satellite brightness temperature data.
-
-    This works by first invoking :func:`tams.data.load_example_ir`
-    and then applying :func:`tams.data.tb_from_ir`.
-
-    This dataset contains 6 time steps of 2-hourly data (every 2 hours):
-    2006-09-01 00--10
-
-    See Also
-    --------
-    :func:`tams.data.download_examples`
-    :func:`tams.data.load_example_ir`
-    :func:`tams.data.tb_from_ir`
-
-    :doc:`/examples/sample-satellite-data`
-
-    :doc:`/examples/tracking-options`
-    """
-
-    r = load_example_ir()
-
-    return tb_from_ir(r, ch=9)
-
-
-def load_example_mpas() -> xarray.Dataset:
-    r"""Load the example MPAS dataset.
-
-    This is a spatial and variable subset of native MPAS output,
-    Furthermore, it has been regridded to a regular lat/lon grid (0.25°)
-    from the original 15-km mesh.
-
-    After regridding, it was spatially subsetted so that
-    lat ranges from -5 to 40°N
-    and lon from 85 to 170°E.
-    This domain relates to the PRECIP field campaign
-    (:func:`load_mpas_precip`).
-
-    It has ``tb`` (estimated brightness temperature)
-    and ``precip`` (precipitation rate, derived by summing the MPAS accumulated
-    grid-scale and convective precip variables ``rainnc`` and ``rainc`` and differentiating).
-
-    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
-
-    .. math::
-       E = \sigma T^4
-       \implies T = (E / \sigma)^{1/4}
-
-    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
-    in W m\ :sup:`-2`
-    and :math:`\sigma` is the Stefan--Boltzmann constant.
-
-    This dataset contains 127 time steps of hourly data:
-    2006-09-08 12 -- 2006-09-13 18.
-
-    See Also
-    --------
-    :func:`tams.data.download_examples`
-    :func:`tams.load_example_mpas_ug`
-
-    :doc:`/examples/tams-run`
-
-    :doc:`/examples/tracking-options`
-
-    :doc:`/examples/sample-mpas-ug-data`
-    """
-
-    ds = xr.open_dataset(HERE / "MPAS_data.nc").rename(xtime="time")
-
-    # Mask 0 values of T (e.g. at initial time since OLR is zero then)
-    ds["tb"] = ds.tb.where(ds.tb > 0)
-
-    ds.lat.attrs.update(long_name="Latitude", units="degree_north")
-    ds.lon.attrs.update(long_name="Longitude", units="degree_east")
-    ds.tb.attrs.update(long_name="Brightness temperature", units="K")
-    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
-
-    return ds
-
-
-def load_example_mpas_ug() -> xarray.Dataset:
-    r"""Load the example MPAS unstructured grid dataset.
-
-    This is a spatial and variable subset of native 15-km global mesh MPAS output.
-
-    It has been spatially subsetted so that
-    lat ranges from -5 to 20°N
-    and lon from 85 to 170°E,
-    similar to the example regridded MPAS dataset (:func:`load_example_mpas`)
-    except for a smaller lat upper bound.
-
-    Like the regridded MPAS dataset, it has hourly
-    ``tb`` (estimated brightness temperature)
-    and ``precip`` (precipitation rate)
-    for the period
-    2006-09-08 12 -- 2006-09-13 18.
-
-    Like the regridded MPAS dataset,
-    ``tb`` was estimated using the (black-body) Stefan--Boltzmann law:
-
-    .. math::
-       E = \sigma T^4
-       \implies T = (E / \sigma)^{1/4}
-
-    where :math:`E` is the OLR (outgoing longwave radiation, ``olrtoa`` in MPAS output)
-    in W m\ :sup:`-2`
-    and :math:`\sigma` is the Stefan--Boltzmann constant.
-
-    See Also
-    --------
-    :func:`tams.data.download_examples`
-    :func:`tams.load_example_mpas`
-
-    :doc:`/examples/sample-mpas-ug-data`
-    """
-
-    ds = xr.open_dataset(HERE / "MPAS_unstructured_data.nc").rename(
-        Time="time",
-        nCells="cell",
-        latcell="lat",
-        loncell="lon",
-    )
-
-    # Mask zero values of Tb
-    ds["tb"] = ds.tb.where(ds.tb > 0)
-
-    # Set time (time variable in there just has elapsed hours as int)
-    ds["time"] = pd.date_range("2006-Sep-08 12", freq="1h", periods=ds.sizes["time"])
-
-    # Diff accumulated precip to get mm/h
-    ds["precip"] = ds.precip.diff("time", label="lower")
-
-    # Add variables attrs
-    ds.lat.attrs.update(long_name="Latitude (cell center)", units="degree_north")
-    ds.lon.attrs.update(long_name="Longitude (cell center)", units="degree_east")
-    ds.tb.attrs.update(long_name="Brightness temperature", units="K")
-    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
-
-    return ds
-
-
-def load_mpas_precip(paths: str | Sequence[str], *, parallel: bool = False) -> xarray.Dataset:
-    """Derive a TAMS input dataset from post-processed MPAS runs for the PRECIP field campaign.
+def clear_cache(*, quiet: bool = False):
+    """Clear the cache if it exists, leaving an empty directory.
 
     Parameters
     ----------
-    paths
-        Corresponding to the post-processed datasets to load from.
-
-        Pass a string glob or a sequence of string paths.
-        (Ensure sorted if doing the latter.)
-
-        .. important::
-           Currently it is assumed that each individual file corresponds
-           to a single time, which is detected from the file name.
-    parallel
-        If set, do the initial processing (each file) in parallel.
-        Currently uses joblib.
+    quiet
+        Suppress output messages.
     """
+    from shutil import rmtree
 
-    if isinstance(paths, str):
-        from glob import glob
+    cache_dir = _get_cache_dir()
+    s_cache_dir = cache_dir.as_posix()
 
-        paths = sorted(glob(paths))
+    if not cache_dir.exists():
+        if not quiet:
+            print(f"Cache directory {s_cache_dir} does not exist")
+        return
 
-    if len(paths) == 0:
-        raise ValueError("no paths")
+    files = sorted(p for p in cache_dir.glob("**/*") if p.is_file())
+    if not files and not quiet:
+        print(f"No files found in cache directory {s_cache_dir}")
 
-    def load_one(p):
-        import re
+    rmtree(cache_dir)
+    cache_dir.mkdir()
+    if not quiet:
+        print("Removed:")
+        for p in files:
+            print(f"- {p.relative_to(cache_dir).as_posix()}")
 
-        try:
-            from scipy.constants import sigma
-        except ImportError:
-            sigma = 5.67037442e-8
 
-        p = Path(p)
+def fetch_example(key: str, *, progress: bool = False) -> Path:
+    """Retrieve an example data file using pooch and gdown.
 
-        ds = xr.open_dataset(p)
-        ds_ = ds[["olrtoa", "rainc", "rainnc"]]
-        ds_ = ds_.rename(Time="time")
+    Parameters
+    ----------
+    key
+        String identifying which example file to retrieve.
+    progress
+        Show download progress.
 
-        # Detect time from file name and assign
-        fn = p.name
-        m = re.fullmatch(
-            r"mpas_init_20[0-9]{8}_valid_(?P<dt>[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2})_.+\.nc",
-            fn,
+    Examples
+    --------
+    >>> import tams
+    >>> path = tams.data.fetch_example("msg-tb")
+
+    See Also
+    --------
+    open_example
+    load_example
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
+    try:
+        import pooch
+    except ImportError as e:
+        raise RuntimeError(
+            "pooch is required in order to auto download the example data files. "
+            "It is available on conda-forge and PyPI as 'pooch'."
+        ) from e
+
+    try:
+        ef = _EXAMPLE_FILE_DIRECT_LUT[key]
+    except KeyError:
+        s_keys = ", ".join(repr(f.key) for f in _EXAMPLE_FILES)
+        raise ValueError(
+            f"unknown example file key {key!r}. Available keys are: {s_keys}."
+        ) from None
+
+    pooch_logger = pooch.get_logger()
+    pooch_logger_level = pooch_logger.level
+    pooch_logger.setLevel(logging.WARNING)
+
+    try:
+        p = pooch.retrieve(
+            url=ef.file_id,
+            known_hash=f"sha256:{ef.sha256}",
+            fname=ef.fname or f"{ef.key}.nc",
+            path=_get_cache_dir(),
+            downloader=partial(_gdownload, quiet=not progress),
         )
-        s_dt = m.groupdict()["dt"]
-        t = pd.to_datetime(s_dt, format="%Y-%m-%d_%H")
-        ds_["time"] = ("time", [t])
+    finally:
+        pooch_logger.setLevel(pooch_logger_level)
 
-        # Compute CTT from TOA OLR
-        ds_["tb"] = (ds_.olrtoa / sigma) ** (1 / 4)  # TODO: epsilon?
-        ds_.tb.attrs.update(
-            long_name="Brightness temperature",
-            units="K",
-            info="Estimated from 'olrtoa' using the S-B law",
-        )
+    return Path(p)
 
-        # Combine precip vars
-        ds_["aprecip"] = ds_.rainc + ds_.rainnc
-        ds_.aprecip.attrs.update(long_name="Accumulated precip", units="mm")
 
-        # Drop other vars
-        ds_ = ds_.drop_vars(["olrtoa", "rainc", "rainnc"])
+def open_example(
+    key: str,
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> xarray.Dataset:
+    """Open an example dataset with xarray.
 
-        return ds_
+    Parameters
+    ----------
+    key
+        String identifying the example dataset.
+    progress
+        Show download progress if applicable.
+    **kwargs
+        Passed to :func:`xarray.open_dataset`.
 
-    # Load combined
-    if parallel:
-        try:
-            import joblib
-        except ImportError as e:
-            raise RuntimeError("joblib required") from e
+    Examples
+    --------
+    >>> import tams
+    >>> ds = tams.data.open_example("msg-tb")
 
-        dss = joblib.Parallel(n_jobs=-2, verbose=10)(joblib.delayed(load_one)(p) for p in paths)
-    else:
-        dss = (load_one(p) for p in paths)
+    See Also
+    --------
+    load_example
+        Loads the dataset into memory.
 
-    ds = xr.concat(dss, dim="time")
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
+    lut = {**_EXAMPLE_FILE_DIRECT_LUT, **_EXAMPLE_FILE_INDIRECT_LUT}
+    try:
+        ef = lut[key]
+    except KeyError:
+        s_keys = ", ".join(repr(k) for k in lut)
+        raise ValueError(
+            f"unknown example dataset key {key!r}. Available keys are: {s_keys}."
+        ) from None
 
-    # Mask 0 values of T (e.g. at initial time since OLR is zero then)
-    ds["tb"] = ds.tb.where(ds.tb > 0)
+    p = fetch_example(ef.key, progress=progress)
+    post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
 
-    # Compute precip by diffing the accumulated precip variable
-    # In MPAS output, precip outputs are accumulated *up to* the output timestamp
-    # Here, we left-label average rain rate over output time step
-    t = pd.to_datetime(ds.time.values)
-    dt = t[1:] - t[:-1]
-    dt_h = dt.total_seconds() / 3600
-    da_dt_h = xr.DataArray(
-        dims="time",
-        data=np.r_[dt_h, np.nan].astype(np.float32),
-        coords={"time": ds.time},
-    )
-    ds["precip"] = ds.aprecip.diff("time", label="lower") / da_dt_h
-    ds.precip.attrs.update(long_name="Precipitation rate", units="mm h-1")
-    ds = ds.drop_vars(["aprecip"])
+    return post(xr.open_dataset(p, **kwargs))
 
-    return ds
+
+def load_example(
+    key: str,
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> xarray.Dataset:
+    """Load an example dataset into memory with xarray.
+
+    Parameters
+    ----------
+    key
+        String identifying the example dataset.
+    progress
+        Show download progress if applicable.
+    **kwargs
+        Passed to :func:`xarray.open_dataset`.
+
+    Examples
+    --------
+    >>> import tams
+    >>> ds = tams.data.load_example("msg-tb")
+
+    See Also
+    --------
+    open_example
+        Just opens (:func:`xarray.open_dataset`) the dataset
+        (without triggering the load into memory).
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
+    with open_example(key, progress=progress, **kwargs) as ds:
+        return ds.load()
 
 
 def _time_input_to_pandas(
@@ -457,6 +444,10 @@ def get_mergir(
     See Also
     --------
     :doc:`/examples/get`
+
+    Notes
+    -----
+    .. versionadded:: 0.1.6
     """
     import earthaccess
 
@@ -527,6 +518,9 @@ def get_imerg(
 
     This is half-hourly 0.1° (~ 10-km) resolution data.
     Each HDF5 file contains one time step.
+    Each time step represents the mean precipitation rate
+    for the half-hourly period that starts at the indicated time
+    (i.e., left-labeled).
 
     .. note::
        The Python packages
@@ -559,6 +553,10 @@ def get_imerg(
     See Also
     --------
     :doc:`/examples/get`
+
+    Notes
+    -----
+    .. versionadded:: 0.1.6
     """
     import earthaccess
 
@@ -610,7 +608,13 @@ def get_imerg(
     # Convert to normal datetime
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-        ds["time"] = ds.indexes["time"].to_datetimeindex()  # type: ignore[attr-defined]
+        # `time_unit` is new in v2025.01.2 (2025-01-31)
+        # https://docs.xarray.dev/en/stable/whats-new.html#v2025-01-2-jan-31-2025
+        # The future default will be us instead of ns
+        try:
+            ds["time"] = ds.indexes["time"].to_datetimeindex(time_unit="ns")
+        except TypeError:
+            ds["time"] = ds.indexes["time"].to_datetimeindex()
 
     if "precipitationCal" in ds:
         ds = ds.rename_vars({"precipitationCal": "precipitation"})
