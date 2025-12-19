@@ -27,6 +27,30 @@ if TYPE_CHECKING:
 class Blob:
     """An elliptical blob that can be used to represent a cloud element
     (or part of one, if blobs are overlapping).
+
+    Parameters
+    ----------
+    c : array-like of float, shape (2,)
+        Center of the blob. (x, y) (lon, lat) degrees.
+    a
+        Semi-major axis of the blob.
+        When `theta` is 0, this is along the x-axis.
+    b
+        Semi-minor axis of the blob. If not provided, `b` is set to `a` (circle).
+        In this case, `a` is the radius of the circle.
+    theta
+        Angle of rotation (degrees).
+        When `theta` is 0, `a` is along the x-axis.
+    depth
+        Relative to the environment/background, the well depth of the center of the blob.
+        Higher depth means a larger negative anomaly.
+        In TAMS, 235 K cloud-top temperature is used to define cloud elements,
+        while 219 K areas are assumed to represent embedded overshooting tops.
+    tendency : dict, optional
+        Tendency in any of the blob parameters above (`c`, `a`, `b`, `theta`, `depth`).
+        Units: per hour.
+        You can also use :meth:`set_tendency` to set the tendency after creating the blob.
+        The default tendency is 0 for all parameters.
     """
 
     def __init__(
@@ -39,33 +63,6 @@ class Blob:
         depth: float = 20,
         tendency: dict[str, Any] | None = None,
     ) -> None:
-        """
-        Create an elliptical blob with center `c` and semi-axes `a` and `b`.
-
-        Parameters
-        ----------
-        c : array-like of float, shape (2,)
-            Center of the blob. (x, y) (lon, lat) degrees.
-        a
-            Semi-major axis of the blob.
-            When `theta` is 0, this is along the x-axis.
-        b
-            Semi-minor axis of the blob. If not provided, `b` is set to `a` (circle).
-            In this case, `a` is the radius of the circle.
-        theta
-            Angle of rotation (degrees).
-            When `theta` is 0, `a` is along the x-axis.
-        depth
-            Relative to the environment/background, the well depth of the center of the blob.
-            Higher depth means a larger negative anomaly.
-            In TAMS, 235 K cloud-top temperature is used to define cloud elements,
-            while 219 K areas are assumed to represent embedded overshooting tops.
-        tendency : dict, optional
-            Tendency in any of the blob parameters above (`c`, `a`, `b`, `theta`, `depth`).
-            Units: per hour.
-            You can also use :meth:`set_tendency` to set the tendency after creating the blob.
-            The default tendency is 0 for all parameters.
-        """
         self.c = np.asarray(c, dtype=float)
         if not a > 0:
             raise ValueError(f"Invalid semi-major axis: {a}")
@@ -290,7 +287,16 @@ def _to_arr(x, *, default_num: int = 100) -> np.ndarray:
 
 
 class Field:
-    """A field of blobs."""
+    """A field of blobs.
+
+    Parameters
+    ----------
+    blobs
+    lat, lon
+        One-dimensional grid coordinate definitions (degrees).
+    ctt_background
+        Background/environmental/clear-sky infrared brightness temperature.
+    """
 
     def __init__(
         self,
@@ -299,15 +305,6 @@ class Field:
         lon=(-20, 20, 81),
         ctt_background: float = 270,
     ) -> None:
-        """
-        Parameters
-        ----------
-        blobs
-        lat, lon
-            One-dimensional grid coordinate definitions (degrees).
-        ctt_background
-            Background/environmental/clear-sky infrared brightness temperature.
-        """
         if blobs is None:
             blobs = []
         elif isinstance(blobs, Blob):
@@ -405,17 +402,17 @@ class Field:
 
 
 class Sim:
-    """Simulate a field of blobs."""
+    """Simulate a field of blobs.
+
+    Parameters
+    ----------
+    field
+        The field (initial state) to start from.
+    dt
+        Time step (hours).
+    """
 
     def __init__(self, field: Field | None = None, dt: float = 1) -> None:
-        """
-        Parameters
-        ----------
-        field
-            The field (initial state) to start from.
-        dt
-            Time step (hours).
-        """
         if field is None:
             field = Field()
         self.field = field
