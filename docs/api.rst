@@ -84,7 +84,7 @@ These can be accessed with :func:`tams.data.open_example` or
        2006-09-01 00--10
      -
    * - ``msg-tb``
-     - As in ``msg-tb`` but with :func:`tams.data.tb_from_ir` applied
+     - As in ``msg-rad`` but with :func:`tams.data.tb_from_ir` applied
        to convert radiance to brightness temperature (K).
      - :doc:`/examples/sample-satellite-data`, :doc:`/examples/identify`
    * - ``imerg``
