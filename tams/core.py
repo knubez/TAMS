@@ -1077,20 +1077,11 @@ def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
     assert xy.shape[1] == 2
 
     with warnings.catch_warnings():
+        # Current usage is deprecated as of v0.26 (2025-12)
         warnings.filterwarnings(
             "ignore",
             category=FutureWarning,
-            message=r"Calling ``EllipseModel\(\)`` \(without arguments\) .* deprecated",
-        )
-        warnings.filterwarnings(
-            "ignore",
-            category=FutureWarning,
-            message="`estimate` is deprecated",
-        )
-        warnings.filterwarnings(
-            "ignore",
-            category=FutureWarning,
-            message="`params` is deprecated",
+            message=".* deprecated",
         )
 
         m = EllipseModel()
