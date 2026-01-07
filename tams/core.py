@@ -1076,17 +1076,34 @@ def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
     xy = np.asarray(p.exterior.coords)
     assert xy.shape[1] == 2
 
-    m = EllipseModel()
-    success = m.estimate(xy)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            category=FutureWarning,
+            message=r"Calling ``EllipseModel\(\)`` \(without arguments\) .* deprecated",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=FutureWarning,
+            message="`estimate` is deprecated",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=FutureWarning,
+            message="`params` is deprecated",
+        )
 
-    if not success:
-        warnings.warn(f"ellipse model failed for {p}", stacklevel=2)
-        return np.nan
+        m = EllipseModel()
+        success = m.estimate(xy)
 
-    _, _, xhw, yhw, _ = m.params
-    # ^ xc, yc, a, b, theta; from the docs
-    #   a with x, b with y (after subtracting the rotation), but they are half-widths
-    #   theta is in radians
+        if not success:
+            warnings.warn(f"ellipse model failed for {p}", stacklevel=2)
+            return np.nan
+
+        _, _, xhw, yhw, _ = m.params
+        # ^ xc, yc, a, b, theta; from the docs
+        #   a with x, b with y (after subtracting the rotation), but they are half-widths
+        #   theta is in radians
 
     rat = yhw / xhw if xhw > yhw else xhw / yhw
 
