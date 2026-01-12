@@ -318,6 +318,8 @@ class Field:
     Parameters
     ----------
     blobs
+        One or more :class:`Blob` instances defining the field.
+        If ``None`` (default), an empty field is created.
     lat, lon
         One-dimensional grid coordinate definitions (degrees).
     ctt_background
