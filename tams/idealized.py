@@ -181,6 +181,12 @@ class Blob:
         Parameters
         ----------
         x, y : array-like
+            Two-dimensional array, e.g. from :func:`~numpy.meshgrid`.
+
+        Returns
+        -------
+        z : array
+            The well depth at each :math:`(x, y)` point.
         """
         cx, cy = self.c
         t = np.deg2rad(self.theta)
