@@ -28,6 +28,8 @@ extensions = [
     "sphinx_togglebutton",
 ]
 
+nitpicky = True
+
 exclude_patterns = [
     "_build/**/*",
     "**.ipynb_checkpoints",
