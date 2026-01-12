@@ -9,8 +9,9 @@ from __future__ import annotations
 import datetime
 import re
 import warnings
+from collections.abc import Hashable
 from pathlib import Path
-from typing import Any, Hashable
+from typing import Any
 
 import geopandas as gpd
 import numpy as np
