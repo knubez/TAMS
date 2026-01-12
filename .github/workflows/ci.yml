@@ -15,6 +15,9 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@v6
 
@@ -23,6 +26,8 @@ jobs:
         with:
           environment-file: environment-dev.yml
           cache-environment: true
+          create-args: >-
+            python=${{ matrix.python-version }}
 
       - name: pytest
         run: pytest -v -ra tests

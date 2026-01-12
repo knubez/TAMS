@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import datetime
-from typing import Generator
 
 import pybtex.plugin
 from pybtex.database import Entry, Person

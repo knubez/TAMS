@@ -18,11 +18,10 @@ from shapely import affinity
 from shapely.geometry import Point
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Self
 
     from matplotlib.patches import Ellipse
     from shapely.geometry import LinearRing, Polygon
-    from typing_extensions import Self  # 3.11
 
 
 class Blob:

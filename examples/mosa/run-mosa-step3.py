@@ -4,8 +4,9 @@ Convert from CE gdf output to summary formats (step 3)
 
 import re
 from calendar import isleap
+from collections.abc import Hashable
 from pathlib import Path
-from typing import Any, Hashable
+from typing import Any
 
 import numpy as np
 import pandas as pd
