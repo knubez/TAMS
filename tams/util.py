@@ -67,7 +67,7 @@ def plot_tracked(
         Add colorbar with time info.
     cbar_kwargs
         Keyword arguments to pass to ``plt.colorbar``.
-    ax
+    ax : Axes or GeoAxes, optional
         Axes to plot on. If not provided, a new figure is created.
         The figure size used is ``(size * aspect, size)``.
     size

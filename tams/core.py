@@ -174,7 +174,7 @@ def contour(
     unstructured
         Whether the grid of `x` is unstructured (e.g. MPAS native output).
         Default: assume unstructured if `x` is 1-D.
-    triangulation
+    triangulation : Triangulation, optional
         A pre-computed :class:`~matplotlib.tri.Triangulation` for `x`
         with unstructured grid.
     closed_only
