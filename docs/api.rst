@@ -208,6 +208,7 @@ Transform blobs:
    Blob.split
    Blob.copy
    Blob.to_geopandas
+   Blob.to_patch
 
 Compute the blob's impact on the field:
 

@@ -20,6 +20,7 @@ from shapely.geometry import Point
 if TYPE_CHECKING:
     from typing import Any
 
+    from matplotlib.patches import Ellipse
     from shapely.geometry import LinearRing, Polygon
     from typing_extensions import Self
 
@@ -121,6 +122,25 @@ class Blob:
     def to_geopandas(self, *, crs="EPSG:4326") -> gpd.GeoSeries:
         """Convert the blob to a GeoPandas GeoSeries, using the polygon."""
         return gpd.GeoSeries([self.polygon], crs=crs)
+
+    def to_patch(self, **kwargs) -> Ellipse:
+        """Convert the blob to a Matplotlib Ellipse patch.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments to pass to :class:`matplotlib.patches.Ellipse`.
+        """
+        from matplotlib.patches import Ellipse
+
+        p = Ellipse(
+            xy=tuple(self.c),
+            width=2 * self.a,
+            height=2 * self.b,
+            angle=self.theta,
+            **kwargs,
+        )
+        return p
 
     def set_tendency(self, **kwargs) -> Self:
         """Set in place the tendency of one or more of the ellipse parameters in per hour units.
