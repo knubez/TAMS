@@ -49,14 +49,14 @@ def tb_from_ir(r, ch: int):
 
     Parameters
     ----------
-    r : array-like
+    r : duck-array
         Radiance. Units: m2 m-2 sr-1 (cm-1)-1
     ch
         Channel number, in 4--11.
 
     Returns
     -------
-    tb
+    tb : duck-array
         Brightness temperature (same type as `r`).
     """
     if ch not in range(4, 12):
