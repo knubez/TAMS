@@ -198,9 +198,11 @@ class Blob:
             return -self.depth * (1 - (r / self.a) ** 2)
         else:
             # Elliptical blob
-            a = self.a * np.cos(t) + self.b * np.sin(t)
-            b = self.a * np.sin(t) + self.b * np.cos(t)
-            return -self.depth * (1 - ((dx / a) ** 2 + (dy / b) ** 2))
+            cos_t = np.cos(t)
+            sin_t = np.sin(t)
+            x_t = dx * cos_t + dy * sin_t
+            y_t = -dx * sin_t + dy * cos_t
+            return -self.depth * (1 - ((x_t / self.a) ** 2 + (y_t / self.b) ** 2))
 
     def merge(self, other: Blob) -> Blob:
         """Merge with another blob, creating a new blob with area-weighted-average characteristics."""
