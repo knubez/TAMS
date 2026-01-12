@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from matplotlib.patches import Ellipse
     from shapely.geometry import LinearRing, Polygon
-    from typing_extensions import Self
+    from typing_extensions import Self  # 3.11
 
 
 class Blob:
