@@ -261,7 +261,7 @@ class Blob:
         Or the y-axis if the ellipse is a circle.
         """
         if n < 2:
-            raise ValueError(f"n must be at least 1, got {n!r}")
+            raise ValueError(f"n must be at least 2, got {n!r}")
 
         f = 1 / n
         a, b = f * self.a, f * self.b
