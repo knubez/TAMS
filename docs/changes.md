@@ -35,3 +35,4 @@
   and should still work even when using `parallel=True`.
   The logs now include more information about the contouring,
   including reasons for exclusion ({pull}`74`).
+- Create idealized datasets for testing using {mod}`tams.idealized` ({pull}`80`).

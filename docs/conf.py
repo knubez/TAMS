@@ -65,7 +65,9 @@ napoleon_type_aliases = {
     "Dataset": "~xarray.Dataset",
     "Figure": "~matplotlib.figure.Figure",
     "Axes": "~matplotlib.axes.Axes",
+    "Ellipse": "~matplotlib.patches.Ellipse",
     "Callable": "~typing.Callable",
+    "gpd.GeoSeries": "geopandas.GeoSeries",
     "gpd.GeoDataFrame": "geopandas.GeoDataFrame",
     # General terms
     "sequence": ":term:`sequence`",

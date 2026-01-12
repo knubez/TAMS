@@ -1061,6 +1061,9 @@ def track(
     # Combine into one frame
     cs = pd.concat(css)
 
+    # Ensure MCS ID is int (in case of empty times)
+    cs["mcs_id"] = cs["mcs_id"].astype(int)
+
     return cs.reset_index(drop=True)  # drop nested time, CE ind index
 
 

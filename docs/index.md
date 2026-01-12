@@ -2,10 +2,6 @@
 "og:description": TAMS (Tracking Algorithm for Mesoscale Convective Systems) in Python
 ---
 
-```{module} tams
-
-```
-
 # TAMS
 
 TAMS (**T**racking **A**lgorithm for **M**esoscale Convective **S**ystems) in Python and with more flexibility.
@@ -27,6 +23,7 @@ examples/tracking-options.ipynb
 examples/sample-mpas-ug-data.ipynb
 examples/identify.ipynb
 examples/get.ipynb
+examples/idealized.ipynb
 ```
 
 ```{toctree}
