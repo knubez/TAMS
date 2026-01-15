@@ -661,5 +661,7 @@ def get_imerg(
         "ShortName": short_name,
         "Version": version,
     }
+    if "time" not in ds.dims:
+        ds.encoding["unlimited_dims"] = set()
 
     return ds
