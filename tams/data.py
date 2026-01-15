@@ -153,6 +153,16 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
         file_id="1KoeCyT4qn_qLmZsheIC88si_4cfjwYb4",
         sha256="2759e77d6a600dbec344701899a6430245ecfde363c7ecaacbc5efada5bda2d2",
     ),
+    _ExampleFile(
+        key="docs-get-example-imerg",
+        file_id="1IUN4ZP5Ln5FpO8IVbMQJxqnw-cryHoHy",
+        sha256="bc346622a39815417f30580cad1dc64e672e874aa8263fc3cb951263b5ce85c5",
+    ),
+    _ExampleFile(
+        key="docs-get-example-mergir",
+        file_id="1D86cYEI_cg-ib7Jma5Kf7aICNoYGtnab",
+        sha256="a200a0fd2f9534a107ef1e654d22fcf4f9a5d18a35e6b701a0f2b2049dd83130",
+    ),
 ]
 
 _EXAMPLE_FILE_DIRECT_LUT = {f.key: f for f in _EXAMPLE_FILES}
