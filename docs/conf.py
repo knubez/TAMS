@@ -28,6 +28,8 @@ extensions = [
     "sphinx_togglebutton",
 ]
 
+nitpicky = True
+
 exclude_patterns = [
     "_build/**/*",
     "**.ipynb_checkpoints",
@@ -46,6 +48,7 @@ intersphinx_mapping = {
     "dask": ("https://docs.dask.org/en/latest/", None),
     "shapely": ("https://shapely.readthedocs.io/en/stable/", None),
     "earthaccess": ("https://earthaccess.readthedocs.io/en/stable/", None),
+    "cartopy": ("https://cartopy.readthedocs.io/stable/", None),
 }
 
 extlinks = {
@@ -66,9 +69,15 @@ napoleon_type_aliases = {
     "Figure": "~matplotlib.figure.Figure",
     "Axes": "~matplotlib.axes.Axes",
     "Ellipse": "~matplotlib.patches.Ellipse",
+    "Triangulation": "~matplotlib.tri.Triangulation",
     "Callable": "~typing.Callable",
+    "GeoSeries": "geopandas.GeoSeries",
+    "GeoDataFrame": "geopandas.GeoDataFrame",
     "gpd.GeoSeries": "geopandas.GeoSeries",
     "gpd.GeoDataFrame": "geopandas.GeoDataFrame",
+    "GeoAxes": "~cartopy.mpl.geoaxes.GeoAxes",
+    "Path": "~pathlib.Path",
+    "datetime-like": ":func:`datetime-like <pandas.to_datetime>`",
     # General terms
     "sequence": ":term:`sequence`",
     "iterable": ":term:`iterable`",
@@ -81,6 +90,7 @@ napoleon_type_aliases = {
     # NumPy terms
     "array_like": ":term:`array_like`",
     "array-like": ":term:`array-like <array_like>`",
+    "duck-array": ":term:`duck-array <duck array>`",
     "scalar": ":term:`scalar`",
     "array": ":term:`array`",
     "hashable": ":term:`hashable <name>`",

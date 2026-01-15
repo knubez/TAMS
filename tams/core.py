@@ -174,7 +174,7 @@ def contour(
     unstructured
         Whether the grid of `x` is unstructured (e.g. MPAS native output).
         Default: assume unstructured if `x` is 1-D.
-    triangulation
+    triangulation : Triangulation, optional
         A pre-computed :class:`~matplotlib.tri.Triangulation` for `x`
         with unstructured grid.
     closed_only
@@ -185,7 +185,7 @@ def contour(
 
     Returns
     -------
-    cs
+    cs : GeoDataFrame
         GeoDataframe of analyzed contours.
         Closed contours as :class:`~shapely.LinearRing`,
         open contours as :class:`~shapely.LineString`.
@@ -519,12 +519,12 @@ def identify(
 
     Returns
     -------
-    css235
+    css235 : list of GeoDataFrame
         List of dataframes of 235 K contour polygons (CEs).
         If `size_filter` is enabled (default), an ``area_km2`` column is included,
         column ``cs219`` gives the cold cores for each CE as a multi-polygon,
         and those rows that don't meet the size filtering criteria are dropped.
-    css219
+    css219 : list of GeoDataFrame
         List of dataframes of 219 K contour polygons (cold cores).
         If `size_filter` is enabled (default), an ``area_km2`` column is included,
         but all rows are included, regardless of the area value.

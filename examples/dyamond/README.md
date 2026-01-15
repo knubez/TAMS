@@ -42,7 +42,7 @@ Compared to normal TAMS usage, there are a few differences:
   It was done in order to compare to other trackers.
   Some information is lost in this conversion.
 
-[^dyamond]: https://www.esiwace.eu/the-project/past-phases/dyamond-initiative
+[^dyamond]: https://web.archive.org/web/20250806021644/https://www.esiwace.eu/the-project/past-phases/dyamond-initiative
 
 [^threshs]:
     In general, a higher `ctt_core_threshold` leads to more CEs being identified,

@@ -49,14 +49,14 @@ def tb_from_ir(r, ch: int):
 
     Parameters
     ----------
-    r : array-like
+    r : duck-array
         Radiance. Units: m2 m-2 sr-1 (cm-1)-1
     ch
         Channel number, in 4--11.
 
     Returns
     -------
-    tb
+    tb : duck-array
         Brightness temperature (same type as `r`).
     """
     if ch not in range(4, 12):
@@ -152,6 +152,16 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
         key="mosa-test-4",
         file_id="1KoeCyT4qn_qLmZsheIC88si_4cfjwYb4",
         sha256="2759e77d6a600dbec344701899a6430245ecfde363c7ecaacbc5efada5bda2d2",
+    ),
+    _ExampleFile(
+        key="docs-get-example-imerg",
+        file_id="1IUN4ZP5Ln5FpO8IVbMQJxqnw-cryHoHy",
+        sha256="bc346622a39815417f30580cad1dc64e672e874aa8263fc3cb951263b5ce85c5",
+    ),
+    _ExampleFile(
+        key="docs-get-example-mergir",
+        file_id="1D86cYEI_cg-ib7Jma5Kf7aICNoYGtnab",
+        sha256="a200a0fd2f9534a107ef1e654d22fcf4f9a5d18a35e6b701a0f2b2049dd83130",
     ),
 ]
 
@@ -661,5 +671,7 @@ def get_imerg(
         "ShortName": short_name,
         "Version": version,
     }
+    if "time" not in ds.dims:
+        ds.encoding["unlimited_dims"] = set()
 
     return ds

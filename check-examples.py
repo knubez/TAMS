@@ -84,7 +84,7 @@ if __name__ == "__main__":
         fn = ef.fname or f"{ef.key}.nc"
         p = TMP / fn
         if p.exists() and args.use_cached:
-            print(f"Using cached {ef.key}")
+            print(f"Using cached {ef.key}: {p.as_posix()}")
         else:
             _gdownload(ef.file_id, p.as_posix(), quiet=False)
         check_file(p)

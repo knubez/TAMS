@@ -30,8 +30,8 @@ class Blob:
 
     Parameters
     ----------
-    c : array-like of float, shape (2,)
-        Center of the blob. (x, y) (lon, lat) degrees.
+    c : array-like of float
+        Center of the blob. Shape ``(2,)``: (:math:`x`, :math:`y`) (lon, lat) degrees.
     a
         Semi-major axis of the blob.
         When `theta` is 0, this is along the x-axis.
@@ -93,7 +93,7 @@ class Blob:
 
     @property
     def center(self) -> Point:
-        """The defined center :attr:`c` as a :class:`shapely.Point`."""
+        """The defined center ``c`` as a :class:`shapely.Point`."""
         return Point(self.c)
 
     @property
@@ -179,12 +179,12 @@ class Blob:
 
         Parameters
         ----------
-        x, y : array-like
+        x, y : duck-array
             Two-dimensional array, e.g. from :func:`~numpy.meshgrid`.
 
         Returns
         -------
-        z : array
+        z : duck-array
             The well depth at each :math:`(x, y)` point.
         """
         cx, cy = self.c
