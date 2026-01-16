@@ -332,6 +332,7 @@ def _size_filter(
     threshold: float = 4000,
 ) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
     """Compute areas, associate core areas with cloud elements,
+    filter based on size threshold.
 
     `threshold` is for the total cold-core contour area within a given CE contour
     (units: km2).
@@ -355,7 +356,7 @@ def _size_filter(
     # Drop very small cold cores (insignificant)
     # Note: This wasn't done in original TAMS, but here we are sometimes seeing
     # tiny core contours inside larger ones.
-    individual_core_threshold = 10  # km2
+    individual_core_threshold = min(threshold, 10)  # km2
     core["area_km2"] = core.to_crs("EPSG:32663").area / 10**6
     big_enough = core.area_km2 >= individual_core_threshold
     if not big_enough.empty:
@@ -463,8 +464,16 @@ def _identify_one(
         ce["geometry"] = ce.geometry.convex_hull
         core["geometry"] = core.geometry.convex_hull
 
-    if size_filter:
-        ce, core = _size_filter(ce, core, threshold=size_threshold)
+    if not size_filter:
+        warnings.warn(
+            "Disabling size filtering via the `size_filter` argument is deprecated. "
+            "Instead set `size_threshold=0` to achieve the same effect.",
+            FutureWarning,
+            stacklevel=3,
+        )
+        size_threshold = 0
+
+    ce, core = _size_filter(ce, core, threshold=size_threshold)
 
     return ce, core
 
@@ -505,6 +514,9 @@ def identify(
 
         When enabled (default), this also identifies the cold cores (if any) that are within each CE.
         Only CEs with enough cold-core area (`size_threshold`) are kept.
+
+        .. deprecated:: 0.2.0
+           Set ``size_threshold=0`` instead to disable size filtering.
     size_threshold
         Area threshold (units: km²) to use when `size_filter` is enabled.
     convex_hull
