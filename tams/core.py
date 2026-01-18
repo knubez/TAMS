@@ -388,7 +388,7 @@ def _size_filter(
     )
 
     # Drop CEs whose total cold-core area doesn't meet the threshold
-    ce["area_core_km2"] = ce.core.to_crs("EPSG:32663").area / 10**6
+    ce["area_core_km2"] = (ce.core.to_crs("EPSG:32663").area / 10**6).fillna(0)
     big_enough = ce.area_core_km2 >= threshold
     if not big_enough.empty:
         logger.info(
