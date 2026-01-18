@@ -489,17 +489,16 @@ def identify(
     size_filter
         Whether to apply size-filtering
         (using CE and cold-core areas to filter out CEs that are not MCS material).
-        Filtering at this stage makes TAMS more computationally efficient overall.
-        Disable this option to return all identified CEs.
-        Note that all cold cores are returned regardless of this setting.
-
-        When enabled (default), this also identifies the cold cores (if any) that are within each CE.
         Only CEs with enough cold-core area (`size_threshold`) are kept.
 
         .. deprecated:: 0.2.0
            Set ``size_threshold=0`` instead to disable size filtering.
     size_threshold
-        Area threshold (units: km²) to use when `size_filter` is enabled.
+        Cold-core area threshold (units: km²).
+        CEs with total cold-core area below this threshold
+        are considered not MCS material and are filtered out.
+        Set to 0 to disable size filtering (e.g. in order to do your own).
+        Note that filtering at this stage makes TAMS more computationally efficient overall.
     convex_hull
         Apply convex hull to the CE polygons to simplify the shapes.
 
@@ -514,9 +513,12 @@ def identify(
     -------
     ce : list of GeoDataFrame
         List of dataframes of CE polygons (based on a 235-K threshold by default).
-        If `size_filter` is enabled (default), an ``area_km2`` column is included,
-        column ``core`` gives the cold cores for each CE,
-        and those rows that don't meet the size filtering criteria are dropped.
+        Columns:
+
+        - ``geometry`` -- geometry, the CE polygons
+        - ``area_km2`` -- float, area of the CE polygons (km²)
+        - ``core`` -- geometry, the cold-core polygons within each CE
+        - ``area_core_km2`` -- float, the CE's cold-core area (km²)
 
     See Also
     --------
