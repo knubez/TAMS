@@ -337,9 +337,6 @@ def _size_filter(
     `threshold` is for the total cold-core contour area within a given CE contour
     (units: km2).
     """
-    import geopandas as gpd
-    from shapely.geometry import MultiPolygon
-
     logger = get_worker_logger()
 
     # Drop small CEs (a CE with area < 4000 km2 can't have cold-core area of 4000)
@@ -366,28 +363,25 @@ def _size_filter(
         )
     core = core[big_enough].reset_index(drop=True)
 
-    # Identify indices of cold cores inside CEs
+    # Identify the cold cores that are inside CEs and store them inside the CE frame
     # Note that some CEs might not have any cores inside
-    a = ce.sjoin(core, predicate="contains", how="left").reset_index()
-    # ^ gives an Int64 index with duplicated values, for each core inside a certain CE
-    icores = {  # convert to list
-        ice: sorted(g.index_right.astype(int).to_list())
-        for ice, g in a.groupby("index")
-        if not g.index_right.isna().all()
-    }
+    # And while some have one (Polygon), some may have more than one (MultiPolygon)
+    # Store cold cores inside the CE frame as `MultiPolygon`s
+    ce["core"] = ce.index.map(
+        core.sjoin(
+            ce,
+            predicate="within",
+            how="inner",
+            lsuffix="core",
+            rsuffix="ce",
+        )
+        .groupby("index_ce")
+        .geometry.apply(lambda gs: gs.union_all(method="unary"))
+    )
+    ce["core"] = ce["core"].set_crs("EPSG:4326")
 
-    # Store cold core info inside the CE df
-    ce["inds_core"] = [icores.get(ice, []) for ice in ce.index]
-    # TODO: possible to instead cleanly store the core `MultiPolygon`s in a column?
-    # ce["core"] = ce.inds_core.apply(lambda inds: core.iloc[inds][["geometry"]].dissolve().geometry)
-    # ce["core"] = ce.inds_core.apply(lambda inds: MultiPolygon(core.geometry.iloc[inds].values))
-
-    # Check core area sum inside the CE (total core area 4000 km2)
-    sumcores = {
-        ice: core.iloc[icores.get(ice, [])].to_crs("EPSG:32663").area.sum() / 10**6
-        for ice in ce.index
-    }
-    ce["area_core_km2"] = pd.Series(sumcores, dtype=float)
+    # Drop CEs whose total cold-core area doesn't meet the threshold
+    ce["area_core_km2"] = ce.core.to_crs("EPSG:32663").area / 10**6
     big_enough = ce.area_core_km2 >= threshold
     if not big_enough.empty:
         logger.info(
@@ -395,23 +389,6 @@ def _size_filter(
             f"of big-enough CEs have enough cold-core area ({threshold} km2)"
         )
     ce = ce[big_enough].reset_index(drop=True)
-
-    # Store cold cores inside the CE frame as `MultiPolygon`s
-    ce["core"] = gpd.GeoSeries(
-        ce.inds_core.apply(lambda inds: MultiPolygon(core.geometry.iloc[inds].values))
-    )
-    # NOTE: above method I found to be ~ 10x faster than this alternative:
-    #   gpd.GeoSeries(ce.inds_core.apply(lambda inds: core.iloc[inds][["geometry"]].dissolve().geometry[0]))
-    # The other benefit of applying `MultiPolygon` directly is that we get `MultiPolygon`
-    # even in the case of only one, whereas dissolve gives `Polygon` in that case (row).
-    #
-    # TODO: alternative method dissolve on the cores for each row like below leads to
-    # slightly different data-in-contours pixel counts (greater?) in some cases
-    #   f = lambda row: data_in_contours(tb, core.iloc[row.inds_core].dissolve())
-    #   res_ = ce.apply(f, axis="columns")  # Series of DataFrames
-    #   res = pd.concat(res_.to_list()).reset_index(drop=True)
-    # TODO: unary_union (like dissolve uses), might be better unless can properly deal with
-    # the small holes we sometimes get, otherwise some area gets counted extra
 
     # TODO: some elegant way to drop cores that aren't inside a CE, resetting index
     # but preserving the matching of CE to cores
@@ -1303,7 +1280,7 @@ def run(
     msg("Starting statistics calculations")
 
     # Cleanup
-    ce = ce.drop(columns=["inds_core", "itime", "dtime"]).convert_dtypes()
+    ce = ce.drop(columns=["itime", "dtime"]).convert_dtypes()
     ce.core = ce.core.set_crs("EPSG:4326")  # TODO: ensure set in `identify`
 
     msg("Starting CE aggregation (into MCS time series)")
@@ -1327,7 +1304,10 @@ def run(
             d["core"] = gpd.GeoSeries(
                 time_group[["core"]].apply(
                     lambda g: MultiPolygon(
-                        itertools.chain.from_iterable(mp.geoms for mp in g.core.values)
+                        itertools.chain.from_iterable(
+                            mp.geoms if isinstance(mp, MultiPolygon) else [mp]
+                            for mp in g.core.values
+                        )
                     )
                 )
             )
