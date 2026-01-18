@@ -414,7 +414,7 @@ def _identify_one(
     if time is None:
         s_time = "?"
     else:
-        s_time = time.values[()]
+        s_time = str(time.values[()])
     logger.info(f"identifying CEs in {name} at time {s_time}")
 
     kws = dict(
