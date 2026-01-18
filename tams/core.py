@@ -330,9 +330,10 @@ def _size_filter(
     core: geopandas.GeoDataFrame,
     *,
     threshold: float = 4000,
-) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
+) -> geopandas.GeoDataFrame:
     """Compute areas, associate core areas with cloud elements,
-    filter based on size threshold.
+    filter based on size threshold,
+    returning the CE frame only.
 
     `threshold` is for the total cold-core contour area within a given CE contour
     (units: km2).
@@ -390,10 +391,7 @@ def _size_filter(
         )
     ce = ce[big_enough].reset_index(drop=True)
 
-    # TODO: some elegant way to drop cores that aren't inside a CE, resetting index
-    # but preserving the matching of CE to cores
-
-    return ce, core
+    return ce
 
 
 def _identify_one(
@@ -406,7 +404,7 @@ def _identify_one(
     convex_hull: bool = True,
     unstructured: bool | None = None,
     triangulation: Triangulation | None = None,
-) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
+) -> geopandas.GeoDataFrame:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
     logger = get_worker_logger()
@@ -450,9 +448,9 @@ def _identify_one(
         )
         size_threshold = 0
 
-    ce, core = _size_filter(ce, core, threshold=size_threshold)
+    ce = _size_filter(ce, core, threshold=size_threshold)
 
-    return ce, core
+    return ce
 
 
 def identify(
@@ -464,7 +462,7 @@ def identify(
     size_threshold: float = 4000,
     convex_hull: bool = True,
     parallel: bool = False,
-) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
+) -> list[geopandas.GeoDataFrame]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
     The first list of returned polygon dataframes serve to identify cloud elements (CEs).
     In a given frame from this list, each row corresponds to a certain CE.
@@ -511,12 +509,8 @@ def identify(
     ce : list of GeoDataFrame
         List of dataframes of CE polygons (based on a 235-K threshold by default).
         If `size_filter` is enabled (default), an ``area_km2`` column is included,
-        column ``core`` gives the cold cores for each CE as a multi-polygon,
+        column ``core`` gives the cold cores for each CE,
         and those rows that don't meet the size filtering criteria are dropped.
-    core : list of GeoDataFrame
-        List of dataframes of cold-core polygons (based on a 219-K threshold by default).
-        If `size_filter` is enabled (default), an ``area_km2`` column is included,
-        but all rows are included, regardless of the area value.
 
     See Also
     --------
@@ -568,8 +562,7 @@ def identify(
         if parallel:
             logger.debug(f"assuming one time, ignoring parallel={parallel}")
 
-        ce, core = f(ctt)
-        ces, cores = (ce,), (core,)  # to tuple for consistency
+        ces = [f(ctt)]
 
     elif "time" in dims and (
         (not unstructured and len(dims) == 3) or (unstructured and len(dims) == 2)
@@ -584,14 +577,12 @@ def identify(
                 raise RuntimeError("joblib required") from e
 
             logger.info(f"identifying in parallel over {len(itimes)} time steps")
-            res = joblib.Parallel(n_jobs=-2, verbose=10)(
+            ces = joblib.Parallel(n_jobs=-2, verbose=10)(
                 joblib.delayed(f)(ctt.isel(time=i)) for i in itimes
             )
 
         else:
-            res = [f(ctt.isel(time=i)) for i in itimes]
-
-        ces, cores = zip(*res)
+            ces = [f(ctt.isel(time=i)) for i in itimes]
 
     else:
         raise ValueError(
@@ -607,7 +598,7 @@ def identify(
         warnings.warn(f"No CEs identified for time steps: {inds_empty}", stacklevel=2)
     logger.info(f"identified CEs in {len(ces) - len(inds_empty)}/{len(ces)} time steps")
 
-    return list(ces), list(cores)
+    return ces
 
 
 def _data_in_contours_sjoin(
@@ -1247,7 +1238,7 @@ def run(
     #
 
     msg("Starting `identify`")
-    ces, _ = identify(
+    ces = identify(
         ds.ctt,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
