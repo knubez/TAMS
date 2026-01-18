@@ -338,6 +338,8 @@ def _size_filter(
     `threshold` is for the total cold-core contour area within a given CE contour
     (units: km2).
     """
+    import geopandas as gpd
+
     logger = get_worker_logger()
 
     # Drop small CEs (a CE with area < 4000 km2 can't have cold-core area of 4000)
@@ -368,7 +370,7 @@ def _size_filter(
     # Note that some CEs might not have any cores inside
     # And while some have one (Polygon), some may have more than one (MultiPolygon)
     # Store cold cores inside the CE frame as `MultiPolygon`s
-    ce["core"] = ce.index.map(
+    ce_core_as_index = ce.index.map(
         core.sjoin(
             ce,
             predicate="within",
@@ -379,7 +381,11 @@ def _size_filter(
         .groupby("index_ce")
         .geometry.apply(lambda gs: gs.union_all(method="unary"))
     )
-    ce["core"] = ce["core"].set_crs("EPSG:4326")
+    ce["core"] = gpd.GeoSeries(
+        # When empty, dtype is int64
+        ce_core_as_index.astype("geometry"),
+        crs="EPSG:4326",
+    )
 
     # Drop CEs whose total cold-core area doesn't meet the threshold
     ce["area_core_km2"] = ce.core.to_crs("EPSG:32663").area / 10**6
