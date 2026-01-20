@@ -514,12 +514,13 @@ def identify(
     Returns
     -------
     ces : list of GeoDataFrame
-        List of dataframes of CE polygons (based on a 235-K threshold by default).
+        List of dataframes of CE polygons.
         Columns:
 
         - ``geometry`` -- geometry, the CE polygons
         - ``area_km2`` -- float, area of the CE polygons (km²)
         - ``core`` -- geometry, the cold cores within each CE
+          (:class:`~shapely.MultiPolygon`, :class:`~shapely.Polygon`, or ``None`` if no cores)
         - ``area_core_km2`` -- float, the CE's cold-core area (km²)
 
     See Also
