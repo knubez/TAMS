@@ -367,9 +367,8 @@ def _size_filter(
     core = core[big_enough].reset_index(drop=True)
 
     # Identify the cold cores that are inside CEs and store them inside the CE frame
-    # Note that some CEs might not have any cores inside
-    # And while some have one (Polygon), some may have more than one (MultiPolygon)
-    # Store cold cores inside the CE frame as `MultiPolygon`s
+    # Note that some CEs might not have any cores inside (-> None),
+    # and while some have one (Polygon), some may have more than one (-> MultiPolygon)
     ce_core_as_index = ce.index.map(
         core.sjoin(
             ce,
