@@ -470,7 +470,7 @@ def identify(
     parallel: bool = False,
 ) -> list[geopandas.GeoDataFrame]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
-    The first list of returned polygon dataframes serve to identify cloud elements (CEs).
+    The returned list of polygon dataframes serves to identify cloud elements (CEs).
     In a given frame from this list, each row corresponds to a certain CE.
 
     This is the first step in a TAMS workflow.
@@ -506,24 +506,30 @@ def identify(
 
            * This is done before size filtering / area computation.
            * This fills in any holes the CE polygons may have.
+
+        .. versionadded:: 0.2.0
+           In v0.1.x it was not possible to disable convex hulling.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
 
     Returns
     -------
-    ce : list of GeoDataFrame
+    ces : list of GeoDataFrame
         List of dataframes of CE polygons (based on a 235-K threshold by default).
         Columns:
 
         - ``geometry`` -- geometry, the CE polygons
         - ``area_km2`` -- float, area of the CE polygons (km²)
-        - ``core`` -- geometry, the cold-core polygons within each CE
+        - ``core`` -- geometry, the cold cores within each CE
         - ``area_core_km2`` -- float, the CE's cold-core area (km²)
 
     See Also
     --------
     :doc:`/examples/identify`
         Demonstrating the impacts of options.
+
+    :func:`contour`
+        A lower-level and more general routine for producing shapes by contouring a threshold.
     """
     # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
     dims = tuple(ctt.dims)
