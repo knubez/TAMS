@@ -12,11 +12,11 @@ import pytest
 from shapely import Polygon
 
 import tams
+from tams.core import fit_ellipse
+from tams.idealized import Blob
 
 
 def make_ellipse_polygon(w, h, theta):
-    from tams.idealized import Blob
-
     if w == h:
         theta = 0  # no effect, avoid warning
 
@@ -88,6 +88,16 @@ def test_ellipse_eccen_invalid():
     ):
         res = tams.eccentricity(Polygon([(i, i) for i in range(10)]))
     assert np.isnan(res)
+
+
+def test_ellipse_fit_blob():
+    b = Blob(a=3, b=1, theta=10)
+    m = fit_ellipse(b.polygon)
+    assert m is not None
+    for k in ["c", "a", "b", "theta"]:
+        v0 = getattr(b, k)
+        v = getattr(m, k)
+        assert v == pytest.approx(v0, rel=1e-12), k
 
 
 def test_data_in_contours_methods_same_result(msg_tb0):
