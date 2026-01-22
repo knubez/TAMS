@@ -1232,8 +1232,8 @@ def run(
     import itertools
 
     import geopandas as gpd
+    from shapely import MultiPolygon
     from shapely.errors import ShapelyDeprecationWarning
-    from shapely.geometry import MultiPolygon
 
     assert {"ctt", "pr"} <= set(ds.data_vars)
     assert "time" in ds.dims
