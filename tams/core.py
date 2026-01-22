@@ -1084,7 +1084,7 @@ class Ellipse(NamedTuple):
 
         return Blob(**self._asdict())
 
-    def to_polygon(self, n: int = 100) -> shapely.geometry.polygon.Polygon:
+    def to_polygon(self, n: int = 100) -> shapely.Polygon:
         """Convert to a :class:`shapely.Polygon` object with `n` coords."""
         from shapely import Polygon
 
@@ -1103,7 +1103,7 @@ class Ellipse(NamedTuple):
         return Polygon(zip(x, y))
 
 
-def fit_ellipse(p: shapely.geometry.polygon.Polygon) -> Ellipse | None:
+def fit_ellipse(p: shapely.Polygon) -> Ellipse | None:
     """Fit ellipse to the exterior coordinates of the polygon.
 
     Returns ``None`` on failure.
@@ -1164,7 +1164,7 @@ def fit_ellipse(p: shapely.geometry.polygon.Polygon) -> Ellipse | None:
     )
 
 
-def eccentricity(p: shapely.geometry.polygon.Polygon) -> float:
+def eccentricity(p: shapely.Polygon) -> float:
     """Compute the (first) eccentricity of the least-squares best-fit ellipse
     to the coordinates of the polygon's exterior.
 
@@ -1178,7 +1178,7 @@ def eccentricity(p: shapely.geometry.polygon.Polygon) -> float:
         return res.eccentricity
 
 
-def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon) -> float:
+def calc_ellipse_eccen(p: shapely.Polygon) -> float:
     """Calculate the (first) eccentricity of the least-squares best-fit ellipse
     to the coordinates of the polygon's exterior.
 
