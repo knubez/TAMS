@@ -1068,18 +1068,32 @@ def track(
 
 
 class Ellipse(NamedTuple):
+    """Ellipse fit parameters, e.g. returned by :func:`fit_ellipse`."""
+
     c: tuple[float, float]
+    """Center ``(x, y)`` coordinates."""
+
     a: float
+    """Semi-major axis length."""
+
     b: float
+    """Semi-minor axis length."""
+
     theta: float
+    """Rotation angle (degrees) from x-axis to semi-major axis.
+    Positive counter-clockwise."""
 
     @property
     def eccentricity(self) -> float:
-        """The (first) eccentricity."""
+        r"""The (first) eccentricity.
+
+        .. math::
+           e = \sqrt{1 - \frac{b^2}{a^2}}
+        """
         return np.sqrt(1 - self.b**2 / self.a**2)
 
     def to_blob(self):
-        """Convert to idealized :class:`~tams.idealized.Blob` object,
+        """Convert to :class:`~tams.idealized.Blob` object,
         which provides further conversion methods.
         """
         from .idealized import Blob
