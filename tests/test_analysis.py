@@ -9,6 +9,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
+from shapely import Polygon
 
 import tams
 
@@ -51,6 +52,42 @@ def test_ellipse_eccen(wh):
         check = dict(rel=1e-12)
 
     assert eps == pytest.approx(eps_expected, **check)
+
+
+def test_ellipse_eccen_invalid():
+    with (
+        pytest.warns(
+            RuntimeWarning,  # from scikit-image
+            match=r"Need at least 5 data points to estimate an ellipse\.",
+        ),
+        pytest.warns(
+            UserWarning,
+            match="ellipse model failed for",
+        ),
+    ):
+        res = tams.eccentricity(Polygon([]))
+    assert np.isnan(res)
+
+    with (
+        pytest.warns(
+            RuntimeWarning,  # from scikit-image
+            match=r"Standard deviation of data is too small to estimate ellipse with meaningful precision\.",
+        ),
+        pytest.warns(
+            UserWarning,
+            match="ellipse model failed for",
+        ),
+    ):
+        res = tams.eccentricity(Polygon([(0, 0)] * 5))
+    assert np.isnan(res)
+
+    # scikit-image message (not surfaced in v0.26): "Singular matrix from estimation"
+    with pytest.warns(
+        UserWarning,
+        match="ellipse model failed for",
+    ):
+        res = tams.eccentricity(Polygon([(i, i) for i in range(10)]))
+    assert np.isnan(res)
 
 
 def test_data_in_contours_methods_same_result(msg_tb0):

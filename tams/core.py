@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import functools
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -1067,16 +1067,56 @@ def track(
     return cs.reset_index(drop=True)  # drop nested time, CE ind index
 
 
-def eccentricity(p: shapely.geometry.polygon.Polygon):
-    """Compute the (first) eccentricity of the least-squares best-fit ellipse
-    to the coordinates of the polygon's exterior.
+class Ellipse(NamedTuple):
+    c: tuple[float, float]
+    a: float
+    b: float
+    theta: float
 
-    .. versionchanged:: 0.2.0
-       Renamed from :func:`calc_ellipse_eccen`.
+    @property
+    def eccentricity(self) -> float:
+        """The (first) eccentricity."""
+        return np.sqrt(1 - self.b**2 / self.a**2)
+
+    def to_blob(self):
+        """Convert to idealized :class:`~tams.idealized.Blob` object."""
+        from .idealized import Blob
+
+        return Blob(**self._asdict())
+
+    def to_polygon(self, n: int = 100) -> shapely.geometry.polygon.Polygon:
+        """Convert to a :class:`shapely.Polygon` object with `n` coords."""
+        from shapely import Polygon
+
+        xc, yc = self.c
+        a, b = self.a, self.b
+
+        theta_rad = np.deg2rad(self.theta)
+        sina, cosa = np.sin(theta_rad), np.cos(theta_rad)
+
+        t = np.linspace(0, 2 * np.pi, n)
+        sint, cost = np.sin(t), np.cos(t)
+
+        x = xc + a * cost * cosa - b * sint * sina
+        y = yc + a * cost * sina + b * sint * cosa
+
+        return Polygon(zip(x, y))
+
+
+def fit_ellipse(p: shapely.geometry.polygon.Polygon) -> Ellipse | None:
+    """Fit ellipse to the exterior coordinates of the polygon.
+
+    Returns ``None`` on failure.
+
+    Notes
+    -----
+    Using scikit-image ``EllipseModel``
+    https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.EllipseModel
+
+    .. versionadded:: 0.2.0
+       In v0.1, the fitted ellipse parameters were used to compute the eccentricity
+       but not exposed.
     """
-    # TODO: Ellipse class with methods to convert to shapely Polygon/LinearRing and mpl Ellipse Patch
-
-    # using skimage https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.EllipseModel
     from skimage.measure import EllipseModel
 
     xy = np.asarray(p.exterior.coords)
@@ -1093,21 +1133,52 @@ def eccentricity(p: shapely.geometry.polygon.Polygon):
         m = EllipseModel()
         success = m.estimate(xy)
 
-        if not success:
+        if not success or all(p is None for p in m.params):
+            # pre v0.26, success will be False on early exit,
+            # but in v0.26, if estimate exits early for one of the defined warnings,
+            # success True is returned, but params is not properly defined
+            # success is still False for linalg issues
             warnings.warn(f"ellipse model failed for {p}", stacklevel=2)
-            return np.nan
+            return None
 
-        _, _, xhw, yhw, _ = m.params
-        # ^ xc, yc, a, b, theta; from the docs
-        #   a with x, b with y (after subtracting the rotation), but they are half-widths
-        #   theta is in radians
+        xc, yc, xhw, yhw, theta_rad = m.params
+        # xc, yc, a, b, theta; from the docs
+        # a with x, b with y (after subtracting the rotation)
+        # they are half-widths, not necessarily the a and b semi-axes
+        # theta is in radians
 
-    rat = yhw / xhw if xhw > yhw else xhw / yhw
+    # Sort to semi-major and minor
+    if xhw >= yhw:
+        a, b = xhw, yhw
+    else:
+        a, b = yhw, xhw
 
-    return np.sqrt(1 - rat**2)
+    assert isinstance(xc, float)
+    assert isinstance(yc, float)
+
+    return Ellipse(
+        c=(xc, yc),
+        a=a,
+        b=b,
+        theta=np.rad2deg(theta_rad),
+    )
 
 
-def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
+def eccentricity(p: shapely.geometry.polygon.Polygon) -> float:
+    """Compute the (first) eccentricity of the least-squares best-fit ellipse
+    to the coordinates of the polygon's exterior.
+
+    .. versionchanged:: 0.2.0
+       Renamed from :func:`calc_ellipse_eccen`.
+    """
+    res = fit_ellipse(p)
+    if res is None:
+        return np.nan
+    else:
+        return res.eccentricity
+
+
+def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon) -> float:
     """Calculate the (first) eccentricity of the least-squares best-fit ellipse
     to the coordinates of the polygon's exterior.
 
