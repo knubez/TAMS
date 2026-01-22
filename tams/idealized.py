@@ -41,6 +41,7 @@ class Blob:
     theta
         Angle of rotation (degrees).
         When `theta` is 0, `a` is along the x-axis.
+        Positive angles are counter-clockwise.
     depth
         Relative to the environment/background, the well depth of the center of the blob.
         Higher depth means a larger negative anomaly.
@@ -87,6 +88,33 @@ class Blob:
         }
         if tendency is not None:
             self._tendency.update(tendency)
+
+    @classmethod
+    def from_wh(
+        cls,
+        c=(0, 0),
+        w: float = 1,
+        *,
+        h: float | None = None,
+        **kwargs,
+    ) -> Self:
+        """Create a blob from width and height instead of major and minor semi-axes.
+
+        Parameters
+        ----------
+        c : array-like of float
+            Center of the blob. Shape ``(2,)``: (:math:`x`, :math:`y`) (lon, lat) degrees.
+        w
+            Width of the blob (along the x-axis before rotation).
+        h
+            Height of the blob (along the y-axis before rotation).
+        **kwargs
+            Additional init keyword arguments.
+        """
+        if h is None:
+            h = w
+        b, a = sorted([w / 2, h / 2])
+        return cls(c=c, a=a, b=b, **kwargs)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(c={self.c}, a={self.a}, b={self.b}, theta={self.theta})"

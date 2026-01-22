@@ -9,10 +9,17 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
-from matplotlib.patches import Ellipse
-from shapely.geometry import Polygon
 
 import tams
+
+
+def make_ellipse_polygon(w, h, theta):
+    from tams.idealized import Blob
+
+    if w == h:
+        theta = 0  # no effect, avoid warning
+
+    return Blob.from_wh(w=w, h=h, theta=theta).polygon
 
 
 @pytest.mark.parametrize(
@@ -26,11 +33,10 @@ import tams
 )
 def test_ellipse_eccen(wh):
     w, h = wh
-    ell = Ellipse((1, 1), w, h, angle=np.rad2deg(np.pi / 4))
-    p = Polygon(np.asarray(ell.get_verts()))
+    p = make_ellipse_polygon(w, h, theta=45)
 
-    b, a = sorted([w, h])
-    eps_expected = np.sqrt(1 - b**2 / a**2)
+    b2, a2 = sorted([w, h])
+    eps_expected = np.sqrt(1 - b2**2 / a2**2)
 
     eps = tams.eccentricity(p)
 
@@ -39,10 +45,10 @@ def test_ellipse_eccen(wh):
 
     assert eps == eps_deprecated, "same func"
 
-    if w == h:  # the model gives ~ 0.06 for the circle
-        check = dict(abs=0.07)
+    if w == h:
+        check = dict(abs=1e-7)
     else:
-        check = dict(rel=1e-3)
+        check = dict(rel=1e-12)
 
     assert eps == pytest.approx(eps_expected, **check)
 
