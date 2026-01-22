@@ -6,6 +6,7 @@ __version__ = "0.1.8"
 
 from . import data
 from .core import (
+    calc_ellipse_eccen,
     classify,
     contour,
     data_in_contours,

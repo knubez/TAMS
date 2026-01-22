@@ -34,6 +34,11 @@ def test_ellipse_eccen(wh):
 
     eps = tams.eccentricity(p)
 
+    with pytest.warns(FutureWarning, match="`calc_ellipse_eccen` has been renamed"):
+        eps_deprecated = tams.calc_ellipse_eccen(p)
+
+    assert eps == eps_deprecated, "same func"
+
     if w == h:  # the model gives ~ 0.06 for the circle
         check = dict(abs=0.07)
     else:
