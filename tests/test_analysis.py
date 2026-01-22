@@ -32,7 +32,7 @@ def test_ellipse_eccen(wh):
     b, a = sorted([w, h])
     eps_expected = np.sqrt(1 - b**2 / a**2)
 
-    eps = tams.calc_ellipse_eccen(p)
+    eps = tams.eccentricity(p)
 
     if w == h:  # the model gives ~ 0.06 for the circle
         check = dict(abs=0.07)

@@ -1067,9 +1067,12 @@ def track(
     return cs.reset_index(drop=True)  # drop nested time, CE ind index
 
 
-def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
+def eccentricity(p: shapely.geometry.polygon.Polygon):
     """Compute the (first) eccentricity of the least-squares best-fit ellipse
     to the coordinates of the polygon's exterior.
+
+    .. versionchanged:: 0.2.0
+       Renamed from :func:`calc_ellipse_eccen`.
     """
     # TODO: Ellipse class with methods to convert to shapely Polygon/LinearRing and mpl Ellipse Patch
 
@@ -1102,6 +1105,23 @@ def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
     rat = yhw / xhw if xhw > yhw else xhw / yhw
 
     return np.sqrt(1 - rat**2)
+
+
+def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
+    """Calculate the (first) eccentricity of the least-squares best-fit ellipse
+    to the coordinates of the polygon's exterior.
+
+    .. deprecated:: 0.2.0
+       Renamed to :func:`eccentricity`.
+    """
+    warnings.warn(
+        "`calc_ellipse_eccen` has been renamed to `eccentricity` "
+        "and will be removed in a future version",
+        FutureWarning,
+        stacklevel=2,
+    )
+
+    return eccentricity(p)
 
 
 def _classify_one(cs: geopandas.GeoDataFrame) -> str:
@@ -1148,7 +1168,7 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
     if dur_219_25k >= six_hours:  # organized
         # Compute ellipse eccentricity
         eps = time_groups[["geometry"]].apply(
-            lambda g: calc_ellipse_eccen(g.dissolve().geometry.convex_hull.iloc[0])
+            lambda g: eccentricity(g.dissolve().geometry.convex_hull.iloc[0])
         )
         dur_eps = dt[eps <= 0.7].sum()
         if dur_235_50k >= six_hours and dur_eps >= six_hours:
