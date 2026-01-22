@@ -1079,28 +1079,12 @@ class Ellipse(NamedTuple):
         return np.sqrt(1 - self.b**2 / self.a**2)
 
     def to_blob(self):
-        """Convert to idealized :class:`~tams.idealized.Blob` object."""
+        """Convert to idealized :class:`~tams.idealized.Blob` object,
+        which provides further conversion methods.
+        """
         from .idealized import Blob
 
         return Blob(**self._asdict())
-
-    def to_polygon(self, n: int = 100) -> shapely.Polygon:
-        """Convert to a :class:`shapely.Polygon` object with `n` coords."""
-        from shapely import Polygon
-
-        xc, yc = self.c
-        a, b = self.a, self.b
-
-        theta_rad = np.deg2rad(self.theta)
-        sina, cosa = np.sin(theta_rad), np.cos(theta_rad)
-
-        t = np.linspace(0, 2 * np.pi, n)
-        sint, cost = np.sin(t), np.cos(t)
-
-        x = xc + a * cost * cosa - b * sint * sina
-        y = yc + a * cost * sina + b * sint * cosa
-
-        return Polygon(zip(x, y))
 
 
 def fit_ellipse(p: shapely.Polygon) -> Ellipse | None:
