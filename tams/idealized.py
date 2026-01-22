@@ -14,14 +14,13 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
-from shapely import affinity
-from shapely.geometry import Point
+from shapely import Point, affinity
 
 if TYPE_CHECKING:
     from typing import Any, Self
 
     from matplotlib.patches import Ellipse
-    from shapely.geometry import LinearRing, Polygon
+    from shapely import LinearRing, Polygon
 
 
 class Blob:
