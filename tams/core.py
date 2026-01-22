@@ -326,96 +326,77 @@ def _contours_to_polygons(
 
 
 def _size_filter(
-    cs235: geopandas.GeoDataFrame,
-    cs219: geopandas.GeoDataFrame,
+    ce: geopandas.GeoDataFrame,
+    core: geopandas.GeoDataFrame,
     *,
     threshold: float = 4000,
-) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
-    """Compute areas and use to filter both sets of contours.
+) -> geopandas.GeoDataFrame:
+    """Compute areas, associate core areas with cloud elements,
+    filter based on size threshold,
+    returning the CE frame only.
 
     `threshold` is for the total cold-core contour area within a given CE contour
     (units: km2).
     """
     import geopandas as gpd
-    from shapely.geometry import MultiPolygon
 
     logger = get_worker_logger()
 
-    # Drop small 235s (a 235 with area < 4000 km2 can't have 219 area of 4000)
-    cs235["area_km2"] = cs235.to_crs("EPSG:32663").area / 10**6
+    # Drop small CEs (a CE with area < 4000 km2 can't have cold-core area of 4000)
+    ce["area_km2"] = ce.to_crs("EPSG:32663").area / 10**6
     # ^ This crs is equidistant cylindrical
-    big_enough = cs235.area_km2 >= threshold
+    big_enough = ce.area_km2 >= threshold
     if not big_enough.empty:
         logger.info(
             f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-            f"of 235s are big enough ({threshold} km2)"
+            f"of CEs are big enough ({threshold} km2)"
         )
-    cs235 = cs235[big_enough].reset_index(drop=True)
+    ce = ce[big_enough].reset_index(drop=True)
 
-    # Drop very small 219s (insignificant)
+    # Drop very small cold cores (insignificant)
     # Note: This wasn't done in original TAMS, but here we are sometimes seeing
-    # tiny 219 contours inside larger ones.
-    individual_219_threshold = 10  # km2
-    cs219["area_km2"] = cs219.to_crs("EPSG:32663").area / 10**6
-    big_enough = cs219.area_km2 >= individual_219_threshold
+    # tiny core contours inside larger ones.
+    individual_core_threshold = min(threshold, 10)  # km2
+    core["area_km2"] = core.to_crs("EPSG:32663").area / 10**6
+    big_enough = core.area_km2 >= individual_core_threshold
     if not big_enough.empty:
         logger.info(
             f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-            f"of 219s are big enough ({individual_219_threshold} km2)"
+            f"of cores are big enough ({individual_core_threshold} km2)"
         )
-    cs219 = cs219[big_enough].reset_index(drop=True)
+    core = core[big_enough].reset_index(drop=True)
 
-    # Identify indices of 219s inside 235s
-    # Note that some 235s might not have any 219s inside
-    a = cs235.sjoin(cs219, predicate="contains", how="left").reset_index()
-    # ^ gives an Int64 index with duplicated values, for each 219 inside a certain 235
-    i219s = {  # convert to list
-        i235: sorted(g.index_right.astype(int).to_list())
-        for i235, g in a.groupby("index")
-        if not g.index_right.isna().all()
-    }
-
-    # Store 219 info inside the 235 df
-    cs235["inds219"] = [i219s.get(i235, []) for i235 in cs235.index]
-    # TODO: possible to instead cleanly store the 219 `MultiPolygon`s in a column?
-    # cs235["cs219"] = cs235.inds219.apply(lambda inds: cs219.iloc[inds][["geometry"]].dissolve().geometry)
-    # cs235["cs219"] = cs235.inds219.apply(lambda inds: MultiPolygon(cs219.geometry.iloc[inds].values))
-
-    # Check 219 area sum inside the 235 (total 219 area 4000 km2)
-    sum219s = {
-        i235: cs219.iloc[i219s.get(i235, [])].to_crs("EPSG:32663").area.sum() / 10**6
-        for i235 in cs235.index
-    }
-    cs235["area219_km2"] = pd.Series(sum219s, dtype=float)
-    big_enough = cs235.area219_km2 >= threshold
-    if not big_enough.empty:
-        logger.info(
-            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
-            f"of big-enough 235s have enough 219 area ({threshold} km2)"
+    # Identify the cold cores that are inside CEs and store them inside the CE frame
+    # Note that some CEs might not have any cores inside (-> None),
+    # and while some have one (Polygon), some may have more than one (-> MultiPolygon)
+    ce_core_as_index = ce.index.map(
+        core.sjoin(
+            ce,
+            predicate="within",
+            how="inner",
+            lsuffix="core",
+            rsuffix="ce",
         )
-    cs235 = cs235[big_enough].reset_index(drop=True)
-
-    # Store 219s inside the 235 frame as `MultiPolygon`s
-    cs235["cs219"] = gpd.GeoSeries(
-        cs235.inds219.apply(lambda inds: MultiPolygon(cs219.geometry.iloc[inds].values))
+        .groupby("index_ce")
+        .geometry.apply(lambda gs: gs.union_all(method="unary"))
     )
-    # NOTE: above method I found to be ~ 10x faster than this alternative:
-    #   gpd.GeoSeries(cs235.inds219.apply(lambda inds: cs219.iloc[inds][["geometry"]].dissolve().geometry[0]))
-    # The other benefit of applying `MultiPolygon` directly is that we get `MultiPolygon`
-    # even in the case of only one, whereas dissolve gives `Polygon` in that case (row).
-    #
-    # TODO: alternative method dissolve on the 219s for each row like below leads to
-    # slightly different data-in-contours pixel counts (greater?) in some cases
-    #   f = lambda row: data_in_contours(tb, cs219.iloc[row.inds219].dissolve())
-    #   res_ = cs235.apply(f, axis="columns")  # Series of DataFrames
-    #   res = pd.concat(res_.to_list()).reset_index(drop=True)
-    # TODO: unary_union (like dissolve uses), might be better unless can properly deal with
-    # the small holes we sometimes get, otherwise some area gets counted extra
+    ce["core"] = gpd.GeoSeries(
+        # When empty, dtype is int64
+        ce_core_as_index.astype("geometry"),
+        crs="EPSG:4326",
+    )
 
-    # TODO: some elegant way to drop 219s that aren't inside a 235, resetting index
-    # but preserving the matching of 235 to 219s
+    # Drop CEs whose total cold-core area doesn't meet the threshold
+    ce["area_core_km2"] = (ce.core.to_crs("EPSG:32663").area / 10**6).fillna(0)
+    big_enough = ce.area_core_km2 >= threshold
+    if not big_enough.empty:
+        logger.info(
+            f"{big_enough.value_counts().get(True, 0) / big_enough.size * 100:.1f}% "
+            f"of big-enough CEs have enough cold-core area ({threshold} km2)"
+        )
+    ce = ce[big_enough].reset_index(drop=True)
 
-    return cs235, cs219
+    return ce
 
 
 def _identify_one(
@@ -428,7 +409,7 @@ def _identify_one(
     convex_hull: bool = True,
     unstructured: bool | None = None,
     triangulation: Triangulation | None = None,
-) -> tuple[geopandas.GeoDataFrame, geopandas.GeoDataFrame]:
+) -> geopandas.GeoDataFrame:
     """Identify clouds in 2-D cloud-top temperature data `ctt` (e.g. at a specific time)."""
 
     logger = get_worker_logger()
@@ -438,7 +419,7 @@ def _identify_one(
     if time is None:
         s_time = "?"
     else:
-        s_time = time.values[()]
+        s_time = str(time.values[()])
     logger.info(f"identifying CEs in {name} at time {s_time}")
 
     kws = dict(
@@ -446,13 +427,13 @@ def _identify_one(
         triangulation=triangulation,
         closed_only=True,
     )
-    cs235 = (
+    ce = (
         contour(ctt, ctt_threshold, **kws)  # type: ignore[arg-type]
         .pipe(_contours_to_polygons)
         .pipe(sort_ew)
         .reset_index(drop=True)
     )
-    cs219 = (
+    core = (
         contour(ctt, ctt_core_threshold, **kws)  # type: ignore[arg-type]
         .pipe(_contours_to_polygons)
         .pipe(sort_ew)
@@ -460,13 +441,21 @@ def _identify_one(
     )
 
     if convex_hull:
-        cs235["geometry"] = cs235.geometry.convex_hull
-        cs219["geometry"] = cs219.geometry.convex_hull
+        ce["geometry"] = ce.geometry.convex_hull
+        core["geometry"] = core.geometry.convex_hull
 
-    if size_filter:
-        cs235, cs219 = _size_filter(cs235, cs219, threshold=size_threshold)
+    if not size_filter:
+        warnings.warn(
+            "Disabling size filtering via the `size_filter` argument is deprecated. "
+            "Instead set `size_threshold=0` to achieve the same effect.",
+            FutureWarning,
+            stacklevel=3,
+        )
+        size_threshold = 0
 
-    return cs235, cs219
+    ce = _size_filter(ce, core, threshold=size_threshold)
+
+    return ce
 
 
 def identify(
@@ -478,9 +467,9 @@ def identify(
     size_threshold: float = 4000,
     convex_hull: bool = True,
     parallel: bool = False,
-) -> tuple[list[geopandas.GeoDataFrame], list[geopandas.GeoDataFrame]]:
+) -> list[geopandas.GeoDataFrame]:
     """Identify clouds in 2-D (lat/lon) or 3-D (lat/lon + time) cloud-top temperature data `ctt`.
-    The 235 K contours returned (first list) serve to identify cloud elements (CEs).
+    The returned list of polygon dataframes serves to identify cloud elements (CEs).
     In a given frame from this list, each row corresponds to a certain CE.
 
     This is the first step in a TAMS workflow.
@@ -490,23 +479,25 @@ def identify(
     ctt
         Cloud-top temperature array.
     ctt_threshold
-        Used to identify the edges of cloud elements.
+        Used to identify the edges of cloud elements (CEs).
     ctt_core_threshold
-        Used to identify deep convective cloud regions within larger cloud areas.
+        Used to identify deep convective cloud regions within larger cloud areas (cold cores).
         This is used to determine whether or not a system is eligible for being classified
         as an organized system.
         It helps target raining clouds.
     size_filter
         Whether to apply size-filtering
-        (using 235 K and 219 K areas to filter out CEs that are not MCS material).
-        Filtering at this stage makes TAMS more computationally efficient overall.
-        Disable this option to return all identified CEs.
-        Note that all 219s are returned regardless of this setting.
+        (using CE and cold-core areas to filter out CEs that are not MCS material).
+        Only CEs with enough cold-core area (`size_threshold`) are kept.
 
-        When enabled (default), this also identifies the 219s (if any) that are within each 235.
-        Only 235s with enough 219 area (`size_threshold`) are kept.
+        .. deprecated:: 0.2.0
+           Set ``size_threshold=0`` instead to disable size filtering.
     size_threshold
-        Area threshold (units: km²) to use when `size_filter` is enabled.
+        Cold-core area threshold (units: km²).
+        CEs with total cold-core area below this threshold
+        are considered not MCS material and are filtered out.
+        Set to 0 to disable size filtering (e.g. in order to do your own).
+        Note that filtering at this stage makes TAMS more computationally efficient overall.
     convex_hull
         Apply convex hull to the CE polygons to simplify the shapes.
 
@@ -514,25 +505,31 @@ def identify(
 
            * This is done before size filtering / area computation.
            * This fills in any holes the CE polygons may have.
+
+        .. versionadded:: 0.2.0
+           In v0.1.x it was not possible to disable convex hulling.
     parallel
         Identify in parallel along ``'time'`` dimension for 3-D `ctt` (requires `joblib`).
 
     Returns
     -------
-    css235 : list of GeoDataFrame
-        List of dataframes of 235 K contour polygons (CEs).
-        If `size_filter` is enabled (default), an ``area_km2`` column is included,
-        column ``cs219`` gives the cold cores for each CE as a multi-polygon,
-        and those rows that don't meet the size filtering criteria are dropped.
-    css219 : list of GeoDataFrame
-        List of dataframes of 219 K contour polygons (cold cores).
-        If `size_filter` is enabled (default), an ``area_km2`` column is included,
-        but all rows are included, regardless of the area value.
+    ces : list of GeoDataFrame
+        List of dataframes of CE polygons.
+        Columns:
+
+        - ``geometry`` -- geometry, the CE polygons
+        - ``area_km2`` -- float, area of the CE polygons (km²)
+        - ``core`` -- geometry, the cold cores within each CE
+          (:class:`~shapely.MultiPolygon`, :class:`~shapely.Polygon`, or ``None`` if no cores)
+        - ``area_core_km2`` -- float, the CE's cold-core area (km²)
 
     See Also
     --------
     :doc:`/examples/identify`
         Demonstrating the impacts of options.
+
+    :func:`contour`
+        A lower-level and more general routine for producing shapes by contouring a threshold.
     """
     # TODO: allowing specifying `crs`, `method`, shapely options (buffer, convex-hull), ...
     dims = tuple(ctt.dims)
@@ -579,8 +576,7 @@ def identify(
         if parallel:
             logger.debug(f"assuming one time, ignoring parallel={parallel}")
 
-        cs235, cs219 = f(ctt)
-        css235, css219 = (cs235,), (cs219,)  # to tuple for consistency
+        ces = [f(ctt)]
 
     elif "time" in dims and (
         (not unstructured and len(dims) == 3) or (unstructured and len(dims) == 2)
@@ -595,14 +591,12 @@ def identify(
                 raise RuntimeError("joblib required") from e
 
             logger.info(f"identifying in parallel over {len(itimes)} time steps")
-            res = joblib.Parallel(n_jobs=-2, verbose=10)(
+            ces = joblib.Parallel(n_jobs=-2, verbose=10)(
                 joblib.delayed(f)(ctt.isel(time=i)) for i in itimes
             )
 
         else:
-            res = [f(ctt.isel(time=i)) for i in itimes]
-
-        css235, css219 = zip(*res)
+            ces = [f(ctt.isel(time=i)) for i in itimes]
 
     else:
         raise ValueError(
@@ -611,14 +605,14 @@ def identify(
             "or 1-D (cell) + optional 'time' dim for unstructured grid data."
         )
 
-    inds_empty = [i for i, cs235 in enumerate(css235) if cs235.empty]
-    if len(inds_empty) == len(css235):
+    inds_empty = [i for i, ce in enumerate(ces) if ce.empty]
+    if len(inds_empty) == len(ces):
         warnings.warn("No CEs identified", stacklevel=2)
     elif inds_empty:
         warnings.warn(f"No CEs identified for time steps: {inds_empty}", stacklevel=2)
-    logger.info(f"identified CEs in {len(css235) - len(inds_empty)}/{len(css235)} time steps")
+    logger.info(f"identified CEs in {len(ces) - len(inds_empty)}/{len(ces)} time steps")
 
-    return list(css235), list(css219)
+    return ces
 
 
 def _data_in_contours_sjoin(
@@ -1134,14 +1128,14 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
 
     # Sum areas over cloud elements
     time_groups = cs.groupby("time")
-    area = time_groups[["area_km2", "area219_km2"]].sum()
+    area = time_groups[["area_km2", "area_core_km2"]].sum()
 
     # Get duration (time resolution of our CE data)
     dt = time_groups["dtime"].apply(_the_unique)
     dur_tot = dt.sum()
 
     # Compute area-duration criteria
-    dur_219_25k = dt[area.area219_km2 >= 25_000].sum()
+    dur_219_25k = dt[area.area_core_km2 >= 25_000].sum()
     dur_235_50k = dt[area.area_km2 >= 50_000].sum()
     six_hours = pd.Timedelta(hours=6)
 
@@ -1179,7 +1173,7 @@ def classify(cs: geopandas.GeoDataFrame) -> geopandas.GeoDataFrame:
         return cs.assign(mcs_class=None)
 
     cols = set(cs.columns)
-    cols_needed = {"mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"}
+    cols_needed = {"mcs_id", "geometry", "time", "dtime", "area_km2", "area_core_km2"}
     missing = cols_needed - cols
     if missing:
         raise ValueError(
@@ -1238,8 +1232,8 @@ def run(
     import itertools
 
     import geopandas as gpd
+    from shapely import MultiPolygon
     from shapely.errors import ShapelyDeprecationWarning
-    from shapely.geometry import MultiPolygon
 
     assert {"ctt", "pr"} <= set(ds.data_vars)
     assert "time" in ds.dims
@@ -1258,7 +1252,7 @@ def run(
     #
 
     msg("Starting `identify`")
-    cs235, cs219 = identify(
+    ces = identify(
         ds.ctt,
         ctt_threshold=ctt_threshold,
         ctt_core_threshold=ctt_core_threshold,
@@ -1272,7 +1266,7 @@ def run(
     msg("Starting `track`")
     times = ds.time.values
     dt = pd.Timedelta(times[1] - times[0])  # TODO: equal spacing check here?
-    ce = track(cs235, times, u_projection=u_projection)
+    ce = track(ces, times, u_projection=u_projection)
 
     #
     # 3. Classify
@@ -1291,9 +1285,8 @@ def run(
     msg("Starting statistics calculations")
 
     # Cleanup
-    ce = ce.drop(columns=["inds219", "itime", "dtime"]).convert_dtypes()
-    ce = ce.rename(columns={"geometry": "cs235"}).set_geometry("cs235")
-    ce.cs219 = ce.cs219.set_crs("EPSG:4326")  # TODO: ensure set in `identify`
+    ce = ce.drop(columns=["itime", "dtime"]).convert_dtypes()
+    ce.core = ce.core.set_crs("EPSG:4326")  # TODO: ensure set in `identify`
 
     msg("Starting CE aggregation (into MCS time series)")
     dfs_t = []
@@ -1310,20 +1303,23 @@ def run(
                 category=ShapelyDeprecationWarning,
                 message="__len__ for multi-part geometries is deprecated",
             )
-            d["cs235"] = gpd.GeoSeries(
-                time_group[["cs235"]].apply(lambda g: MultiPolygon(g.geometry.values))
+            d["geometry"] = gpd.GeoSeries(
+                time_group[["geometry"]].apply(lambda g: MultiPolygon(g.geometry.values))
             )
-            d["cs219"] = gpd.GeoSeries(
-                time_group[["cs219"]].apply(
+            d["core"] = gpd.GeoSeries(
+                time_group[["core"]].apply(
                     lambda g: MultiPolygon(
-                        itertools.chain.from_iterable(mp.geoms for mp in g.cs219.values)
+                        itertools.chain.from_iterable(
+                            mp.geoms if isinstance(mp, MultiPolygon) else [mp]
+                            for mp in g.core.values
+                        )
                     )
                 )
             )
 
         d["nce"] = time_group.size()  # codespell:ignore nce
         d["area_km2"] = time_group.area_km2.sum()
-        d["area219_km2"] = time_group.area219_km2.sum()
+        d["area_core_km2"] = time_group.area_core_km2.sum()
         # TODO: compare to re-computing area after (could be different if shift to dissolve)?
 
         df = pd.DataFrame(d).reset_index()  # time -> column
@@ -1346,10 +1342,10 @@ def run(
     # Initial MCS time-resolved
     mcs = (
         gpd.GeoDataFrame(pd.concat(dfs_t).reset_index(drop=True))
-        .set_geometry("cs235", crs="EPSG:4326")
+        .set_geometry("geometry", crs="EPSG:4326")
         .convert_dtypes()
     )
-    mcs.cs219 = mcs.cs219.set_crs("EPSG:4326")
+    mcs.core = mcs.core.set_crs("EPSG:4326")
     mcs.mcs_class = mcs.mcs_class.astype("category")
 
     # Add CTT and PR data stats (time-resolved)
@@ -1359,23 +1355,23 @@ def run(
         df1 = data_in_contours(ds_t.pr, g, merge=True)
         df2 = data_in_contours(
             ds_t.pr,
-            g.set_geometry("cs219").drop(columns=["cs235"]),
+            g.set_geometry("core").drop(columns=["geometry"]),
             merge=False,
-        ).add_suffix("219")
+        ).add_suffix("_core")
         df3 = data_in_contours(
             ds_t.ctt,
-            g.set_geometry("cs219").drop(columns=["cs235"]),
+            g.set_geometry("core").drop(columns=["geometry"]),
             merge=False,
-        ).add_suffix("219")
+        ).add_suffix("_core")
         df = (
             df1.join(df2)
             .join(df3)
             .drop(
                 columns=[
-                    "count_pr219",
+                    "count_pr_core",
                 ]
             )
-            .rename(columns={"count_pr": "npixel", "count_ctt219": "npixel219"})
+            .rename(columns={"count_pr": "npixel", "count_ctt_core": "npixel_core"})
         )
         return df
 
@@ -1405,15 +1401,15 @@ def run(
     mcs_summary.mcs_class = mcs_summary.mcs_class.astype("category")
 
     # Add some CTT and PR stats to summary dataset
-    # TODO: these should be duration-weighted, in case dt is not constant
+    # TODO: these should be duration-weighted, in case dt is not constant (or missing times filled)
     msg("Computing stats for MCS summary dataset")
     vns = [
         "mean_pr",
-        "mean_pr219",
-        "mean_ctt219",
-        "std_ctt219",
+        "mean_pr_core",
+        "mean_ctt_core",
+        "std_ctt_core",
         "area_km2",
-        "area219_km2",
+        "area_core_km2",
         "nce",  # codespell:ignore nce
     ]
     mcs_summary = mcs_summary.join(
@@ -1429,7 +1425,7 @@ def run(
         return gpd.GeoSeries({"first_centroid": cen.iloc[0], "last_centroid": cen.iloc[-1]})
 
     mcs_summary_points = gpd.GeoDataFrame(
-        mcs.groupby("mcs_id")[["cs235", "time"]].apply(f).astype("geometry")
+        mcs.groupby("mcs_id")[["geometry", "time"]].apply(f).astype("geometry")
     )
     # ^ Initially we have GeoDataFrame but the columns don't have dtype geometry
     # `.astype("geometry")` makes that conversion but we lose GeoDataFrame

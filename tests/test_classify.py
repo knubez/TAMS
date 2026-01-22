@@ -12,7 +12,7 @@ import tams
 
 def test_classify_empty():
     cs = gpd.GeoDataFrame(
-        columns=["mcs_id", "geometry", "time", "dtime", "area_km2", "area219_km2"],
+        columns=["mcs_id", "geometry", "time", "dtime", "area_km2", "area_core_km2"],
         crs="EPSG:4326",
     )
     with pytest.warns(UserWarning, match="empty input frame"):
@@ -22,9 +22,12 @@ def test_classify_empty():
 
 def test_classify_cols_check():
     cs = gpd.GeoDataFrame(
-        columns=["mcs_id", "geometry", "time", "area_km2", "area219_km2"],
+        columns=["mcs_id", "geometry", "time", "area_km2", "area_core_km2"],
         data=[[0, None, pd.NaT, np.nan, np.nan]],
         crs="EPSG:4326",
     )
-    with pytest.raises(ValueError, match="missing these columns"):
+    with pytest.raises(
+        ValueError,
+        match=r"missing these columns needed by the classify algorithm: \['dtime'\]",
+    ):
         _ = tams.classify(cs)

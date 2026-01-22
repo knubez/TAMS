@@ -44,9 +44,10 @@ def test_ellipse_eccen(wh):
 
 def test_data_in_contours_methods_same_result(msg_tb0):
     tb = msg_tb0
-    cs235 = tams.core._contours_to_polygons(tams.contour(tb, 235))
+    cs235_ = tams.core._contours_to_polygons(tams.contour(tb, 235))
     cs219 = tams.core._contours_to_polygons(tams.contour(tb, 219))
-    cs235, _ = tams.core._size_filter(cs235, cs219)
+    cs235 = tams.core._size_filter(cs235_, cs219)
+    assert 0 < len(cs235) < len(cs235_)
 
     vn = "tb"
     varnames = [vn]
@@ -67,7 +68,7 @@ def test_data_in_contours_non_xy(mpas):
     # The MPAS one has real lat/lon 1-D dim-coords, not x/y with 2-D lat/lon
     # so with `to_dataframe().reset_index(drop=True)` lat/lon were lost
     ds = mpas.isel(time=1)
-    cs = tams.identify(ds.tb)[0][0]
+    cs = tams.identify(ds.tb)[0]
     data = ds.pr
     cs_precip = tams.data_in_contours(data, cs, method="sjoin")
     assert cs_precip.mean_pr.sum() > 0
@@ -76,7 +77,7 @@ def test_data_in_contours_non_xy(mpas):
 
 def test_data_in_contours_raises_full_nan(mpas):
     data = mpas.isel(time=0).tb
-    cs = tams.identify(mpas.isel(time=1).tb)[0][0]
+    cs = tams.identify(mpas.isel(time=1).tb)[0]
     assert data.isnull().all()
     with pytest.raises(ValueError, match="all null"):
         tams.data_in_contours(data, cs)
@@ -85,7 +86,7 @@ def test_data_in_contours_raises_full_nan(mpas):
 def test_data_in_contours_pass_df(msg_tb0):
     tb = msg_tb0
     data_da = tb
-    contours = tams.identify(tb)[0][0]
+    contours = tams.identify(tb)[0]
 
     data_ds = data_da.to_dataset()
     data_df = data_da.to_dataframe().reset_index(drop=True)  # drop (lat, lon) index
@@ -118,7 +119,7 @@ def test_data_in_contours_pass_ds_multiple_vars(msg_tb0, method):
     tb = msg_tb0
     # TODO: rename to 'tb' in `tb_from_ir` (and update examples/tests)
     data = tb.rename("tb").to_dataset().assign(tb_p100=tb + 100)
-    contours = tams.identify(tb)[0][0]
+    contours = tams.identify(tb)[0]
 
     df = tams.data_in_contours(data, contours, method=method, agg="mean")
     assert tuple(df.columns) == ("mean_tb", "mean_tb_p100")
