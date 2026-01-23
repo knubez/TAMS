@@ -35,11 +35,19 @@ Lower level functions used in the above include:
 .. autosummary::
    :toctree: api/
 
-   calc_ellipse_eccen
    contour
    data_in_contours
+   eccentricity
    overlap
    project
+
+
+Deprecated names:
+
+.. autosummary::
+   :toctree: api/
+
+   calc_ellipse_eccen
 
 
 Data
