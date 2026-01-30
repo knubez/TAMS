@@ -195,6 +195,13 @@ Idealized
    Field
    Sim
 
+Alternative initializers:
+
+.. autosummary::
+   :toctree: api/
+
+   Blob.from_wh
+
 Blob properties:
 
 .. autosummary::
