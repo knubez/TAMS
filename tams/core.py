@@ -1101,10 +1101,13 @@ class Ellipse(NamedTuple):
         return Blob(**self._asdict())
 
 
-def fit_ellipse(p: shapely.Polygon) -> Ellipse | None:
+def fit_ellipse(p: shapely.Polygon) -> Ellipse:
     """Fit ellipse to the exterior coordinates of the polygon.
 
-    Returns ``None`` on failure.
+    Raises
+    ------
+    ValueError
+        If ``EllipseModel`` fitting reports failure.
 
     Notes
     -----
@@ -1136,8 +1139,7 @@ def fit_ellipse(p: shapely.Polygon) -> Ellipse | None:
             # but in v0.26, if estimate exits early for one of the defined warnings,
             # success True is returned, but params is not properly defined
             # success is still False for linalg issues
-            warnings.warn(f"ellipse model failed for {p}", stacklevel=2)
-            return None
+            raise ValueError("unable to fit ellipse to polygon exterior")
 
         xc, yc, xhw, yhw, theta_rad = m.params
         # xc, yc, a, b, theta; from the docs
@@ -1169,8 +1171,10 @@ def eccentricity(p: shapely.Polygon) -> float:
     .. versionchanged:: 0.2.0
        Renamed from :func:`calc_ellipse_eccen`.
     """
-    res = fit_ellipse(p)
-    if res is None:
+    try:
+        res = fit_ellipse(p)
+    except Exception as e:
+        warnings.warn(f"ellipse fitting failed for {p}: {e}", stacklevel=2)
         return np.nan
     else:
         return res.eccentricity

@@ -62,7 +62,7 @@ def test_ellipse_eccen_invalid():
         ),
         pytest.warns(
             UserWarning,
-            match="ellipse model failed for",
+            match="ellipse fitting failed for",
         ),
     ):
         res = tams.eccentricity(Polygon([]))
@@ -75,7 +75,7 @@ def test_ellipse_eccen_invalid():
         ),
         pytest.warns(
             UserWarning,
-            match="ellipse model failed for",
+            match="ellipse fitting failed for",
         ),
     ):
         res = tams.eccentricity(Polygon([(0, 0)] * 5))
@@ -84,7 +84,7 @@ def test_ellipse_eccen_invalid():
     # scikit-image message (not surfaced in v0.26): "Singular matrix from estimation"
     with pytest.warns(
         UserWarning,
-        match="ellipse model failed for",
+        match="ellipse fitting failed for",
     ):
         res = tams.eccentricity(Polygon([(i, i) for i in range(10)]))
     assert np.isnan(res)
