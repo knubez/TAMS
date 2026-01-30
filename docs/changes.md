@@ -20,6 +20,8 @@
 - `tams.contours()` has been renamed to {func}`tams.contour`
   and now returns a {class}`~geopandas.GeoDataFrame` of contour lines
   (instead of a list of arrays of line segment coordinates; {pull}`74`).
+- `tams.calc_ellipse_eccen()` has been renamed to {func}`tams.eccentricity` ({pull}`85`).
+  The old function name can still be used, but it is deprecated and warns.
 
 ### New features
 
