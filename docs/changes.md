@@ -20,6 +20,18 @@
 - `tams.contours()` has been renamed to {func}`tams.contour`
   and now returns a {class}`~geopandas.GeoDataFrame` of contour lines
   (instead of a list of arrays of line segment coordinates; {pull}`74`).
+- {func}`tams.identify` now returns a single of list of {class}`~geopandas.GeoDataFrame`s
+  instead of also returning the identified cores ({pull}`84`).
+  In these frames, the `core` column contains the cold cores within each CE
+  (renamed from `cs219`), with area `area_core_km2` (renamed from `area219_km2`).
+  "235" and "219" language was generally removed
+  in favor of the more general "CE" and "core" terminology,
+  since different thresholds can be used.
+  Scalar geometries of the `core` column are now either
+  {class}`~shapely.MultiPolygon`, {class}`~shapely.Polygon`, or `None` (no cores)
+  instead of always being {class}`~shapely.MultiPolygon`.
+- In {func}`tams.identify`, the `size_filter` Boolean parameter is deprecated
+  (use `size_threshold=0` instead to disable size filtering; {pull}`84`).
 - `tams.calc_ellipse_eccen()` has been renamed to {func}`tams.eccentricity` ({pull}`85`).
   The old function name can still be used, but it is deprecated and warns.
 
