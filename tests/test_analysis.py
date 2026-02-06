@@ -95,7 +95,10 @@ def test_ellipse_fit_blob():
     assert m is not None
     for k in ["c", "a", "b", "angle"]:
         v0 = getattr(b, k)
-        v = getattr(m, k)
+        if k == "c":
+            v = m.center
+        else:
+            v = getattr(m, k)
         assert v == pytest.approx(v0, rel=1e-12), k
 
 

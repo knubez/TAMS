@@ -59,9 +59,9 @@ Ellipse fit parameters:
 .. autosummary::
    :toctree: api/
 
-   Ellipse.c
-   Ellipse.a
-   Ellipse.b
+   Ellipse.center
+   Ellipse.width
+   Ellipse.height
    Ellipse.angle
 
 
@@ -70,6 +70,10 @@ Ellipse properties/methods:
 .. autosummary::
    :toctree: api/
 
+   Ellipse.a
+   Ellipse.b
+   Ellipse.c
+   Ellipse.e
    Ellipse.eccentricity
    Ellipse.to_blob
 

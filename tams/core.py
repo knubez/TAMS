@@ -1067,18 +1067,43 @@ def track(
 class Ellipse(NamedTuple):
     """Ellipse fit parameters, e.g. returned by :func:`fit_ellipse`."""
 
-    c: tuple[float, float]
+    center: tuple[float, float]
     """Center ``(x, y)`` coordinates."""
 
-    a: float
-    """Semi-major axis length."""
+    width: float
+    """Diameter in the x-direction before rotation."""
 
-    b: float
-    """Semi-minor axis length."""
+    height: float
+    """Diameter in the y-direction before rotation."""
 
     angle: float
     """Rotation angle (degrees) from x-axis to semi-major axis.
     Positive counter-clockwise."""
+
+    @property
+    def a(self) -> float:
+        """Semi-major axis length.
+        ``width/2`` or ``height/2``, whichever is larger.
+        """
+        a2, _ = sorted([self.width, self.height], reverse=True)
+        return a2 / 2
+
+    @property
+    def b(self) -> float:
+        """Semi-minor axis length.
+        ``width/2`` or ``height/2``, whichever is smaller.
+        """
+        _, b2 = sorted([self.width, self.height], reverse=True)
+        return b2 / 2
+
+    @property
+    def c(self) -> float:
+        r"""The linear eccentricity (distance from center to focus).
+
+        .. math::
+           c = \sqrt{a^2 - b^2}
+        """
+        return np.sqrt(self.a**2 - self.b**2)
 
     @property
     def eccentricity(self) -> float:
@@ -1089,13 +1114,23 @@ class Ellipse(NamedTuple):
         """
         return np.sqrt(1 - self.b**2 / self.a**2)
 
+    @property
+    def e(self) -> float:
+        """Alias for :attr:`eccentricity`."""
+        return self.eccentricity
+
     def to_blob(self):
         """Convert to :class:`~tams.idealized.Blob` object,
         which provides further conversion methods.
         """
         from .idealized import Blob
 
-        return Blob(**self._asdict())
+        return Blob(
+            c=self.center,
+            a=self.a,
+            b=self.b,
+            angle=self.angle,
+        )
 
 
 def fit_ellipse(p: shapely.Polygon) -> Ellipse:
@@ -1144,19 +1179,13 @@ def fit_ellipse(p: shapely.Polygon) -> Ellipse:
         # they are half-widths, not necessarily the a and b semi-axes
         # theta is in radians
 
-    # Sort to semi-major and minor
-    if xhw >= yhw:
-        a, b = xhw, yhw
-    else:
-        a, b = yhw, xhw
-
     assert isinstance(xc, float)
     assert isinstance(yc, float)
 
     return Ellipse(
-        c=(xc, yc),
-        a=a,
-        b=b,
+        center=(xc, yc),
+        width=xhw * 2,
+        height=yhw * 2,
         angle=np.rad2deg(theta),
     )
 
