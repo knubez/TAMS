@@ -6,7 +6,7 @@ dependencies:
   - pip
   #
   # Core dependencies
-  - geopandas >=0.10
+  - geopandas >=1.0
   - matplotlib >=3.4,!=3.8.0
   - numpy
   - pandas =2.*

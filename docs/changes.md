@@ -32,6 +32,9 @@
   instead of always being {class}`~shapely.MultiPolygon`.
 - In {func}`tams.identify`, the `size_filter` Boolean parameter is deprecated
   (use `size_threshold=0` instead to disable size filtering; {pull}`84`).
+- The minimum GeoPandas version is now
+  [1.0.0](https://geopandas.org/en/stable/docs/changelog.html#version-1-0-0-june-24-2024)
+  ({pull}`87`).
 
 ### New features
 
