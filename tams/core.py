@@ -1,5 +1,8 @@
 """
 Core routines that make up the TAMS algorithm.
+
+Functions for external use should be exported from the top-level;
+users shouldn't need to import/use objects from this module directly.
 """
 
 from __future__ import annotations
@@ -1164,6 +1167,10 @@ def eccentricity(p: shapely.Polygon) -> float:
 
     .. versionchanged:: 0.2.0
        Renamed from :func:`calc_ellipse_eccen`.
+
+    See Also
+    --------
+    fit_ellipse
     """
     try:
         res = fit_ellipse(p)

@@ -176,3 +176,22 @@ Style.default_sorting_style = bibtex_default_style
 
 # Original: None
 Style.default_label_style = bibtex_default_style
+
+
+def setup(app):
+    def skip_member(app, what, name, obj, skip, options):
+        if name.startswith("_"):
+            return True
+
+        # print(f"{name=}, {what=}, {obj=}")
+
+        # Skip inherited (named) tuple methods
+        if what == "method":
+            qualname = getattr(obj, "__qualname__", "")
+
+            if qualname.startswith("tuple."):
+                return True
+
+        return skip
+
+    app.connect("autodoc-skip-member", skip_member)

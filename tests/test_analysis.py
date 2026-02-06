@@ -12,7 +12,6 @@ import pytest
 from shapely import Polygon
 
 import tams
-from tams.core import fit_ellipse
 from tams.idealized import Blob
 
 
@@ -92,7 +91,7 @@ def test_ellipse_eccen_invalid():
 
 def test_ellipse_fit_blob():
     b = Blob(a=3, b=1, theta=10)
-    m = fit_ellipse(b.polygon)
+    m = tams.fit_ellipse(b.polygon)
     assert m is not None
     for k in ["c", "a", "b", "theta"]:
         v0 = getattr(b, k)

@@ -42,7 +42,40 @@ Lower level functions used in the above include:
    project
 
 
-Deprecated names:
+Ellipse fitting
+~~~~~~~~~~~~~~~
+
+Used by :func:`tams.eccentricity`.
+
+.. autosummary::
+   :toctree: api/
+
+   fit_ellipse
+   Ellipse
+
+
+Ellipse fit parameters:
+
+.. autosummary::
+   :toctree: api/
+
+   Ellipse.c
+   Ellipse.a
+   Ellipse.b
+   Ellipse.theta
+
+
+Ellipse properties/methods:
+
+.. autosummary::
+   :toctree: api/
+
+   Ellipse.eccentricity
+   Ellipse.to_blob
+
+
+Deprecated
+~~~~~~~~~~
 
 .. autosummary::
    :toctree: api/
