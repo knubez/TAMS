@@ -1076,7 +1076,7 @@ class Ellipse(NamedTuple):
     b: float
     """Semi-minor axis length."""
 
-    theta: float
+    angle: float
     """Rotation angle (degrees) from x-axis to semi-major axis.
     Positive counter-clockwise."""
 
@@ -1138,7 +1138,7 @@ def fit_ellipse(p: shapely.Polygon) -> Ellipse:
             # success is still False for linalg issues
             raise ValueError("unable to fit ellipse to polygon exterior")
 
-        xc, yc, xhw, yhw, theta_rad = m.params
+        xc, yc, xhw, yhw, theta = m.params
         # xc, yc, a, b, theta; from the docs
         # a with x, b with y (after subtracting the rotation)
         # they are half-widths, not necessarily the a and b semi-axes
@@ -1157,7 +1157,7 @@ def fit_ellipse(p: shapely.Polygon) -> Ellipse:
         c=(xc, yc),
         a=a,
         b=b,
-        theta=np.rad2deg(theta_rad),
+        angle=np.rad2deg(theta),
     )
 
 

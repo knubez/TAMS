@@ -15,11 +15,11 @@ import tams
 from tams.idealized import Blob
 
 
-def make_ellipse_polygon(w, h, theta):
+def make_ellipse_polygon(w, h, angle):
     if w == h:
-        theta = 0  # no effect, avoid warning
+        angle = 0  # no effect, avoid warning
 
-    return Blob.from_wh(w=w, h=h, theta=theta).polygon
+    return Blob.from_wh(w=w, h=h, angle=angle).polygon
 
 
 @pytest.mark.parametrize(
@@ -33,7 +33,7 @@ def make_ellipse_polygon(w, h, theta):
 )
 def test_ellipse_eccen(wh):
     w, h = wh
-    p = make_ellipse_polygon(w, h, theta=45)
+    p = make_ellipse_polygon(w, h, angle=45)
 
     b2, a2 = sorted([w, h])
     eps_expected = np.sqrt(1 - b2**2 / a2**2)
@@ -90,10 +90,10 @@ def test_ellipse_eccen_invalid():
 
 
 def test_ellipse_fit_blob():
-    b = Blob(a=3, b=1, theta=10)
+    b = Blob(a=3, b=1, angle=10)
     m = tams.fit_ellipse(b.polygon)
     assert m is not None
-    for k in ["c", "a", "b", "theta"]:
+    for k in ["c", "a", "b", "angle"]:
         v0 = getattr(b, k)
         v = getattr(m, k)
         assert v == pytest.approx(v0, rel=1e-12), k

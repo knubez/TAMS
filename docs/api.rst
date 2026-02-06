@@ -62,7 +62,7 @@ Ellipse fit parameters:
    Ellipse.c
    Ellipse.a
    Ellipse.b
-   Ellipse.theta
+   Ellipse.angle
 
 
 Ellipse properties/methods:

@@ -33,13 +33,13 @@ class Blob:
         Center of the blob. Shape ``(2,)``: (:math:`x`, :math:`y`) (lon, lat) degrees.
     a
         Semi-major axis of the blob.
-        When `theta` is 0, this is along the x-axis.
+        When `angle` is 0, this is along the x-axis.
     b
         Semi-minor axis of the blob. If not provided, `b` is set to `a` (circle).
         In this case, `a` is the radius of the circle.
-    theta
+    angle
         Angle of rotation (degrees).
-        When `theta` is 0, `a` is along the x-axis.
+        When `angle` is 0, `a` is along the x-axis.
         Positive angles are counter-clockwise.
     depth
         Relative to the environment/background, the well depth of the center of the blob.
@@ -47,7 +47,7 @@ class Blob:
         In TAMS, 235 K cloud-top temperature is used to define cloud elements,
         while 219 K areas are assumed to represent embedded overshooting tops.
     tendency : dict, optional
-        Tendency in any of the blob parameters above (`c`, `a`, `b`, `theta`, `depth`).
+        Tendency in any of the blob parameters above (`c`, `a`, `b`, `angle`, `depth`).
         Units: per hour.
         You can also use :meth:`set_tendency` to set the tendency after creating the blob.
         The default tendency is 0 for all parameters.
@@ -59,7 +59,7 @@ class Blob:
         a: float = 0.5,
         *,
         b: float | None = None,
-        theta: float = 0,
+        angle: float = 0,
         depth: float = 20,
         tendency: dict[str, Any] | None = None,
     ) -> None:
@@ -73,16 +73,16 @@ class Blob:
             self.b = b
         else:
             self.b = a
-        if self.a == self.b and theta != 0:
-            warnings.warn("theta has no effect for circular blobs", stacklevel=2)
-        self.theta = theta
+        if self.a == self.b and angle != 0:
+            warnings.warn("angle has no effect for circular blobs", stacklevel=2)
+        self.angle = angle
         self.depth = depth
 
         self._tendency = {
             "c": np.zeros(2),
             "a": 0.0,
             "b": 0.0,
-            "theta": 0.0,
+            "angle": 0.0,
             "depth": 0.0,
         }
         if tendency is not None:
@@ -116,7 +116,7 @@ class Blob:
         return cls(c=c, a=a, b=b, **kwargs)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(c={self.c}, a={self.a}, b={self.b}, theta={self.theta})"
+        return f"{type(self).__name__}(c={self.c}, a={self.a}, b={self.b}, angle={self.angle})"
 
     @property
     def center(self) -> Point:
@@ -134,7 +134,7 @@ class Blob:
         else:
             ellipse = affinity.rotate(
                 affinity.scale(circle, xfact=self.a / r, yfact=self.b / r),
-                angle=self.theta,
+                angle=self.angle,
                 origin=c,
                 use_radians=False,
             )
@@ -163,7 +163,7 @@ class Blob:
             xy=tuple(self.c),
             width=2 * self.a,
             height=2 * self.b,
-            angle=self.theta,
+            angle=self.angle,
             **kwargs,
         )
         return p
@@ -215,7 +215,7 @@ class Blob:
             The well depth at each :math:`(x, y)` point.
         """
         cx, cy = self.c
-        t = np.deg2rad(self.theta)
+        t = np.deg2rad(self.angle)
         dx = x - cx
         dy = y - cy
         r = np.sqrt(dx**2 + dy**2)
@@ -253,10 +253,10 @@ class Blob:
         b = a * brel
         assert np.isclose(ab_sum, a * b), "area conservation"
 
-        # Area-weighted circular average theta
-        rad_self = np.deg2rad(self.theta)
-        rad_other = np.deg2rad(other.theta)
-        theta = np.rad2deg(
+        # Area-weighted circular average angle
+        rad_self = np.deg2rad(self.angle)
+        rad_other = np.deg2rad(other.angle)
+        angle = np.rad2deg(
             np.arctan2(
                 f_self * np.sin(rad_self) + f_other * np.sin(rad_other),
                 f_self * np.cos(rad_self) + f_other * np.cos(rad_other),
@@ -277,7 +277,7 @@ class Blob:
             c=c,
             a=a,
             b=b,
-            theta=theta,
+            angle=angle,
             depth=depth,
         )
         blob.set_tendency(**tendency)
@@ -294,7 +294,7 @@ class Blob:
         f = 1 / n
         a, b = f * self.a, f * self.b
         o = self.c
-        t = np.deg2rad(self.theta) + np.pi / 2
+        t = np.deg2rad(self.angle) + np.pi / 2
         blobs = []
         for i in range(n):
             r = 2 * b * (i - (n - 1) / 2)
@@ -303,7 +303,7 @@ class Blob:
                 c=c,
                 a=a,
                 b=b,
-                theta=self.theta,
+                angle=self.angle,
                 depth=self.depth,
             )
             blob.set_tendency(**self.get_tendency(copy=True))
@@ -317,7 +317,7 @@ class Blob:
             c=self.c.copy(),
             a=self.a,
             b=self.b,
-            theta=self.theta,
+            angle=self.angle,
             depth=self.depth,
         )
         b.set_tendency(**self.get_tendency(copy=True))
