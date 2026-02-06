@@ -34,6 +34,9 @@
   (use `size_threshold=0` instead to disable size filtering; {pull}`84`).
 - `tams.calc_ellipse_eccen()` has been renamed to {func}`tams.eccentricity` ({pull}`85`).
   The old function name can still be used, but it is deprecated and warns.
+- The minimum GeoPandas version is now
+  [1.0.0](https://geopandas.org/en/stable/docs/changelog.html#version-1-0-0-june-24-2024)
+  ({pull}`87`).
 
 ### New features
 
