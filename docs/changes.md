@@ -54,5 +54,5 @@
   including reasons for exclusion ({pull}`74`).
 - Create idealized datasets for testing using {mod}`tams.idealized` ({pull}`80`).
 - {func}`tams.fit_ellipse` can be used to obtain the ellipse fit parameters
-  used for the eccentrity calculation ({pull}`85`).
+  used for the eccentricity calculation ({pull}`85`).
   It returns a named tuple ({class}`~tams.Ellipse`).
