@@ -167,7 +167,7 @@ class Blob:
         return self
 
     def well(self, x, y):
-        """Parabolic well function in the `a` and `b` directions.
+        """Parabolic well function.
 
         It reaches `depth` (negative) at the center and 0 at the ellipse edge, then continues.
 
