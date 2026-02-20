@@ -1166,7 +1166,7 @@ def fit_ellipse(p: shapely.Polygon) -> Ellipse:
         m = EllipseModel()
         success = m.estimate(xy)
 
-        if not success or all(p is None for p in m.params):
+        if not success or m.params is None or all(p is None for p in m.params):
             # pre v0.26, success will be False on early exit,
             # but in v0.26, if estimate exits early for one of the defined warnings,
             # success True is returned, but params is not properly defined
