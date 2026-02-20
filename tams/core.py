@@ -1125,12 +1125,7 @@ class Ellipse(NamedTuple):
         """
         from .idealized import Blob
 
-        return Blob(
-            c=self.center,
-            a=self.a,
-            b=self.b,
-            angle=self.angle,
-        )
+        return Blob(**self._asdict())
 
 
 def fit_ellipse(p: shapely.Polygon) -> Ellipse:

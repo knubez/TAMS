@@ -232,19 +232,11 @@ Idealized
    Field
    Sim
 
-Alternative initializers:
-
-.. autosummary::
-   :toctree: api/
-
-   Blob.from_wh
-
 Blob properties:
 
 .. autosummary::
    :toctree: api/
 
-   Blob.center
    Blob.ring
    Blob.polygon
 
