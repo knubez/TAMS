@@ -1077,7 +1077,7 @@ class Ellipse(NamedTuple):
     """Diameter in the y-direction before rotation."""
 
     angle: float
-    """Rotation angle (degrees) from x-axis to semi-major axis.
+    """Rotation angle (degrees) from x-axis to the width axis.
     Positive counter-clockwise."""
 
     @property
