@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import pandas
     from cartopy.mpl.geoaxes import GeoAxes
     from matplotlib.axes import Axes
+    from matplotlib.colors import Colormap
 
 
 def sort_ew(cs: geopandas.GeoDataFrame):
@@ -42,6 +43,7 @@ def plot_tracked(
     background: str = "countries",
     label: str = "id",
     add_colorbar: bool = False,
+    cmap: str | Colormap = "GnBu",
     cbar_kwargs: dict | None = None,
     ax: Axes | GeoAxes | None = None,
     size: float = 4,
@@ -65,6 +67,12 @@ def plot_tracked(
         "none": don't label CEs.
     add_colorbar
         Add colorbar with time info.
+    cmap
+        Colormap, used to indicate the time of each CE
+        relative to the min and max time in the frame.
+        With the default (``'GnBu'``), the earliest CEs are light green.
+        Note that only the 0.2--0.85 range of the colormap is used,
+        and the upper bound (0.85) will be used if there is only one unique time.
     cbar_kwargs
         Keyword arguments to pass to ``plt.colorbar``.
     ax : Axes or GeoAxes, optional
@@ -147,12 +155,14 @@ def plot_tracked(
     tmin, tmax = t.iloc[0], t.iloc[-1]
     dt = t.diff().min()
 
+    cmap_obj = plt.get_cmap(cmap)
+
     def get_color(t_):
         if tmin == tmax:
-            return plt.cm.tab10.colors[0]
+            return cmap_obj(0.85)
         else:
             x = (t_ - tmin) / (tmax - tmin) * 0.65 + 0.2
-            return plt.cm.GnBu(x)
+            return cmap_obj(x)
 
     # Plot blobs at each time
     for t_, g in cs.groupby("time"):
