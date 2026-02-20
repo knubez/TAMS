@@ -1179,8 +1179,9 @@ def fit_ellipse(p: shapely.Polygon) -> Ellipse:
         # they are half-widths, not necessarily the a and b semi-axes
         # theta is in radians
 
-    assert isinstance(xc, float)
-    assert isinstance(yc, float)
+    if TYPE_CHECKING:
+        assert isinstance(xc, float)
+        assert isinstance(yc, float)
 
     return Ellipse(
         center=(xc, yc),
