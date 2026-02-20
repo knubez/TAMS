@@ -14,14 +14,13 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
-from shapely import affinity
-from shapely.geometry import Point
+from shapely import Point, affinity
 
 if TYPE_CHECKING:
     from typing import Any, Self
 
     from matplotlib.patches import Ellipse
-    from shapely.geometry import LinearRing, Polygon
+    from shapely import LinearRing, Polygon
 
 
 class Blob:
@@ -30,24 +29,24 @@ class Blob:
 
     Parameters
     ----------
-    c : array-like of float
+    center : array-like of float
         Center of the blob. Shape ``(2,)``: (:math:`x`, :math:`y`) (lon, lat) degrees.
-    a
-        Semi-major axis of the blob.
-        When `theta` is 0, this is along the x-axis.
-    b
-        Semi-minor axis of the blob. If not provided, `b` is set to `a` (circle).
-        In this case, `a` is the radius of the circle.
-    theta
+    width
+        Width of the blob (along the x-axis before rotation).
+    height
+        Height of the blob (along the y-axis before rotation).
+        Assumed same as `width` if not provided (i.e., circular blob).
+    angle
         Angle of rotation (degrees).
-        When `theta` is 0, `a` is along the x-axis.
+        When `angle` is 0, `width` is along the x-axis.
+        Positive angles are counter-clockwise.
     depth
         Relative to the environment/background, the well depth of the center of the blob.
         Higher depth means a larger negative anomaly.
         In TAMS, 235 K cloud-top temperature is used to define cloud elements,
         while 219 K areas are assumed to represent embedded overshooting tops.
     tendency : dict, optional
-        Tendency in any of the blob parameters above (`c`, `a`, `b`, `theta`, `depth`).
+        Tendency in any of the blob parameters above (`center`, `width`, `height`, `angle`, `depth`).
         Units: per hour.
         You can also use :meth:`set_tendency` to set the tendency after creating the blob.
         The default tendency is 0 for all parameters.
@@ -55,59 +54,54 @@ class Blob:
 
     def __init__(
         self,
-        c=(0, 0),
-        a: float = 0.5,
+        center=(0, 0),
+        width: float = 1,
         *,
-        b: float | None = None,
-        theta: float = 0,
+        height: float | None = None,
+        angle: float = 0,
         depth: float = 20,
         tendency: dict[str, Any] | None = None,
     ) -> None:
-        self.c = np.asarray(c, dtype=float)
-        if not a > 0:
-            raise ValueError(f"Invalid semi-major axis: {a}")
-        self.a = a
-        if b is not None:
-            if not 0 < b <= a:
-                raise ValueError(f"Invalid semi-minor axis: {b}")
-            self.b = b
+        self.center = np.asarray(center, dtype=float)
+        if not width > 0:
+            raise ValueError(f"Invalid width: {width}")
+        self.width = width
+        if height is not None:
+            if not height > 0:
+                raise ValueError(f"Invalid height: {height}")
+            self.height = height
         else:
-            self.b = a
-        if self.a == self.b and theta != 0:
-            warnings.warn("theta has no effect for circular blobs", stacklevel=2)
-        self.theta = theta
+            self.height = width
+        if self.width == self.height and angle != 0:
+            warnings.warn("angle has no effect for circular blobs", stacklevel=2)
+        self.angle = angle
         self.depth = depth
 
         self._tendency = {
-            "c": np.zeros(2),
-            "a": 0.0,
-            "b": 0.0,
-            "theta": 0.0,
+            "center": np.zeros(2),
+            "width": 0.0,
+            "height": 0.0,
+            "angle": 0.0,
             "depth": 0.0,
         }
         if tendency is not None:
             self._tendency.update(tendency)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(c={self.c}, a={self.a}, b={self.b}, theta={self.theta})"
-
-    @property
-    def center(self) -> Point:
-        """The defined center ``c`` as a :class:`shapely.Point`."""
-        return Point(self.c)
+        return f"{type(self).__name__}(center={self.center}, width={self.width}, height={self.height}, angle={self.angle})"
 
     @property
     def polygon(self) -> Polygon:
         """The ellipse as a :class:`shapely.Polygon`."""
-        c = self.center
-        r = min(self.a, self.b)
-        circle = c.buffer(r)
-        if self.a == self.b:
+        c = Point(self.center)
+        d = min(self.width, self.height)
+        circle = c.buffer(d / 2)
+        if self.width == self.height:
             return circle
         else:
             ellipse = affinity.rotate(
-                affinity.scale(circle, xfact=self.a / r, yfact=self.b / r),
-                angle=self.theta,
+                affinity.scale(circle, xfact=self.width / d, yfact=self.height / d),
+                angle=self.angle,
                 origin=c,
                 use_radians=False,
             )
@@ -133,10 +127,10 @@ class Blob:
         from matplotlib.patches import Ellipse
 
         p = Ellipse(
-            xy=tuple(self.c),
-            width=2 * self.a,
-            height=2 * self.b,
-            angle=self.theta,
+            xy=tuple(self.center),
+            width=self.width,
+            height=self.height,
+            angle=self.angle,
             **kwargs,
         )
         return p
@@ -149,7 +143,7 @@ class Blob:
         for k, v in kwargs.items():
             if k not in self._tendency:
                 raise ValueError(f"Invalid key: {k!r}")
-            if k == "c":
+            if k == "center":
                 v = np.asarray(v, dtype=float)
             self._tendency[k] = v
         return self
@@ -173,7 +167,7 @@ class Blob:
         return self
 
     def well(self, x, y):
-        """Parabolic well function in the `a` and `b` directions.
+        """Parabolic well function.
 
         It reaches `depth` (negative) at the center and 0 at the ellipse edge, then continues.
 
@@ -187,21 +181,21 @@ class Blob:
         z : duck-array
             The well depth at each :math:`(x, y)` point.
         """
-        cx, cy = self.c
-        t = np.deg2rad(self.theta)
+        cx, cy = self.center
+        t = np.deg2rad(self.angle)
         dx = x - cx
         dy = y - cy
         r = np.sqrt(dx**2 + dy**2)
-        if self.a == self.b:
+        if self.width == self.height:
             # Circular blob
-            return -self.depth * (1 - (r / self.a) ** 2)
+            return -self.depth * (1 - (r * 2 / self.width) ** 2)
         else:
             # Elliptical blob
             cos_t = np.cos(t)
             sin_t = np.sin(t)
             x_t = dx * cos_t + dy * sin_t
             y_t = -dx * sin_t + dy * cos_t
-            return -self.depth * (1 - ((x_t / self.a) ** 2 + (y_t / self.b) ** 2))
+            return -self.depth * (1 - ((x_t * 2 / self.width) ** 2 + (y_t * 2 / self.height) ** 2))
 
     def merge(self, other: Blob) -> Blob:
         """Merge with another blob, creating a new blob with area-weighted-average characteristics."""
@@ -210,26 +204,26 @@ class Blob:
         if not self.polygon.intersects(other.polygon):
             raise ValueError("Blobs do not intersect")
 
-        ab_self = self.a * self.b
-        ab_other = other.a * other.b
-        ab_sum = ab_self + ab_other
+        wh_self = self.width * self.height
+        wh_other = other.width * other.height
+        wh_sum = wh_self + wh_other
 
-        f_self = ab_self / ab_sum
-        f_other = ab_other / ab_sum
+        f_self = wh_self / wh_sum
+        f_other = wh_other / wh_sum
 
         # Area-weighted average center
-        c = f_self * self.c + f_other * other.c
+        center = f_self * self.center + f_other * other.center
 
-        # Area-weighted average semi axes
-        brel = f_self * self.b / self.a + f_other * other.b / other.a
-        a = np.sqrt(ab_sum / brel)
-        b = a * brel
-        assert np.isclose(ab_sum, a * b), "area conservation"
+        # Area-weighted average dimensions
+        hrel = f_self * self.height / self.width + f_other * other.height / other.width
+        width = np.sqrt(wh_sum / hrel)
+        height = width * hrel
+        assert np.isclose(wh_sum, width * height), "area conservation"
 
-        # Area-weighted circular average theta
-        rad_self = np.deg2rad(self.theta)
-        rad_other = np.deg2rad(other.theta)
-        theta = np.rad2deg(
+        # Area-weighted circular average angle
+        rad_self = np.deg2rad(self.angle)
+        rad_other = np.deg2rad(other.angle)
+        angle = np.rad2deg(
             np.arctan2(
                 f_self * np.sin(rad_self) + f_other * np.sin(rad_other),
                 f_self * np.cos(rad_self) + f_other * np.cos(rad_other),
@@ -247,10 +241,10 @@ class Blob:
             tendency[k] = f_self * v_self + f_other * v_other
 
         blob = Blob(
-            c=c,
-            a=a,
-            b=b,
-            theta=theta,
+            center=center,
+            width=width,
+            height=height,
+            angle=angle,
             depth=depth,
         )
         blob.set_tendency(**tendency)
@@ -258,25 +252,25 @@ class Blob:
         return blob
 
     def split(self, n: int = 2) -> list[Blob]:
-        """Split the blob into `n` smaller blobs that line up along the semi-minor axis.
+        """Split the blob into `n` smaller blobs that line up along the minor axis.
         Or the y-axis if the ellipse is a circle.
         """
         if n < 2:
             raise ValueError(f"n must be at least 2, got {n!r}")
 
         f = 1 / n
-        a, b = f * self.a, f * self.b
-        o = self.c
-        t = np.deg2rad(self.theta) + np.pi / 2
+        w, h = f * self.width, f * self.height
+        o = self.center
+        t = np.deg2rad(self.angle) + np.pi / 2
         blobs = []
         for i in range(n):
-            r = 2 * b * (i - (n - 1) / 2)
+            r = h * (i - (n - 1) / 2)
             c = o + r * np.r_[np.cos(t), np.sin(t)]
             blob = Blob(
-                c=c,
-                a=a,
-                b=b,
-                theta=self.theta,
+                center=c,
+                width=w,
+                height=h,
+                angle=self.angle,
                 depth=self.depth,
             )
             blob.set_tendency(**self.get_tendency(copy=True))
@@ -286,15 +280,15 @@ class Blob:
 
     def copy(self) -> Blob:
         """Return a copy of the blob."""
-        b = Blob(
-            c=self.c.copy(),
-            a=self.a,
-            b=self.b,
-            theta=self.theta,
+        blob = Blob(
+            center=self.center.copy(),
+            width=self.width,
+            height=self.height,
+            angle=self.angle,
             depth=self.depth,
         )
-        b.set_tendency(**self.get_tendency(copy=True))
-        return b
+        blob.set_tendency(**self.get_tendency(copy=True))
+        return blob
 
 
 def _to_arr(x, *, default_num: int = 100) -> np.ndarray:

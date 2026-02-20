@@ -35,11 +35,56 @@ Lower level functions used in the above include:
 .. autosummary::
    :toctree: api/
 
-   calc_ellipse_eccen
    contour
    data_in_contours
+   eccentricity
    overlap
    project
+
+
+Ellipse fitting
+~~~~~~~~~~~~~~~
+
+Used by :func:`tams.eccentricity`.
+
+.. autosummary::
+   :toctree: api/
+
+   fit_ellipse
+   Ellipse
+
+
+Ellipse fit parameters:
+
+.. autosummary::
+   :toctree: api/
+
+   Ellipse.center
+   Ellipse.width
+   Ellipse.height
+   Ellipse.angle
+
+
+Ellipse properties/methods:
+
+.. autosummary::
+   :toctree: api/
+
+   Ellipse.a
+   Ellipse.b
+   Ellipse.c
+   Ellipse.e
+   Ellipse.eccentricity
+   Ellipse.to_blob
+
+
+Deprecated
+~~~~~~~~~~
+
+.. autosummary::
+   :toctree: api/
+
+   calc_ellipse_eccen
 
 
 Data
@@ -192,7 +237,6 @@ Blob properties:
 .. autosummary::
    :toctree: api/
 
-   Blob.center
    Blob.ring
    Blob.polygon
 

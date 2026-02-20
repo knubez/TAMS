@@ -1,12 +1,15 @@
 """
 Core routines that make up the TAMS algorithm.
+
+Functions for external use should be exported from the top-level;
+users shouldn't need to import/use objects from this module directly.
 """
 
 from __future__ import annotations
 
 import functools
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -1061,13 +1064,87 @@ def track(
     return cs.reset_index(drop=True)  # drop nested time, CE ind index
 
 
-def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
-    """Compute the (first) eccentricity of the least-squares best-fit ellipse
-    to the coordinates of the polygon's exterior.
-    """
-    # TODO: Ellipse class with methods to convert to shapely Polygon/LinearRing and mpl Ellipse Patch
+class Ellipse(NamedTuple):
+    """Ellipse fit parameters, e.g. returned by :func:`fit_ellipse`."""
 
-    # using skimage https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.EllipseModel
+    center: tuple[float, float]
+    """Center ``(x, y)`` coordinates."""
+
+    width: float
+    """Diameter in the x-direction before rotation."""
+
+    height: float
+    """Diameter in the y-direction before rotation."""
+
+    angle: float
+    """Rotation angle (degrees) from x-axis to the width axis.
+    Positive counter-clockwise."""
+
+    @property
+    def a(self) -> float:
+        """Semi-major axis length.
+        ``width/2`` or ``height/2``, whichever is larger.
+        """
+        a2, _ = sorted([self.width, self.height], reverse=True)
+        return a2 / 2
+
+    @property
+    def b(self) -> float:
+        """Semi-minor axis length.
+        ``width/2`` or ``height/2``, whichever is smaller.
+        """
+        _, b2 = sorted([self.width, self.height], reverse=True)
+        return b2 / 2
+
+    @property
+    def c(self) -> float:
+        r"""The linear eccentricity (distance from center to focus).
+
+        .. math::
+           c = \sqrt{a^2 - b^2}
+        """
+        return np.sqrt(self.a**2 - self.b**2)
+
+    @property
+    def eccentricity(self) -> float:
+        r"""The (first) eccentricity.
+
+        .. math::
+           e = \sqrt{1 - \frac{b^2}{a^2}}
+        """
+        return np.sqrt(1 - self.b**2 / self.a**2)
+
+    @property
+    def e(self) -> float:
+        """Alias for :attr:`eccentricity`."""
+        return self.eccentricity
+
+    def to_blob(self):
+        """Convert to :class:`~tams.idealized.Blob` object,
+        which provides further conversion methods.
+        """
+        from .idealized import Blob
+
+        return Blob(**self._asdict())
+
+
+def fit_ellipse(p: shapely.Polygon) -> Ellipse:
+    """Fit ellipse to the exterior coordinates of the polygon.
+
+    Raises
+    ------
+    ValueError
+        If ``EllipseModel`` fitting reports failure.
+
+    Notes
+    -----
+    Using scikit-image ``EllipseModel``
+    https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.EllipseModel
+
+    .. versionadded:: 0.2.0
+       In v0.1, the fitted ellipse parameters were used to compute the eccentricity
+       but not exposed.
+    """
     from skimage.measure import EllipseModel
 
     xy = np.asarray(p.exterior.coords)
@@ -1084,18 +1161,66 @@ def calc_ellipse_eccen(p: shapely.geometry.polygon.Polygon):
         m = EllipseModel()
         success = m.estimate(xy)
 
-        if not success:
-            warnings.warn(f"ellipse model failed for {p}", stacklevel=2)
-            return np.nan
+        if not success or m.params is None or all(p is None for p in m.params):
+            # pre v0.26, success will be False on early exit,
+            # but in v0.26, if estimate exits early for one of the defined warnings,
+            # success True is returned, but params is not properly defined
+            # success is still False for linalg issues
+            raise ValueError("unable to fit ellipse to polygon exterior")
 
-        _, _, xhw, yhw, _ = m.params
-        # ^ xc, yc, a, b, theta; from the docs
-        #   a with x, b with y (after subtracting the rotation), but they are half-widths
-        #   theta is in radians
+        xc, yc, xhw, yhw, theta = m.params
+        # xc, yc, a, b, theta; from the docs
+        # a with x, b with y (after subtracting the rotation)
+        # they are half-widths, not necessarily the a and b semi-axes
+        # theta is in radians
 
-    rat = yhw / xhw if xhw > yhw else xhw / yhw
+    if TYPE_CHECKING:
+        assert isinstance(xc, float)
+        assert isinstance(yc, float)
 
-    return np.sqrt(1 - rat**2)
+    return Ellipse(
+        center=(xc, yc),
+        width=xhw * 2,
+        height=yhw * 2,
+        angle=np.rad2deg(theta),
+    )
+
+
+def eccentricity(p: shapely.Polygon) -> float:
+    """Compute the (first) eccentricity of the least-squares best-fit ellipse
+    to the coordinates of the polygon's exterior.
+
+    .. versionchanged:: 0.2.0
+       Renamed from :func:`calc_ellipse_eccen`.
+
+    See Also
+    --------
+    fit_ellipse
+    """
+    try:
+        res = fit_ellipse(p)
+    except Exception as e:
+        warnings.warn(f"ellipse fitting failed for {p}: {e}", stacklevel=2)
+        return np.nan
+    else:
+        return res.eccentricity
+
+
+def calc_ellipse_eccen(p: shapely.Polygon) -> float:
+    """Calculate the (first) eccentricity of the least-squares best-fit ellipse
+    to the coordinates of the polygon's exterior.
+
+    .. deprecated:: 0.2.0
+       Renamed to :func:`eccentricity`.
+    """
+    warnings.warn(
+        "`calc_ellipse_eccen` has been renamed to `eccentricity` "
+        "and will be removed in a future version",
+        FutureWarning,
+        stacklevel=2,
+    )
+
+    return eccentricity(p)
 
 
 def _classify_one(cs: geopandas.GeoDataFrame) -> str:
@@ -1142,7 +1267,7 @@ def _classify_one(cs: geopandas.GeoDataFrame) -> str:
     if dur_219_25k >= six_hours:  # organized
         # Compute ellipse eccentricity
         eps = time_groups[["geometry"]].apply(
-            lambda g: calc_ellipse_eccen(g.dissolve().geometry.convex_hull.iloc[0])
+            lambda g: eccentricity(g.dissolve().geometry.convex_hull.iloc[0])
         )
         dur_eps = dt[eps <= 0.7].sum()
         if dur_235_50k >= six_hours and dur_eps >= six_hours:

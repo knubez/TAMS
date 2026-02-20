@@ -5,11 +5,11 @@ from tams.idealized import Blob
 
 def test_merge_area_con():
     d = 0.5
-    b1 = Blob(c=(-d, 0))
-    b2 = Blob(c=(d, 0))
+    b1 = Blob(center=(-d, 0), width=1)
+    b2 = Blob(center=(d, 0), width=1)
     merged = b1.merge(b2)
 
-    ab_sum = b1.a * b1.b + b2.a * b2.b
-    ab_merged = merged.a * merged.b
+    wh_sum = b1.width * b1.height + b2.width * b2.height
+    wh_merged = merged.width * merged.height
 
-    assert np.isclose(ab_sum, ab_merged)
+    assert np.isclose(wh_sum, wh_merged)

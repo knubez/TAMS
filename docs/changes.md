@@ -32,6 +32,8 @@
   instead of always being {class}`~shapely.MultiPolygon`.
 - In {func}`tams.identify`, the `size_filter` Boolean parameter is deprecated
   (use `size_threshold=0` instead to disable size filtering; {pull}`84`).
+- `tams.calc_ellipse_eccen()` has been renamed to {func}`tams.eccentricity` ({pull}`85`).
+  The old function name can still be used, but it is deprecated and warns.
 - The minimum GeoPandas version is now
   [1.0.0](https://geopandas.org/en/stable/docs/changelog.html#version-1-0-0-june-24-2024)
   ({pull}`87`).
@@ -51,3 +53,6 @@
   The logs now include more information about the contouring,
   including reasons for exclusion ({pull}`74`).
 - Create idealized datasets for testing using {mod}`tams.idealized` ({pull}`80`).
+- {func}`tams.fit_ellipse` can be used to obtain the ellipse fit parameters
+  used for the eccentricity calculation ({pull}`85`).
+  It returns a named tuple ({class}`~tams.Ellipse`).

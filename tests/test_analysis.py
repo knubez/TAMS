@@ -9,10 +9,17 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
-from matplotlib.patches import Ellipse
-from shapely.geometry import Polygon
+from shapely import Polygon
 
 import tams
+from tams.idealized import Blob
+
+
+def make_ellipse_polygon(width, height, angle):
+    if width == height:
+        angle = 0  # no effect, avoid warning
+
+    return Blob(width=width, height=height, angle=angle).polygon
 
 
 @pytest.mark.parametrize(
@@ -26,20 +33,70 @@ import tams
 )
 def test_ellipse_eccen(wh):
     w, h = wh
-    ell = Ellipse((1, 1), w, h, angle=np.rad2deg(np.pi / 4))
-    p = Polygon(np.asarray(ell.get_verts()))
+    p = make_ellipse_polygon(w, h, angle=45)
 
-    b, a = sorted([w, h])
-    eps_expected = np.sqrt(1 - b**2 / a**2)
+    b2, a2 = sorted([w, h])
+    eps_expected = np.sqrt(1 - b2**2 / a2**2)
 
-    eps = tams.calc_ellipse_eccen(p)
+    eps = tams.eccentricity(p)
 
-    if w == h:  # the model gives ~ 0.06 for the circle
-        check = dict(abs=0.07)
+    with pytest.warns(FutureWarning, match="`calc_ellipse_eccen` has been renamed"):
+        eps_deprecated = tams.calc_ellipse_eccen(p)
+
+    assert eps == eps_deprecated, "same func"
+
+    if w == h:
+        check = dict(abs=1e-7)
     else:
-        check = dict(rel=1e-3)
+        check = dict(rel=1e-12)
 
     assert eps == pytest.approx(eps_expected, **check)
+
+
+def test_ellipse_eccen_invalid():
+    with (
+        pytest.warns(
+            RuntimeWarning,  # from scikit-image
+            match=r"Need at least 5 data points to estimate an ellipse\.",
+        ),
+        pytest.warns(
+            UserWarning,
+            match="ellipse fitting failed for",
+        ),
+    ):
+        res = tams.eccentricity(Polygon([]))
+    assert np.isnan(res)
+
+    with (
+        pytest.warns(
+            RuntimeWarning,  # from scikit-image
+            match=r"Standard deviation of data is too small to estimate ellipse with meaningful precision\.",
+        ),
+        pytest.warns(
+            UserWarning,
+            match="ellipse fitting failed for",
+        ),
+    ):
+        res = tams.eccentricity(Polygon([(0, 0)] * 5))
+    assert np.isnan(res)
+
+    # scikit-image message (not surfaced in v0.26): "Singular matrix from estimation"
+    with pytest.warns(
+        UserWarning,
+        match="ellipse fitting failed for",
+    ):
+        res = tams.eccentricity(Polygon([(i, i) for i in range(10)]))
+    assert np.isnan(res)
+
+
+def test_ellipse_fit_blob():
+    b = Blob(width=6, height=2, angle=10)
+    m = tams.fit_ellipse(b.polygon)
+    assert m is not None
+    for k in ["center", "width", "height", "angle"]:
+        v0 = getattr(b, k)
+        v = getattr(m, k)
+        assert v == pytest.approx(v0, rel=1e-12), k
 
 
 def test_data_in_contours_methods_same_result(msg_tb0):
