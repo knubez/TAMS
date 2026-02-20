@@ -67,7 +67,7 @@ def plot_tracked(
         "none": don't label CEs.
     add_colorbar
         Add colorbar with time info.
-    cmap
+    cmap : str or Colormap
         Colormap, used to indicate the time of each CE
         relative to the min and max time in the frame.
         With the default (``'GnBu'``), the earliest CEs are light green.
