@@ -154,6 +154,8 @@ def plot_tracked(
     t = pd.Series(sorted(cs.time.unique()))
     tmin, tmax = t.iloc[0], t.iloc[-1]
     dt = t.diff().min()
+    if tmin == tmax and add_colorbar:
+        raise ValueError("adding colorbar when there is only one unique time is not supported")
 
     cmap_obj = plt.get_cmap(cmap)
 
