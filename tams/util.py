@@ -47,7 +47,11 @@ def cmap_section(
     from matplotlib.colors import ListedColormap
 
     if not 0 <= start < stop <= 1:
-        raise ValueError("invalid start/stop values. Must be in [0, 1].")
+        raise ValueError(
+            "invalid start/stop values. "
+            "Must be in [0, 1] and start < stop "
+            f"(got {start=}, {stop=})."
+        )
 
     cmap_ = plt.get_cmap(cmap)
 
