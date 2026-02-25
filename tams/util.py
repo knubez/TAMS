@@ -51,9 +51,11 @@ def cmap_section(
 
     cmap_ = plt.get_cmap(cmap)
 
+    base_name = getattr(cmap_, "name", "cmap")
+
     return ListedColormap(
         cmap_(np.linspace(start, stop, num)),
-        name=f"{cmap}_{start}_{stop}",
+        name=f"{base_name}_{start}_{stop}",
     )
 
 
