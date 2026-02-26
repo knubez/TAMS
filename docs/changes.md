@@ -56,3 +56,4 @@
 - {func}`tams.fit_ellipse` can be used to obtain the ellipse fit parameters
   used for the eccentricity calculation ({pull}`85`).
   It returns a named tuple ({class}`~tams.Ellipse`).
+- Specify `cmap` in {func}`tams.plot_tracked` ({pull}`89`).

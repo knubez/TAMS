@@ -70,6 +70,7 @@ napoleon_type_aliases = {
     "Axes": "~matplotlib.axes.Axes",
     "Ellipse": "~matplotlib.patches.Ellipse",
     "Triangulation": "~matplotlib.tri.Triangulation",
+    "Colormap": "~matplotlib.colors.Colormap",
     "Callable": "~typing.Callable",
     "GeoSeries": "geopandas.GeoSeries",
     "GeoDataFrame": "geopandas.GeoDataFrame",

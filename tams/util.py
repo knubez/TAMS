@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import pandas
     from cartopy.mpl.geoaxes import GeoAxes
     from matplotlib.axes import Axes
+    from matplotlib.colors import Colormap
 
 
 def sort_ew(cs: geopandas.GeoDataFrame):
@@ -35,6 +36,33 @@ def sort_ew(cs: geopandas.GeoDataFrame):
         # fmt: on
 
 
+def cmap_section(
+    cmap: str | Colormap,
+    start: float = 0.0,
+    stop: float = 1.0,
+    num: int = 256,
+) -> Colormap:
+    """Sample a portion of a colormap to make a new one."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import ListedColormap
+
+    if not 0 <= start < stop <= 1:
+        raise ValueError(
+            "invalid start/stop values. "
+            "Must be in [0, 1] and start < stop "
+            f"(got {start=}, {stop=})."
+        )
+
+    cmap_ = plt.get_cmap(cmap)
+
+    base_name = getattr(cmap_, "name", "cmap")
+
+    return ListedColormap(
+        cmap_(np.linspace(start, stop, num)),
+        name=f"{base_name}_{start}_{stop}",
+    )
+
+
 def plot_tracked(
     cs: geopandas.GeoDataFrame,
     *,
@@ -42,6 +70,7 @@ def plot_tracked(
     background: str = "countries",
     label: str = "id",
     add_colorbar: bool = False,
+    cmap: str | Colormap | None = None,
     cbar_kwargs: dict | None = None,
     ax: Axes | GeoAxes | None = None,
     size: float = 4,
@@ -65,6 +94,13 @@ def plot_tracked(
         "none": don't label CEs.
     add_colorbar
         Add colorbar with time info.
+        Only allowed if there is more than one unique time.
+    cmap : str or Colormap, optional
+        Colormap, used to indicate the time of each CE
+        relative to the min and max time in the frame.
+        The default is the 0.2--0.85 section of ``'GnBu'``,
+        such that the earliest CEs are light green.
+        Note that the upper bound will be used if there is only one unique time.
     cbar_kwargs
         Keyword arguments to pass to ``plt.colorbar``.
     ax : Axes or GeoAxes, optional
@@ -146,13 +182,20 @@ def plot_tracked(
     t = pd.Series(sorted(cs.time.unique()))
     tmin, tmax = t.iloc[0], t.iloc[-1]
     dt = t.diff().min()
+    if tmin == tmax and add_colorbar:
+        raise ValueError("adding colorbar when there is only one unique time is not supported")
+
+    if cmap is None:
+        cmap = cmap_section("GnBu", 0.2, 0.85)
+
+    cmap_obj = plt.get_cmap(cmap)
 
     def get_color(t_):
         if tmin == tmax:
-            return plt.cm.tab10.colors[0]
+            return cmap_obj(1.0)
         else:
-            x = (t_ - tmin) / (tmax - tmin) * 0.65 + 0.2
-            return plt.cm.GnBu(x)
+            x = (t_ - tmin) / (tmax - tmin)
+            return cmap_obj(x)
 
     # Plot blobs at each time
     for t_, g in cs.groupby("time"):
