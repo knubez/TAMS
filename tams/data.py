@@ -17,6 +17,7 @@ import xarray as xr
 if TYPE_CHECKING:
     from typing import Any
 
+    import geopandas
     import pooch
     import xarray
 
@@ -93,6 +94,11 @@ class _ExampleFile(NamedTuple):
     fname: str | None = None
     """File name to save as. ``{key}.nc`` will be used if not provided."""
 
+    @property
+    def is_nc(self) -> bool:
+        """Whether this file is a netCDF file."""
+        return self.fname is None or self.fname.endswith(".nc")
+
 
 _EXAMPLE_FILES: list[_ExampleFile] = [
     _ExampleFile(
@@ -106,7 +112,7 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
         sha256="14ce08ff06e27e75c19e7a32570ee21302717b6bd073cebacac74807d2f0a7cb",
     ),
     _ExampleFile(
-        "imerg",
+        key="imerg",
         file_id="1wWV7eugFrw9T5h4NMFFKKr8kLcKKckn-",
         sha256="3aa2c2ca23d6c6d1abd3a9f3df5e0acae939e76d586c3a6ea1c7af807a99e154",
     ),
@@ -120,6 +126,12 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
         key="mpas-regridded",
         file_id="1ZPuSXNIM8Vu2AF-L_GVTfx93QfiaWxIv",
         sha256="240d10c671d8d35a717f41a8343573447d1410355cf80e22c468c594c3401186",
+    ),
+    _ExampleFile(
+        key="mpas-regridded-identify",
+        file_id="1Fpm-5blySnBdOvE4EQM8_YLMpwzRr_cb",
+        sha256="f146ef16b98169c181e0dd5ba41984b2f638f488fb124fec6eb0ba21576f47af",
+        fname="mpas-regridded-identify.parquet.gz",
     ),
     #
     _ExampleFile(
@@ -347,6 +359,7 @@ def open_example(
     .. versionadded:: 0.2.0
     """
     lut = {**_EXAMPLE_FILE_DIRECT_LUT, **_EXAMPLE_FILE_INDIRECT_LUT}
+    lut = {k: f for k, f in lut.items() if f.is_nc}
     try:
         ef = lut[key]
     except KeyError:
@@ -395,6 +408,53 @@ def load_example(
     """
     with open_example(key, progress=progress, **kwargs) as ds:
         return ds.load()
+
+
+def read_example(
+    key: str,
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> geopandas.GeoDataFrame:
+    """Open an example dataset with GeoPandas (e.g. pre-identified CEs).
+
+    Parameters
+    ----------
+    key
+        String identifying the example dataset.
+    progress
+        Show download progress if applicable.
+    **kwargs
+        Passed to :func:`geopandas.read_parquet`.
+
+    Examples
+    --------
+    >>> import tams
+    >>> ce = tams.data.read_example("mpas-regridded-identify")
+
+    See Also
+    --------
+    load_example, open_example
+        For loading xarray Datasets of input data.
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
+    import geopandas as gpd
+
+    lut = {k: f for k, f in _EXAMPLE_FILE_DIRECT_LUT.items() if not f.is_nc}
+    try:
+        ef = lut[key]
+    except KeyError:
+        s_keys = ", ".join(repr(k) for k in lut)
+        raise ValueError(
+            f"unknown example dataset key {key!r}. Available keys are: {s_keys}."
+        ) from None
+
+    p = fetch_example(ef.key, progress=progress)
+
+    return gpd.read_parquet(p, **kwargs)
 
 
 def _time_input_to_pandas(
