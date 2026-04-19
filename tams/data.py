@@ -288,10 +288,11 @@ def fetch_example(key: str, *, progress: bool = False) -> Path:
             "It is available on conda-forge and PyPI as 'pooch'."
         ) from e
 
+    lut = _EXAMPLE_FILE_DIRECT_LUT
     try:
-        ef = _EXAMPLE_FILE_DIRECT_LUT[key]
+        ef = lut[key]
     except KeyError:
-        s_keys = ", ".join(repr(f.key) for f in _EXAMPLE_FILES)
+        s_keys = ", ".join(repr(k) for k in lut)
         raise ValueError(
             f"unknown example file key {key!r}. Available keys are: {s_keys}."
         ) from None
