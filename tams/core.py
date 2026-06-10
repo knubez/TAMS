@@ -266,11 +266,15 @@ def _contours_to_polygons(
     from shapely import Polygon
     from shapely.geometry.polygon import orient
 
+    logger = get_worker_logger()
+
     if cs.empty:
         return gpd.GeoDataFrame(
             geometry=[],
             crs="EPSG:4326",
         )
+
+    n0 = len(cs)
 
     # Preprocess by selecting closed contours, converting to polygons,
     # computing area, and sorting (smallest -> largest)
@@ -322,6 +326,8 @@ def _contours_to_polygons(
                 continue
             new_polys.append(cs.loc[i].contour)
 
+    logger.info(f"{n0} contours -> {len(new_polys)} polygons")
+
     return gpd.GeoDataFrame(
         geometry=new_polys,
         crs="EPSG:4326",
@@ -344,6 +350,8 @@ def _size_filter(
     import geopandas as gpd
 
     logger = get_worker_logger()
+
+    n0 = len(ce)
 
     # Drop small CEs (a CE with area < 4000 km2 can't have cold-core area of 4000)
     ce["area_km2"] = ce.to_crs("EPSG:32663").area / 10**6
@@ -398,6 +406,8 @@ def _size_filter(
             f"of big-enough CEs have enough cold-core area ({threshold} km2)"
         )
     ce = ce[big_enough].reset_index(drop=True)
+
+    logger.info(f"{len(ce)}/{n0} CEs retained after size filtering")
 
     return ce
 
