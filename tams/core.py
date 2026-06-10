@@ -8,6 +8,7 @@ users shouldn't need to import/use objects from this module directly.
 from __future__ import annotations
 
 import functools
+import re
 import warnings
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -27,6 +28,11 @@ if TYPE_CHECKING:
 
 
 logger = get_logger()
+
+
+def _remove_validity_explanation_location(s):
+    """e.g. 'invalid closed (Ring Self-intersection[-77.6131744384766 37.6409950256348])'"""
+    return re.sub(r"\[.*?\]", "[...]", s)
 
 
 def _contour_segs_to_gdf(
@@ -98,7 +104,8 @@ def _contour_segs_to_gdf(
                 skipped[f"invalid closed ({e})"] += 1
                 continue
             if not r.is_valid:
-                skipped[f"invalid closed ({explain_validity(r)})"] += 1
+                expl = _remove_validity_explanation_location(explain_validity(r))
+                skipped[f"invalid closed ({expl})"] += 1
                 continue
             encloses_higher = r.is_ccw
             r_ccw = orient(Polygon(r)).exterior  # ensure consistent
@@ -116,7 +123,8 @@ def _contour_segs_to_gdf(
         else:
             encloses_higher = None
             if not ls.is_valid:
-                skipped[f"invalid open ({explain_validity(ls)})"] += 1
+                expl = _remove_validity_explanation_location(explain_validity(ls))
+                skipped[f"invalid open ({expl})"] += 1
                 continue
             if not ls.is_simple:
                 # e.g. self-intersecting
