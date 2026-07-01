@@ -8,7 +8,7 @@ dependencies:
   # Core dependencies
   - geopandas >=1.0
   - matplotlib >=3.4,!=3.8.0
-  - numpy
+  - numpy <2.5
   - pandas =2.*
   - scikit-image
   - shapely
