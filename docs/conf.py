@@ -10,10 +10,13 @@ import pybtex.plugin
 from pybtex.database import Entry, Person
 from pybtex.style.labels import BaseLabelStyle
 from pybtex.style.sorting import BaseSortingStyle
+from sphinx.util import logging
 
-# De-clutter tracebacks on RTD
+logger = logging.getLogger(__name__)
+
 if "READTHEDOCS" in os.environ:
-    ipython_dir = Path(tempfile.gettempdir()) / "tams_ipython_clean_logs"
+    logger.info("Running on Read the Docs, configuring IPython for monochrome.")
+    ipython_dir = Path(tempfile.gettempdir()) / "ipython_monochrome"
     (ipython_dir / "profile_default").mkdir(parents=True, exist_ok=True)
     with open(ipython_dir / "profile_default" / "ipython_config.py", "w") as f:
         f.write("c.InteractiveShell.colors = 'NoColor'\n")
