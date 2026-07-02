@@ -1,12 +1,26 @@
 from __future__ import annotations
 
+import os
+import tempfile
 from collections.abc import Generator
 from datetime import datetime
+from pathlib import Path
 
 import pybtex.plugin
 from pybtex.database import Entry, Person
 from pybtex.style.labels import BaseLabelStyle
 from pybtex.style.sorting import BaseSortingStyle
+from sphinx.util import logging
+
+logger = logging.getLogger(__name__)
+
+if "READTHEDOCS" in os.environ:
+    logger.info("Running on Read the Docs, configuring IPython for monochrome.")
+    ipython_dir = Path(tempfile.gettempdir()) / "ipython_monochrome"
+    (ipython_dir / "profile_default").mkdir(parents=True, exist_ok=True)
+    with open(ipython_dir / "profile_default" / "ipython_config.py", "w") as f:
+        f.write("c.InteractiveShell.colors = 'NoColor'\n")
+    os.environ["IPYTHONDIR"] = str(ipython_dir)
 
 project = "tams"
 html_title = "TAMS"
