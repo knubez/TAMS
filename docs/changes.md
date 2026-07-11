@@ -51,7 +51,7 @@
 - Logger level and handler can be controlled using {func}`tams.set_options`
   and should still work even when using `parallel=True`.
   The logs now include more information about the contouring,
-  including reasons for exclusion ({pull}`74`).
+  including reasons for exclusion ({pull}`74`, {pull}`98`).
 - Create idealized datasets for testing using {mod}`tams.idealized` ({pull}`80`).
 - {func}`tams.fit_ellipse` can be used to obtain the ellipse fit parameters
   used for the eccentricity calculation ({pull}`85`).

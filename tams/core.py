@@ -8,6 +8,7 @@ users shouldn't need to import/use objects from this module directly.
 from __future__ import annotations
 
 import functools
+import re
 import warnings
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -27,6 +28,21 @@ if TYPE_CHECKING:
 
 
 logger = get_logger()
+
+_RE_BRACKETED_COORDS = re.compile(r"\[[0-9eE+\-.,\s]+\]")
+
+_KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION = False
+
+
+def _remove_validity_explanation_location(s: str) -> str:
+    """Obfuscate bracketed coordinate locations in Shapely messages.
+
+    Example: 'Ring Self-intersection[-77.6131744384766 37.6409950256348]'
+    -> 'Ring Self-intersection[...]'
+    """
+    if _KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION:
+        return s
+    return _RE_BRACKETED_COORDS.sub("[...]", s)
 
 
 def _contour_segs_to_gdf(
@@ -95,10 +111,12 @@ def _contour_segs_to_gdf(
             try:
                 r = LinearRing(ls)
             except (ValueError, TopologicalError) as e:
-                skipped[f"invalid closed ({e})"] += 1
+                expl = _remove_validity_explanation_location(str(e))
+                skipped[f"invalid closed ({expl})"] += 1
                 continue
             if not r.is_valid:
-                skipped[f"invalid closed ({explain_validity(r)})"] += 1
+                expl = _remove_validity_explanation_location(explain_validity(r))
+                skipped[f"invalid closed ({expl})"] += 1
                 continue
             encloses_higher = r.is_ccw
             r_ccw = orient(Polygon(r)).exterior  # ensure consistent
@@ -116,7 +134,8 @@ def _contour_segs_to_gdf(
         else:
             encloses_higher = None
             if not ls.is_valid:
-                skipped[f"invalid open ({explain_validity(ls)})"] += 1
+                expl = _remove_validity_explanation_location(explain_validity(ls))
+                skipped[f"invalid open ({expl})"] += 1
                 continue
             if not ls.is_simple:
                 # e.g. self-intersecting
@@ -266,11 +285,15 @@ def _contours_to_polygons(
     from shapely import Polygon
     from shapely.geometry.polygon import orient
 
+    logger = get_worker_logger()
+
     if cs.empty:
         return gpd.GeoDataFrame(
             geometry=[],
             crs="EPSG:4326",
         )
+
+    n0 = len(cs)
 
     # Preprocess by selecting closed contours, converting to polygons,
     # computing area, and sorting (smallest -> largest)
@@ -322,6 +345,8 @@ def _contours_to_polygons(
                 continue
             new_polys.append(cs.loc[i].contour)
 
+    logger.info(f"{n0} contours -> {len(new_polys)} polygons")
+
     return gpd.GeoDataFrame(
         geometry=new_polys,
         crs="EPSG:4326",
@@ -344,6 +369,8 @@ def _size_filter(
     import geopandas as gpd
 
     logger = get_worker_logger()
+
+    n0 = len(ce)
 
     # Drop small CEs (a CE with area < 4000 km2 can't have cold-core area of 4000)
     ce["area_km2"] = ce.to_crs("EPSG:32663").area / 10**6
@@ -398,6 +425,8 @@ def _size_filter(
             f"of big-enough CEs have enough cold-core area ({threshold} km2)"
         )
     ce = ce[big_enough].reset_index(drop=True)
+
+    logger.info(f"{len(ce)}/{n0} CEs retained after size filtering")
 
     return ce
 
