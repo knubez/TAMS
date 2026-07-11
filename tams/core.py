@@ -30,8 +30,13 @@ if TYPE_CHECKING:
 logger = get_logger()
 
 
+_KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION = False
+
+
 def _remove_validity_explanation_location(s):
     """e.g. 'invalid closed (Ring Self-intersection[-77.6131744384766 37.6409950256348])'"""
+    if _KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION:
+        return s
     return re.sub(r"\[.*?\]", "[...]", s)
 
 

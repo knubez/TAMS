@@ -9,6 +9,8 @@ import xarray as xr
 
 import tams
 
+tams.core._KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION = True
+
 
 def test_contour_too_small_skipped():
     # With a few of the sample MPAS data time steps (e.g. `.isel(time=22)`)
