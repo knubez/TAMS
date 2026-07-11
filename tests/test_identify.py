@@ -63,6 +63,13 @@ def test_contour(msg_tb0, caplog):
         assert gdf.dtypes["encloses_higher"] == "boolean"
 
 
+def test_message_coord_obfuscation():
+    s = "invalid closed (Ring Self-intersection[-77.6131744384766 37.6409950256348])"
+    obfuscated = tams.core._remove_validity_explanation_location(s)
+    obfuscated_again = tams.core._remove_validity_explanation_location(obfuscated)
+    assert obfuscated == "invalid closed (Ring Self-intersection[...])" == obfuscated_again
+
+
 @pytest.mark.parametrize(
     "contour, messages",
     [

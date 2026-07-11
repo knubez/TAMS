@@ -29,15 +29,16 @@ if TYPE_CHECKING:
 
 logger = get_logger()
 
+_RE_BRACKETED_COORDS = re.compile(r"\[[0-9eE+\-.,\s]+\]")
 
 _KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION = False
 
 
-def _remove_validity_explanation_location(s):
+def _remove_validity_explanation_location(s: str) -> str:
     """e.g. 'invalid closed (Ring Self-intersection[-77.6131744384766 37.6409950256348])'"""
     if _KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION:
         return s
-    return re.sub(r"\[.*?\]", "[...]", s)
+    return _RE_BRACKETED_COORDS.sub("[...]", s)
 
 
 def _contour_segs_to_gdf(
