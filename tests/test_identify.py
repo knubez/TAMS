@@ -9,8 +9,6 @@ import xarray as xr
 
 import tams
 
-tams.core._KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION = True
-
 
 def test_contour_too_small_skipped():
     # With a few of the sample MPAS data time steps (e.g. `.isel(time=22)`)
@@ -100,7 +98,9 @@ def test_contour(msg_tb0, caplog):
         ),
     ],
 )
-def test_contour_skipped(contour, messages, caplog):
+def test_contour_skipped(contour, messages, caplog, monkeypatch):
+    monkeypatch.setattr(tams.core, "_KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION", True)
+
     contours = [np.asarray(contour)]
     if isinstance(messages, str):
         messages = [messages]
