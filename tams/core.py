@@ -35,7 +35,11 @@ _KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION = False
 
 
 def _remove_validity_explanation_location(s: str) -> str:
-    """e.g. 'invalid closed (Ring Self-intersection[-77.6131744384766 37.6409950256348])'"""
+    """Obfuscate bracketed coordinate locations in Shapely messages.
+
+    Example: 'Ring Self-intersection[-77.6131744384766 37.6409950256348]'
+    -> 'Ring Self-intersection[...]'
+    """
     if _KEEP_INVALID_CONTOUR_EXPLANATION_LOCATION:
         return s
     return _RE_BRACKETED_COORDS.sub("[...]", s)
