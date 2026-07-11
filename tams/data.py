@@ -9,7 +9,7 @@ import warnings
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple, overload
 
 import numpy as np
 import pandas as pd
@@ -340,39 +340,13 @@ def fetch_example(key: str, *, progress: bool = False) -> Path:
     return Path(p)
 
 
-def open_example(
-    key: str,
+def _open_example(
+    key: str,  # un-narrowed to please mypy
     *,
     progress: bool = False,
     **kwargs,
-) -> xarray.Dataset:
-    """Open an example dataset with xarray.
-
-    Parameters
-    ----------
-    key
-        String identifying the example dataset.
-    progress
-        Show download progress if applicable.
-    **kwargs
-        Passed to :func:`xarray.open_dataset`.
-
-    Examples
-    --------
-    >>> import tams
-    >>> ds = tams.data.open_example("msg-tb")
-
-    See Also
-    --------
-    load_example
-        Loads the dataset into memory.
-
-    Notes
-    -----
-    .. versionadded:: 0.2.0
-    """
+) -> xarray.Dataset | geopandas.GeoDataFrame:
     lut = {**_EXAMPLE_FILE_DIRECT_LUT, **_EXAMPLE_FILE_INDIRECT_LUT}
-    lut = {k: f for k, f in lut.items() if f.file_type.is_nc}
     try:
         ef = lut[key]
     except KeyError:
@@ -382,18 +356,55 @@ def open_example(
         ) from None
 
     p = fetch_example(ef.key, progress=progress)
-    post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
+    if ef.file_type.is_nc:
+        post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
+        return post(xr.open_dataset(p, **kwargs))
 
-    return post(xr.open_dataset(p, **kwargs))
+    import geopandas as gpd
+
+    return gpd.read_parquet(p, **kwargs)
 
 
-def load_example(
+@overload
+def open_example(
+    key: Literal[
+        "msg-rad-v0.1",
+        "msg-rad",
+        "msg-tb",
+        "imerg",
+        "mpas-regridded-v0.1",
+        "mpas-regridded",
+        "mpas-native-v0.1",
+        "mpas-native",
+        "mosa-test-1",
+        "mosa-test-2",
+        "mosa-test-3",
+        "mosa-test-4",
+        "docs-get-example-imerg",
+        "docs-get-example-mergir",
+    ],
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> xarray.Dataset: ...
+
+
+@overload
+def open_example(
+    key: Literal["mpas-regridded-identify",],
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> geopandas.GeoDataFrame: ...
+
+
+def open_example(
     key: str,
     *,
     progress: bool = False,
     **kwargs,
-) -> xarray.Dataset:
-    """Load an example dataset into memory with xarray.
+) -> xarray.Dataset | geopandas.GeoDataFrame:
+    """Open an example dataset.
 
     Parameters
     ----------
@@ -402,12 +413,83 @@ def load_example(
     progress
         Show download progress if applicable.
     **kwargs
-        Passed to :func:`xarray.open_dataset`.
+        Passed to :func:`xarray.open_dataset` or :func:`geopandas.read_parquet`,
+        depending on the key.
+
+    Examples
+    --------
+    >>> import tams
+    >>> ds = tams.data.open_example("msg-tb")
+    >>> ce = tams.data.open_example("mpas-regridded-identify")
+
+    See Also
+    --------
+    load_example
+        Loads the data into memory.
+
+    Notes
+    -----
+    .. versionadded:: 0.2.0
+    """
+    return _open_example(key, progress=progress, **kwargs)
+
+
+@overload
+def load_example(
+    key: Literal[
+        "msg-rad-v0.1",
+        "msg-rad",
+        "msg-tb",
+        "imerg",
+        "mpas-regridded-v0.1",
+        "mpas-regridded",
+        "mpas-native-v0.1",
+        "mpas-native",
+        "mosa-test-1",
+        "mosa-test-2",
+        "mosa-test-3",
+        "mosa-test-4",
+        "docs-get-example-imerg",
+        "docs-get-example-mergir",
+    ],
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> xarray.Dataset: ...
+
+
+@overload
+def load_example(
+    key: Literal["mpas-regridded-identify",],
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> geopandas.GeoDataFrame: ...
+
+
+def load_example(
+    key: str,
+    *,
+    progress: bool = False,
+    **kwargs,
+) -> xarray.Dataset | geopandas.GeoDataFrame:
+    """Load an example dataset into memory.
+
+    Parameters
+    ----------
+    key
+        String identifying the example dataset.
+    progress
+        Show download progress if applicable.
+    **kwargs
+        Passed to :func:`xarray.open_dataset` or :func:`geopandas.read_parquet`,
+        depending on the key.
 
     Examples
     --------
     >>> import tams
     >>> ds = tams.data.load_example("msg-tb")
+    >>> ce = tams.data.load_example("mpas-regridded-identify")
 
     See Also
     --------
@@ -419,55 +501,12 @@ def load_example(
     -----
     .. versionadded:: 0.2.0
     """
-    with open_example(key, progress=progress, **kwargs) as ds:
-        return ds.load()
+    ds = _open_example(key, progress=progress, **kwargs)
+    if isinstance(ds, xr.Dataset):
+        with ds as opened_ds:
+            return opened_ds.load()
 
-
-def read_example(
-    key: str,
-    *,
-    progress: bool = False,
-    **kwargs,
-) -> geopandas.GeoDataFrame:
-    """Open an example dataset with GeoPandas (e.g. pre-identified CEs).
-
-    Parameters
-    ----------
-    key
-        String identifying the example dataset.
-    progress
-        Show download progress if applicable.
-    **kwargs
-        Passed to :func:`geopandas.read_parquet`.
-
-    Examples
-    --------
-    >>> import tams
-    >>> ce = tams.data.read_example("mpas-regridded-identify")
-
-    See Also
-    --------
-    load_example, open_example
-        For loading xarray Datasets of input data.
-
-    Notes
-    -----
-    .. versionadded:: 0.2.0
-    """
-    import geopandas as gpd
-
-    lut = {k: f for k, f in _EXAMPLE_FILE_DIRECT_LUT.items() if not f.file_type.is_nc}
-    try:
-        ef = lut[key]
-    except KeyError:
-        s_keys = ", ".join(repr(k) for k in lut)
-        raise ValueError(
-            f"unknown example dataset key {key!r}. Available keys are: {s_keys}."
-        ) from None
-
-    p = fetch_example(ef.key, progress=progress)
-
-    return gpd.read_parquet(p, **kwargs)
+    return ds
 
 
 def _time_input_to_pandas(

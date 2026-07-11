@@ -2,6 +2,9 @@
 Test routines from :mod:`tams.data`.
 """
 
+import re
+from typing import get_overloads
+
 import pytest
 
 import tams
@@ -36,6 +39,33 @@ def test_load_mpas_sample(mpas):
     ds = mpas
     assert tuple(ds.data_vars) == ("tb", "pr")
     assert tuple(ds.coords) == ("time", "lon", "lat")
+
+
+@pytest.mark.parametrize("func_name", ["open_example", "load_example"])
+def test_example_overload_annotations_match_registry(func_name):
+    func = getattr(tams.data, func_name)
+    overloads = get_overloads(func)
+
+    assert len(overloads) == 2
+
+    public_lut = {
+        **tams.data._EXAMPLE_FILE_DIRECT_LUT,
+        **tams.data._EXAMPLE_FILE_INDIRECT_LUT,
+    }
+    expected_nc_keys = {k for k, f in public_lut.items() if f.file_type.is_nc}
+    expected_parquet_keys = {
+        k for k, f in tams.data._EXAMPLE_FILE_DIRECT_LUT.items() if not f.file_type.is_nc
+    }
+
+    observed = {}
+    for overload in overloads:
+        key_annotation = overload.__annotations__["key"]
+        return_annotation = overload.__annotations__["return"]
+        keys = set(re.findall(r'["\']([^"\']+)["\']', key_annotation))
+        observed[return_annotation] = keys
+
+    assert observed["xarray.Dataset"] == expected_nc_keys
+    assert observed["geopandas.GeoDataFrame"] == expected_parquet_keys
 
 
 @skipif_no_earthdata

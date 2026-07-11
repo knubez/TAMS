@@ -1,5 +1,5 @@
 [flake8]
 max-line-length = 100
-ignore = E203,E402,E501,W503,E226
+ignore = E203,E402,E501,W503,E226,E704
 per-file-ignores =
     tams/__init__.py: F401
