@@ -106,7 +106,8 @@ def _contour_segs_to_gdf(
             try:
                 r = LinearRing(ls)
             except (ValueError, TopologicalError) as e:
-                skipped[f"invalid closed ({e})"] += 1
+                expl = _remove_validity_explanation_location(str(e))
+                skipped[f"invalid closed ({expl})"] += 1
                 continue
             if not r.is_valid:
                 expl = _remove_validity_explanation_location(explain_validity(r))
