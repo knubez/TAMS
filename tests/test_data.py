@@ -3,6 +3,7 @@ Test routines from :mod:`tams.data`.
 """
 
 import re
+from pathlib import Path
 from typing import get_overloads
 
 import pytest
@@ -11,7 +12,63 @@ import tams
 
 from . import skipif_no_earthdata
 
+EF = tams.data._ExampleFile
 EFT = tams.data._ExampleFileType
+
+
+def _public_lut() -> dict[str, EF]:
+    return {
+        **tams.data._EXAMPLE_FILE_DIRECT_LUT,
+        **tams.data._EXAMPLE_FILE_INDIRECT_LUT,
+    }
+
+
+def _public_current_keys() -> set[str]:
+    public_lut = _public_lut()
+    keys = {k for k in public_lut if re.search(r"-v\d+(?:\.\d+)*$", k) is None}
+    assert keys, "No current keys identified in the public LUT"
+    return keys
+
+
+def _api_rst_example_table_keys() -> set[str]:
+    p = Path(__file__).resolve().parents[1] / "docs" / "api.rst"
+    text = p.read_text(encoding="utf-8")
+
+    try:
+        section = text.split(".. _example_datasets:", maxsplit=1)[1]
+        section = section.split("External data sources", maxsplit=1)[0]
+    except IndexError as e:
+        raise AssertionError("Could not locate example-datasets table in docs/api.rst") from e
+
+    keys = set()
+    for line in section.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("* - ``"):
+            continue
+
+        code_keys = re.findall(r"``([^`]+)``", stripped)
+        if "..." in stripped and len(code_keys) == 2:
+            first, last = code_keys
+            prefix1, n1 = first.rsplit("-", maxsplit=1)
+            prefix2, n2 = last.rsplit("-", maxsplit=1)
+            if prefix1 != prefix2:
+                raise AssertionError(f"Unexpected ellipsis key range: {stripped!r}")
+            for i in range(int(n1), int(n2) + 1):
+                keys.add(f"{prefix1}-{i}")
+        else:
+            keys.update(code_keys)
+
+    return keys
+
+
+def _data_module_example_keys() -> set[str]:
+    keys = set()
+    for func_name in ("fetch_example", "open_example", "load_example"):
+        func = getattr(tams.data, func_name)
+        doc = func.__doc__ or ""
+        found = re.findall(r'tams\.data\.(?:fetch|open|load)_example\("([^"]+)"\)', doc)
+        keys.update(found)
+    return keys
 
 
 def test_load_pooch_missing(mocker):
@@ -48,10 +105,7 @@ def test_example_overload_annotations_match_registry(func_name):
     func = getattr(tams.data, func_name)
     overloads = get_overloads(func)
 
-    public_lut = {
-        **tams.data._EXAMPLE_FILE_DIRECT_LUT,
-        **tams.data._EXAMPLE_FILE_INDIRECT_LUT,
-    }
+    public_lut = _public_lut()
     expected_nc_keys = {k for k, f in public_lut.items() if f.file_type is EFT.NETCDF}
     expected_geoparquet_keys = {k for k, f in public_lut.items() if f.file_type is EFT.GEOPARQUET}
     expected_parquet_keys = {k for k, f in public_lut.items() if f.file_type is EFT.PARQUET}
@@ -70,6 +124,19 @@ def test_example_overload_annotations_match_registry(func_name):
         assert observed["pandas.DataFrame"] == expected_parquet_keys
     else:
         assert "pandas.DataFrame" not in observed
+
+
+def test_api_doc_example_table_up_to_date():
+    expected = _public_current_keys()
+    observed = _api_rst_example_table_keys()
+    assert observed == expected
+
+
+def test_docstring_examples_current():
+    valid = _public_current_keys()
+    observed = _data_module_example_keys()
+    assert observed, "No tams.data.*_example(...) calls found in data-module docstring examples"
+    assert observed <= valid
 
 
 @skipif_no_earthdata

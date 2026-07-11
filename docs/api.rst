@@ -198,9 +198,18 @@ These can be accessed with :func:`tams.data.open_example` or
        in W m\ :sup:`-2`
        and :math:`\sigma` is the Stefan--Boltzmann constant.
      - :doc:`/examples/sample-mpas-ug-data`
+    * - ``mpas-regridded-identify``
+       - Pre-identified cloud elements from ``mpas-regridded`` for use in tracking examples.
+       - :doc:`/examples/track`
    * - ``mosa-test-1``, ..., ``mosa-test-4``
      - Small idealized/test datasets from the MOSA paper :cite:p:`Prein_etal_2024`.
      -
+    * - ``docs-get-example-imerg``
+       - Small IMERG sample used in the :doc:`/examples/get` example.
+       - :doc:`/examples/get`
+    * - ``docs-get-example-mergir``
+       - Small MERGIR sample used in the :doc:`/examples/get` example.
+       - :doc:`/examples/get`
 
 External data sources
 ~~~~~~~~~~~~~~~~~~~~~
