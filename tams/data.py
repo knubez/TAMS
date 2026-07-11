@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import warnings
+from enum import StrEnum
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
@@ -81,6 +82,18 @@ def tb_from_ir(r, ch: int):
     return tb
 
 
+class _ExampleFileType(StrEnum):
+    NC = ".nc"
+    """netCDF."""
+
+    PARQUET = ".parquet"
+    """(Geo)Parquet (of any internal compression)."""
+
+    @property
+    def is_nc(self) -> bool:
+        return self is _ExampleFileType.NC
+
+
 class _ExampleFile(NamedTuple):
     key: str
     """Key to identify the example file."""
@@ -91,13 +104,13 @@ class _ExampleFile(NamedTuple):
     sha256: str
     """Expected (known) SHA256 hash of the file."""
 
-    fname: str | None = None
-    """File name to save as. ``{key}.nc`` will be used if not provided."""
+    file_type: _ExampleFileType = _ExampleFileType.NC
+    """Sets the extension to use when saving the file."""
 
     @property
-    def is_nc(self) -> bool:
-        """Whether this file is a netCDF file."""
-        return self.fname is None or self.fname.endswith(".nc")
+    def file_name(self) -> str:
+        """File name to save as (determined by :attr:`key` and :attr:`file_type`)."""
+        return f"{self.key}{self.file_type}"
 
 
 _EXAMPLE_FILES: list[_ExampleFile] = [
@@ -131,7 +144,7 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
         key="mpas-regridded-identify",
         file_id="1Fpm-5blySnBdOvE4EQM8_YLMpwzRr_cb",
         sha256="f146ef16b98169c181e0dd5ba41984b2f638f488fb124fec6eb0ba21576f47af",
-        fname="mpas-regridded-identify.parquet.gz",
+        file_type=_ExampleFileType.PARQUET,
     ),
     #
     _ExampleFile(
@@ -317,7 +330,7 @@ def fetch_example(key: str, *, progress: bool = False) -> Path:
         p = pooch.retrieve(
             url=ef.file_id,
             known_hash=f"sha256:{ef.sha256}",
-            fname=ef.fname or f"{ef.key}.nc",
+            fname=ef.file_name,
             path=_get_cache_dir(),
             downloader=partial(_gdownload, quiet=not progress),
         )
@@ -359,7 +372,7 @@ def open_example(
     .. versionadded:: 0.2.0
     """
     lut = {**_EXAMPLE_FILE_DIRECT_LUT, **_EXAMPLE_FILE_INDIRECT_LUT}
-    lut = {k: f for k, f in lut.items() if f.is_nc}
+    lut = {k: f for k, f in lut.items() if f.file_type.is_nc}
     try:
         ef = lut[key]
     except KeyError:
@@ -443,7 +456,7 @@ def read_example(
     """
     import geopandas as gpd
 
-    lut = {k: f for k, f in _EXAMPLE_FILE_DIRECT_LUT.items() if not f.is_nc}
+    lut = {k: f for k, f in _EXAMPLE_FILE_DIRECT_LUT.items() if not f.file_type.is_nc}
     try:
         ef = lut[key]
     except KeyError:

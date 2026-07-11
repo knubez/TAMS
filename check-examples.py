@@ -81,7 +81,7 @@ if __name__ == "__main__":
         if ef.key.endswith("-v0.1"):
             print(f"Skipping {ef.key} (old version)\n\n")
             continue
-        fn = ef.fname or f"{ef.key}.nc"
+        fn = ef.file_name or f"{ef.key}.nc"
         p = TMP / fn
         if p.exists() and args.use_cached:
             print(f"Using cached {ef.key}: {p.as_posix()}")
