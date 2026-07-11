@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import warnings
 from enum import StrEnum
+from enum import auto as _enum_auto
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NamedTuple, overload
@@ -83,11 +84,14 @@ def tb_from_ir(r, ch: int):
 
 
 class _ExampleFileType(StrEnum):
-    NC = ".nc"
-    """netCDF."""
+    NETCDF = _enum_auto()
+    """netCDF. For example: brightness temperature."""
 
-    PARQUET = ".parquet"
-    """(Geo)Parquet (of any internal compression)."""
+    GEOPARQUET = _enum_auto()
+    """GeoParquet (of any internal compression). For example: tracked CEs."""
+
+    PARQUET = _enum_auto()
+    """Parquet (of any internal compression). For example: MCS stats (without CE/MCS shapes)."""
 
 
 class _ExampleFile(NamedTuple):
@@ -100,13 +104,23 @@ class _ExampleFile(NamedTuple):
     sha256: str
     """Expected (known) SHA256 hash of the file."""
 
-    file_type: _ExampleFileType = _ExampleFileType.NC
+    file_type: _ExampleFileType = _ExampleFileType.NETCDF
     """Sets the extension to use when saving the file."""
+
+    @property
+    def file_extension(self) -> str:
+        """File extension, determined by :attr:`file_type`."""
+        if self.file_type is _ExampleFileType.NETCDF:
+            return ".nc"
+        elif self.file_type in {_ExampleFileType.PARQUET, _ExampleFileType.GEOPARQUET}:
+            return ".parquet"
+        else:
+            raise AssertionError(f"Unexpected file type: {self.file_type}")
 
     @property
     def file_name(self) -> str:
         """File name to save as (determined by :attr:`key` and :attr:`file_type`)."""
-        return f"{self.key}{self.file_type}"
+        return f"{self.key}{self.file_extension}"
 
 
 _EXAMPLE_FILES: list[_ExampleFile] = [
@@ -140,7 +154,7 @@ _EXAMPLE_FILES: list[_ExampleFile] = [
         key="mpas-regridded-identify",
         file_id="1Fpm-5blySnBdOvE4EQM8_YLMpwzRr_cb",
         sha256="f146ef16b98169c181e0dd5ba41984b2f638f488fb124fec6eb0ba21576f47af",
-        file_type=_ExampleFileType.PARQUET,
+        file_type=_ExampleFileType.GEOPARQUET,
     ),
     #
     _ExampleFile(
@@ -341,7 +355,7 @@ def _open_example(
     *,
     progress: bool = False,
     **kwargs,
-) -> xarray.Dataset | geopandas.GeoDataFrame:
+) -> xarray.Dataset | geopandas.GeoDataFrame | pd.DataFrame:
     lut = {**_EXAMPLE_FILE_DIRECT_LUT, **_EXAMPLE_FILE_INDIRECT_LUT}
     try:
         ef = lut[key]
@@ -353,12 +367,14 @@ def _open_example(
 
     p = fetch_example(ef.key, progress=progress)
     post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
-    if ef.file_type is _ExampleFileType.NC:
+    if ef.file_type is _ExampleFileType.NETCDF:
         ds = xr.open_dataset(p, **kwargs)
-    elif ef.file_type is _ExampleFileType.PARQUET:
+    elif ef.file_type is _ExampleFileType.GEOPARQUET:
         import geopandas as gpd
 
         ds = gpd.read_parquet(p, **kwargs)
+    elif ef.file_type is _ExampleFileType.PARQUET:
+        ds = pd.read_parquet(p, **kwargs)
     else:
         raise AssertionError(f"Unexpected file type for key {key!r}: {ef.file_type}")
 
@@ -403,7 +419,7 @@ def open_example(
     *,
     progress: bool = False,
     **kwargs,
-) -> xarray.Dataset | geopandas.GeoDataFrame:
+) -> xarray.Dataset | geopandas.GeoDataFrame | pd.DataFrame:
     """Open an example dataset.
 
     Parameters
@@ -413,7 +429,9 @@ def open_example(
     progress
         Show download progress if applicable.
     **kwargs
-        Passed to :func:`xarray.open_dataset` or :func:`geopandas.read_parquet`,
+        Passed to :func:`xarray.open_dataset`,
+        :func:`geopandas.read_parquet`,
+        or :func:`pandas.read_parquet`,
         depending on the key.
 
     Examples
@@ -472,7 +490,7 @@ def load_example(
     *,
     progress: bool = False,
     **kwargs,
-) -> xarray.Dataset | geopandas.GeoDataFrame:
+) -> xarray.Dataset | geopandas.GeoDataFrame | pd.DataFrame:
     """Load an example dataset into memory.
 
     Parameters
@@ -482,7 +500,9 @@ def load_example(
     progress
         Show download progress if applicable.
     **kwargs
-        Passed to :func:`xarray.open_dataset` or :func:`geopandas.read_parquet`,
+        Passed to :func:`xarray.open_dataset`,
+        :func:`geopandas.read_parquet`,
+        or :func:`pandas.read_parquet`,
         depending on the key.
 
     Examples

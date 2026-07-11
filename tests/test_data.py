@@ -48,13 +48,12 @@ def test_example_overload_annotations_match_registry(func_name):
     func = getattr(tams.data, func_name)
     overloads = get_overloads(func)
 
-    assert len(overloads) == 2
-
     public_lut = {
         **tams.data._EXAMPLE_FILE_DIRECT_LUT,
         **tams.data._EXAMPLE_FILE_INDIRECT_LUT,
     }
-    expected_nc_keys = {k for k, f in public_lut.items() if f.file_type is EFT.NC}
+    expected_nc_keys = {k for k, f in public_lut.items() if f.file_type is EFT.NETCDF}
+    expected_geoparquet_keys = {k for k, f in public_lut.items() if f.file_type is EFT.GEOPARQUET}
     expected_parquet_keys = {k for k, f in public_lut.items() if f.file_type is EFT.PARQUET}
 
     observed = {}
@@ -64,8 +63,13 @@ def test_example_overload_annotations_match_registry(func_name):
         keys = set(re.findall(r'["\']([^"\']+)["\']', key_annotation))
         observed[return_annotation] = keys
 
+    assert len(overloads) == 2 + int(bool(expected_parquet_keys))
     assert observed["xarray.Dataset"] == expected_nc_keys
-    assert observed["geopandas.GeoDataFrame"] == expected_parquet_keys
+    assert observed["geopandas.GeoDataFrame"] == expected_geoparquet_keys
+    if expected_parquet_keys:
+        assert observed["pandas.DataFrame"] == expected_parquet_keys
+    else:
+        assert "pandas.DataFrame" not in observed
 
 
 @skipif_no_earthdata
