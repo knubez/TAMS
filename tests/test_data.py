@@ -11,6 +11,8 @@ import tams
 
 from . import skipif_no_earthdata
 
+EFT = tams.data._ExampleFileType
+
 
 def test_load_pooch_missing(mocker):
     mocker.patch.dict("sys.modules", pooch=None)
@@ -52,10 +54,8 @@ def test_example_overload_annotations_match_registry(func_name):
         **tams.data._EXAMPLE_FILE_DIRECT_LUT,
         **tams.data._EXAMPLE_FILE_INDIRECT_LUT,
     }
-    expected_nc_keys = {k for k, f in public_lut.items() if f.file_type.is_nc}
-    expected_parquet_keys = {
-        k for k, f in tams.data._EXAMPLE_FILE_DIRECT_LUT.items() if not f.file_type.is_nc
-    }
+    expected_nc_keys = {k for k, f in public_lut.items() if f.file_type is EFT.NC}
+    expected_parquet_keys = {k for k, f in public_lut.items() if f.file_type is EFT.PARQUET}
 
     observed = {}
     for overload in overloads:

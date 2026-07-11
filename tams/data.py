@@ -89,10 +89,6 @@ class _ExampleFileType(StrEnum):
     PARQUET = ".parquet"
     """(Geo)Parquet (of any internal compression)."""
 
-    @property
-    def is_nc(self) -> bool:
-        return self is _ExampleFileType.NC
-
 
 class _ExampleFile(NamedTuple):
     key: str
@@ -356,13 +352,17 @@ def _open_example(
         ) from None
 
     p = fetch_example(ef.key, progress=progress)
-    if ef.file_type.is_nc:
-        post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
-        return post(xr.open_dataset(p, **kwargs))
+    post = _EXAMPLE_POSTPROC.get(key, lambda ds: ds)
+    if ef.file_type is _ExampleFileType.NC:
+        ds = xr.open_dataset(p, **kwargs)
+    elif ef.file_type is _ExampleFileType.PARQUET:
+        import geopandas as gpd
 
-    import geopandas as gpd
+        ds = gpd.read_parquet(p, **kwargs)
+    else:
+        raise AssertionError(f"Unexpected file type for key {key!r}: {ef.file_type}")
 
-    return gpd.read_parquet(p, **kwargs)
+    return post(ds)
 
 
 @overload
