@@ -23,7 +23,7 @@ repos:
         args: [--py311-plus]
 
   - repo: https://github.com/PyCQA/isort
-    rev: "10.0.0b2"
+    rev: "9.0.2"
     hooks:
       - id: isort
 
